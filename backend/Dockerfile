@@ -1,4 +1,3 @@
-# --- Estágio único por ora (multi-stage virá quando houver build de assets) ---
 
 # python:3.12-slim é a imagem oficial mínima.
 # Não usar :latest — versão fixa garante reprodutibilidade.
@@ -24,6 +23,12 @@ RUN pip install uv && uv sync --frozen --no-dev
 # Copia o código-fonte depois das dependências (cache mais eficiente)
 COPY src ./src
 
+# Copia o bootstrap de configuração.
+# O operador pode executar dentro do container com:
+#   docker run --rm -it capacidade-prod-backend python create_config.py
+# O arquivo usa apenas stdlib + psycopg2-binary (já nas deps de produção).
+COPY create_config.py ./
+
 # PYTHONPATH aponta para src/ para que `import cp` funcione
 # mesmo sem `uv pip install -e .` dentro do container.
 ENV PYTHONPATH=/app/src
@@ -31,5 +36,6 @@ ENV PYTHONPATH=/app/src
 # Troca para usuário não-root
 USER appuser
 
-# Entrypoint: executa cp.main como módulo Python
-CMD ["python", "-m", "cp.main"]
+# Entrypoint: uvicorn serve a aplicação FastAPI.
+# --host 0.0.0.0 é obrigatório em container — 127.0.0.1 não é acessível de fora.
+CMD ["uv", "run", "uvicorn", "cp.main:app", "--host", "0.0.0.0", "--port", "8000"]

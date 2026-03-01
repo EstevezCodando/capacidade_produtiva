@@ -5,7 +5,9 @@ description = "Sistema de gestão operacional CapacidadeProdutiva"
 readme = "README.md"
 requires-python = "==3.12.*"
 
-dependencies = []
+dependencies = [
+    "psycopg2-binary>=2.9.11",
+]
 
 # ---------------------------------------------------------------------------
 # Build system
