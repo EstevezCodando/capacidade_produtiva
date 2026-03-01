@@ -1,0 +1,25 @@
+# Ambiente virtual — nunca commitar
+.venv/
+
+# Caches de ferramentas
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Artefatos de cobertura
+.coverage
+htmlcov/
+
+# Artefatos de build
+dist/
+build/
+*.egg-info/
+
+# Variáveis de ambiente — NUNCA commitar segredos
+.env
+.env.*
+
+# uv.lock DEVE ser commitado — remove esta linha se aparecer aqui por engano
+# uv.lock

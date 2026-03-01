@@ -1,0 +1,57 @@
+[project]
+name = "capacidade-produtiva"
+version = "0.1.0"
+description = "Sistema de gestão operacional CapacidadeProdutiva"
+readme = "README.md"
+requires-python = "==3.12.*"
+# Nenhuma dependência de runtime ainda — Sprint 1 é só fundação
+dependencies = []
+
+# ---------------------------------------------------------------------------
+# Build system
+# ---------------------------------------------------------------------------
+# hatchling é o build backend moderno padrão.
+# É ele que sabe como empacotar o src/cp como pacote instalável.
+# Sem isso, `uv pip install -e .` não saberia o que fazer.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# hatchling precisa saber onde está o código com src layout
+[tool.hatch.build.targets.wheel]
+packages = ["src/cp"]
+
+# ---------------------------------------------------------------------------
+# Ferramentas de desenvolvimento
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+# 100 caracteres: padrão pragmático de times modernos
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# E = erros de estilo (pycodestyle)
+# F = erros lógicos (pyflakes) — variável não usada, import não usado, etc.
+# I = ordenação de imports (isort)
+select = ["E", "F", "I"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+# strict = true ativa: disallow_untyped_defs, warn_return_any,
+# no_implicit_optional, warn_unused_ignores, e mais 10+ verificações.
+# Mais trabalho agora, menos bugs em produção.
+strict = true
+
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+# --cov=cp         → mede cobertura do pacote cp (não dos testes)
+# --cov-report=term-missing → mostra no terminal quais linhas não têm teste
+# --cov-fail-under=90 → falha o CI se cobertura < 90%
+addopts = "--cov=cp --cov-report=term-missing --cov-fail-under=90"
+testpaths = ["tests"]

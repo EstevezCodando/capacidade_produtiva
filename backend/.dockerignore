@@ -1,0 +1,11 @@
+# Não enviar para o contexto do Docker build:
+__pycache__/
+*.pyc
+tests/
+.git/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+*.egg-info/
