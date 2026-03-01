@@ -14,7 +14,7 @@ RUN useradd -m appuser
 # Copia apenas os arquivos de dependência primeiro.
 # Motivo: Docker cacheia cada layer. Se só o código mudar (não o pyproject),
 # o `uv sync` não roda de novo — o build fica muito mais rápido.
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 
 # Instala uv e sincroniza dependências com lock file.
 # --frozen: recusa instalar se uv.lock divergir do pyproject.toml
