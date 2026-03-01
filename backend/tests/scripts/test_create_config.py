@@ -7,6 +7,7 @@ e que erros são propagados de forma legível.
 """
 
 import argparse
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -144,34 +145,35 @@ class TestVerifyAuthServer:
 
 
 class TestVerifySapConnection:
-    def test_conexão_bem_sucedida_não_levanta(self) -> None:
+    def test_conexão_bem_sucedida_não_levanta(self, monkeypatch: pytest.MonkeyPatch) -> None:
         mock_conn = MagicMock()
         mock_cur = MagicMock()
         mock_conn.cursor.return_value = mock_cur
 
-        with patch("psycopg2.connect", return_value=mock_conn):
-            cc.verify_sap_connection("localhost", 5432, "sap", "user", "pass")
+        mock_psycopg2 = MagicMock()
+        mock_psycopg2.connect.return_value = mock_conn
+        monkeypatch.setitem(sys.modules, "psycopg2", mock_psycopg2)
+
+        cc.verify_sap_connection("localhost", 5432, "sap", "user", "pass")
 
         mock_cur.execute.assert_called_once_with("SELECT 1")
         mock_cur.close.assert_called_once()
         mock_conn.close.assert_called_once()
 
-    def test_falha_de_conexão_levanta_runtime_error(self) -> None:
-        import psycopg2  # type: ignore[import-untyped]
+    def test_falha_de_conexão_levanta_runtime_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        mock_psycopg2 = MagicMock()
+        mock_psycopg2.OperationalError = Exception
+        mock_psycopg2.connect.side_effect = Exception("connection refused")
+        monkeypatch.setitem(sys.modules, "psycopg2", mock_psycopg2)
 
-        with patch(
-            "psycopg2.connect",
-            side_effect=psycopg2.OperationalError("connection refused"),
-        ):
-            with pytest.raises(RuntimeError, match="Falha ao conectar no banco SAP"):
-                cc.verify_sap_connection("localhost", 5432, "sap", "user", "senha_errada")
+        with pytest.raises(RuntimeError, match="Falha ao conectar no banco SAP"):
+            cc.verify_sap_connection("localhost", 5432, "sap", "user", "senha_errada")
 
     def test_psycopg2_nao_instalado_levanta_runtime_error(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Simula ambiente sem psycopg2 instalado."""
         import builtins
-
         real_import = builtins.__import__
 
         def mock_import(name: str, *args: object, **kwargs: object) -> object:
@@ -244,16 +246,10 @@ class TestWriteConfigEnv:
         monkeypatch.setattr(cc, "_CONFIG_ENV", server_dir / "config.env")
 
         cc.write_config_env(
-            cp_db_host="h",
-            cp_db_port=5432,
-            cp_db_name="d",
-            cp_db_user="u",
-            cp_db_password="p",
-            sap_db_host="h2",
-            sap_db_port=5432,
-            sap_db_name="sap",
-            sap_db_user="u2",
-            sap_db_password="p2",
+            cp_db_host="h", cp_db_port=5432, cp_db_name="d",
+            cp_db_user="u", cp_db_password="p",
+            sap_db_host="h2", sap_db_port=5432, sap_db_name="sap",
+            sap_db_user="u2", sap_db_password="p2",
             auth_server_url="http://auth:3010",
             jwt_secret="s",
             app_port=8000,
@@ -272,39 +268,23 @@ class TestWriteConfigEnv:
 class TestArgumentParser:
     def test_parser_aceita_todas_as_flags_longas(self) -> None:
         parser = cc._build_parser()
-        args = parser.parse_args(
-            [
-                "--cp-db-host",
-                "cp-host",
-                "--cp-db-port",
-                "5432",
-                "--cp-db-name",
-                "capacidade_produtiva",
-                "--cp-db-user",
-                "cp_user",
-                "--cp-db-password",
-                "cp_pass",
-                "--sap-db-host",
-                "sap-host",
-                "--sap-db-port",
-                "5433",
-                "--sap-db-name",
-                "sap",
-                "--sap-db-user",
-                "sap_user",
-                "--sap-db-password",
-                "sap_pass",
-                "--auth-server-url",
-                "http://auth:3010",
-                "--sap-config-env",
-                "/opt/sap/server/config.env",
-                "--app-port",
-                "8000",
-                "--log-level",
-                "INFO",
-                "--overwrite",
-            ]
-        )
+        args = parser.parse_args([
+            "--cp-db-host", "cp-host",
+            "--cp-db-port", "5432",
+            "--cp-db-name", "capacidade_produtiva",
+            "--cp-db-user", "cp_user",
+            "--cp-db-password", "cp_pass",
+            "--sap-db-host", "sap-host",
+            "--sap-db-port", "5433",
+            "--sap-db-name", "sap",
+            "--sap-db-user", "sap_user",
+            "--sap-db-password", "sap_pass",
+            "--auth-server-url", "http://auth:3010",
+            "--sap-config-env", "/opt/sap/server/config.env",
+            "--app-port", "8000",
+            "--log-level", "INFO",
+            "--overwrite",
+        ])
         assert args.cp_db_host == "cp-host"
         assert args.sap_db_host == "sap-host"
         assert args.auth_server_url == "http://auth:3010"
@@ -451,7 +431,9 @@ class TestCreateConfigFlow:
 
         with (
             patch.object(cc, "verify_sap_connection"),
-            patch.object(cc, "verify_auth_server", side_effect=RuntimeError("auth offline")),
+            patch.object(
+                cc, "verify_auth_server", side_effect=RuntimeError("auth offline")
+            ),
         ):
             with pytest.raises(SystemExit) as exc_info:
                 cc.create_config(args)
