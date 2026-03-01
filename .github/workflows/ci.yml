@@ -1,0 +1,61 @@
+name: CI
+
+# Dispara em: push para main, e em qualquer pull request
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    name: Lint + Type Check + Test
+    runs-on: ubuntu-latest
+
+    # Limita a 15min para evitar jobs pendurados consumindo créditos
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar uv
+        run: pip install uv
+
+      # uv sync instala dev dependencies (pytest, ruff, mypy).
+      # --frozen garante que ninguém rodou `uv add` sem commitar o lock.
+      - name: Instalar dependências (com dev)
+        working-directory: backend
+        run: uv sync --frozen
+
+      # Ruff verifica estilo e lógica em < 1 segundo
+      - name: Lint (ruff)
+        working-directory: backend
+        run: uv run ruff check .
+
+      # Mypy verifica tipos estritamente
+      - name: Type check (mypy)
+        working-directory: backend
+        run: uv run mypy src
+
+      # Pytest com cobertura — falha se < 90%
+      - name: Testes + cobertura
+        working-directory: backend
+        run: uv run pytest
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    # Só constrói o Docker se os testes passarem
+    needs: quality
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build da imagem Docker
+        working-directory: backend
+        run: docker build -t capacidade-prod-backend .
