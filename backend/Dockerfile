@@ -1,3 +1,4 @@
+# --- Estágio único por ora (multi-stage virá quando houver build de assets) ---
 
 # python:3.12-slim é a imagem oficial mínima.
 # Não usar :latest — versão fixa garante reprodutibilidade.

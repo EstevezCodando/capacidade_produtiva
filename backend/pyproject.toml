@@ -5,9 +5,7 @@ description = "Sistema de gestão operacional CapacidadeProdutiva"
 readme = "README.md"
 requires-python = "==3.12.*"
 
-dependencies = [
-    "psycopg2-binary>=2.9.11",
-]
+dependencies = []
 
 # ---------------------------------------------------------------------------
 # Build system
@@ -34,6 +32,11 @@ target-version = "py312"
 # I = ordenação de imports (isort)
 select = ["E", "F", "I"]
 
+[tool.ruff.lint.isort]
+# src-layout: informa ao isort onde estão os pacotes first-party
+src-paths = ["src"]
+known-first-party = ["cp"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
@@ -44,10 +47,17 @@ python_version = "3.12"
 
 strict = true
 
+[project.scripts]
+# Permite executar: uv run create-config
+# Em vez de: python scripts/create_config.py
+create-config = "scripts.create_config:main"
+
 # ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
 addopts = "--cov=cp --cov-report=term-missing --cov-fail-under=80"
 testpaths = ["tests"]
+
+pythonpath = ["scripts"]
 
 [tool.coverage.report]
 exclude_lines = [
