@@ -12,14 +12,11 @@ Responsabilidades:
 Não cria bancos de dados — ações privilegiadas são opt-in explícito.
 """
 
-from __future__ import annotations
-
 import argparse
 import getpass
 import sys
 from pathlib import Path
 from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # Caminhos
@@ -132,9 +129,7 @@ def verify_auth_server(url: str) -> None:
         ) from exc
 
     if response.status != 200:
-        raise RuntimeError(
-            f"Serviço de Autenticação retornou HTTP {response.status} em GET /api"
-        )
+        raise RuntimeError(f"Serviço de Autenticação retornou HTTP {response.status} em GET /api")
 
     try:
         data = json.loads(body)
@@ -145,9 +140,7 @@ def verify_auth_server(url: str) -> None:
 
     expected_message = "Serviço de autenticação operacional"
     if data.get("message") != expected_message:
-        raise RuntimeError(
-            f"Resposta inesperada do Serviço de Autenticação: {data}"
-        )
+        raise RuntimeError(f"Resposta inesperada do Serviço de Autenticação: {data}")
 
 
 # ---------------------------------------------------------------------------
@@ -173,14 +166,10 @@ def read_jwt_secret_from_sap_config(sap_config_env_path: Path) -> str:
         if line.startswith("JWT_SECRET="):
             secret = line.split("=", 1)[1].strip()
             if not secret:
-                raise ValueError(
-                    f"JWT_SECRET está vazio no arquivo {sap_config_env_path}"
-                )
+                raise ValueError(f"JWT_SECRET está vazio no arquivo {sap_config_env_path}")
             return secret
 
-    raise KeyError(
-        f"JWT_SECRET não encontrado no arquivo {sap_config_env_path}"
-    )
+    raise KeyError(f"JWT_SECRET não encontrado no arquivo {sap_config_env_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -267,9 +256,7 @@ def _collect_from_user(args: argparse.Namespace) -> dict[str, Any]:
     params["cp_db_host"] = args.cp_db_host or _ask(
         "Endereço do servidor PostgreSQL do CP", default="localhost"
     )
-    params["cp_db_port"] = int(
-        args.cp_db_port or _ask("Porta PostgreSQL do CP", default="5432")
-    )
+    params["cp_db_port"] = int(args.cp_db_port or _ask("Porta PostgreSQL do CP", default="5432"))
     params["cp_db_name"] = args.cp_db_name or _ask(
         "Nome do banco de dados do CP", default="capacidade_produtiva"
     )
@@ -284,12 +271,8 @@ def _collect_from_user(args: argparse.Namespace) -> dict[str, Any]:
     params["sap_db_host"] = args.sap_db_host or _ask(
         "Endereço do servidor PostgreSQL do SAP", default="localhost"
     )
-    params["sap_db_port"] = int(
-        args.sap_db_port or _ask("Porta PostgreSQL do SAP", default="5432")
-    )
-    params["sap_db_name"] = args.sap_db_name or _ask(
-        "Nome do banco de dados do SAP", default="sap"
-    )
+    params["sap_db_port"] = int(args.sap_db_port or _ask("Porta PostgreSQL do SAP", default="5432"))
+    params["sap_db_name"] = args.sap_db_name or _ask("Nome do banco de dados do SAP", default="sap")
     params["sap_db_user"] = args.sap_db_user or _ask("Usuário PostgreSQL do SAP (somente leitura)")
     params["sap_db_password"] = args.sap_db_password or _ask(
         "Senha do usuário PostgreSQL do SAP", secret=True
@@ -337,8 +320,7 @@ def create_config(args: argparse.Namespace) -> None:
         # Verificar se config.env já existe
         if _CONFIG_ENV.exists() and not args.overwrite:
             raise FileExistsError(
-                f"Arquivo {_CONFIG_ENV} já existe. "
-                "Use --overwrite para sobrescrever."
+                f"Arquivo {_CONFIG_ENV} já existe. " "Use --overwrite para sobrescrever."
             )
 
         params = _collect_from_user(args)
