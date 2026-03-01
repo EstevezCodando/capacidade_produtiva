@@ -33,8 +33,6 @@ target-version = "py312"
 select = ["E", "F", "I"]
 
 [tool.ruff.lint.isort]
-# src-layout: informa ao isort onde estão os pacotes first-party
-src-paths = ["src"]
 known-first-party = ["cp"]
 
 [tool.ruff.format]
@@ -56,7 +54,8 @@ create-config = "scripts.create_config:main"
 [tool.pytest.ini_options]
 addopts = "--cov=cp --cov-report=term-missing --cov-fail-under=80"
 testpaths = ["tests"]
-
+# Adiciona scripts/ ao pythonpath para que os testes importem create_config
+# sem path-hacks — o pytest injeta esses caminhos antes de rodar os testes
 pythonpath = ["scripts"]
 
 [tool.coverage.report]
