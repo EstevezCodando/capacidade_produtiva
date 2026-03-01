@@ -26,9 +26,8 @@ COPY src ./src
 
 # Copia o bootstrap de configuração.
 # O operador pode executar dentro do container com:
-#   docker run --rm -it capacidade-prod-backend python create_config.py
-# O arquivo usa apenas stdlib + psycopg2-binary (já nas deps de produção).
-COPY create_config.py ./
+#   docker run --rm -it capacidade-prod-backend uv run create-config
+COPY scripts ./scripts
 
 # PYTHONPATH aponta para src/ para que `import cp` funcione
 # mesmo sem `uv pip install -e .` dentro do container.
