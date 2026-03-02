@@ -108,6 +108,7 @@ jobs:
         working-directory: backend
         run: uv run pytest
 
+
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
@@ -117,5 +118,5 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build da imagem Docker
-        working-directory: backend
-        run: docker build -t capacidade-prod-backend 
+        run: docker build -t capacidade-prod-backend backend
+        

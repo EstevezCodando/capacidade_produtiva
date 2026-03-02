@@ -1,37 +1,26 @@
-# --- Estágio único por ora (multi-stage virá quando houver build de assets) ---
-
-# python:3.12-slim é a imagem oficial mínima.
-# Não usar :latest — versão fixa garante reprodutibilidade.
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Cria usuário não-root antes de qualquer COPY.
-# Rodar como root em container é risco de segurança:
-# se houver exploração, o atacante ganha root no host em configurações padrão.
 RUN useradd -m appuser
 
-# Copia apenas os arquivos de dependência primeiro.
-# Motivo: Docker cacheia cada layer. Se só o código mudar (não o pyproject),
-# o `uv sync` não roda de novo — o build fica muito mais rápido.
 COPY pyproject.toml uv.lock README.md ./
 
-# Instala uv e sincroniza dependências com lock file.
-# --frozen: recusa instalar se uv.lock divergir do pyproject.toml
-# --no-dev: não instala pytest, ruff, mypy em produção
-RUN pip install uv && uv sync --frozen --no-dev
+ARG UV_VERSION=0.5.0
 
-# Copia o código-fonte depois das dependências (cache mais eficiente)
+RUN pip install --no-cache-dir "uv==${UV_VERSION}"
+
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+
+RUN mkdir -p /opt/venv && chown -R appuser:appuser /opt/venv /app
+
+RUN uv sync --frozen --no-dev
+
 COPY src ./src
 
-
-# PYTHONPATH aponta para src/ para que `import cp` funcione
-# mesmo sem `uv pip install -e .` dentro do container.
 ENV PYTHONPATH=/app/src
 
-# Troca para usuário não-root
 USER appuser
 
-# Entrypoint: uvicorn serve a aplicação FastAPI.
-# --host 0.0.0.0 é obrigatório em container — 127.0.0.1 não é acessível de fora.
 CMD ["uv", "run", "uvicorn", "cp.main:app", "--host", "0.0.0.0", "--port", "8000"]
