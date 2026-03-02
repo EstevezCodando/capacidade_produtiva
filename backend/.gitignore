@@ -8,6 +8,8 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
+
+
 # Artefatos de cobertura
 .coverage
 htmlcov/
@@ -23,3 +25,6 @@ build/
 
 # uv.lock DEVE ser commitado — remove esta linha se aparecer aqui por engano
 # uv.lock
+
+#Credenciais de banco de dados
+/backend/server/
