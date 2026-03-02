@@ -14,17 +14,13 @@ def _contar(engine_cp: Engine, tabela: str) -> int:
 def test_sync_idempotente(engine_sap: Engine, engine_cp: Engine, sap_seed: None) -> None:
     """Rodar sync duas vezes seguidas não altera a contagem de registros."""
     sincronizar_sap_para_snapshot(engine_sap, engine_cp)
-    antes = _contar(engine_cp, "macrocontrole_atividade")
+    resultados_segunda = sincronizar_sap_para_snapshot(engine_sap, engine_cp)
 
-    sincronizar_sap_para_snapshot(engine_sap, engine_cp)
-    depois = _contar(engine_cp, "macrocontrole_atividade")
-
-    assert antes == depois
+    gravadas_por_tabela = {r.nome: r.gravadas for r in resultados_segunda}
+    assert gravadas_por_tabela["macrocontrole_atividade"] == 0
 
 
-def test_limpeza_remove_finalizadas_antigas(
-    engine_sap: Engine, engine_cp: Engine, sap_seed: None
-) -> None:
+def test_limpeza_remove_finalizadas_antigas(engine_sap: Engine, engine_cp: Engine, sap_seed: None) -> None:
     """Limpeza deve remover atividades finalizadas há mais de 180 dias."""
     sincronizar_sap_para_snapshot(engine_sap, engine_cp)
 

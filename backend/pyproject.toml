@@ -23,10 +23,14 @@ build-backend = "hatchling.build"
 packages = ["src/cp"]
 
 [project.scripts]
+bootstrap = "cp.cli.bootstrap:main"
+bootstrap-db = "cp.cli.bootstrap_db:main"
+bootstrap-config = "cp.cli.bootstrap_config:main"
 create-config = "cp.cli.create_config:main"
+sync-sap = "cp.cli.sync_sap:main"
 
 [tool.ruff]
-line-length = 100
+line-length = 150
 target-version = "py312"
 
 [tool.ruff.lint]
@@ -54,6 +58,11 @@ testpaths = ["tests"]
 [tool.coverage.report]
 exclude_lines = [
     "if __name__ == .__main__.:",
+]
+[tool.coverage.run]
+source = ["src"]
+omit = [
+  "src/cp/cli/*",
 ]
 
 [dependency-groups]

@@ -45,14 +45,11 @@ def _upsert(
     col_str = ", ".join(cols)
     par_str = ", ".join(f":{c}" for c in cols)
     set_str = ", ".join(f"{c}=EXCLUDED.{c}" for c in cols if c != pk)
-    sql = text(
-        f"INSERT INTO {_SCHEMA}.{tabela} ({col_str}) VALUES ({par_str}) "
-        f"ON CONFLICT ({pk}) DO UPDATE SET {set_str}"
-    )
+    sql = text(f"INSERT INTO {_SCHEMA}.{tabela} ({col_str}) VALUES ({par_str}) " f"ON CONFLICT ({pk}) DO UPDATE SET {set_str}")
     total = 0
     for i in range(0, len(rows), _BATCH):
-        conn.execute(sql, rows[i : i + _BATCH])
-        total += len(rows[i : i + _BATCH])
+        result = conn.execute(sql, rows[i : i + _BATCH])
+        total += int(result.rowcount or 0)
     return total
 
 
@@ -68,17 +65,12 @@ def _upsert_quando_mudou(
     col_str = ", ".join(cols)
     par_str = ", ".join(f":{c}" for c in cols)
     set_str = ", ".join(f"{c}=EXCLUDED.{c}" for c in cols if c != pk)
-    where = " OR ".join(
-        f"{_SCHEMA}.{tabela}.{c} IS DISTINCT FROM EXCLUDED.{c}" for c in cols if c != pk
-    )
-    sql = text(
-        f"INSERT INTO {_SCHEMA}.{tabela} ({col_str}) VALUES ({par_str}) "
-        f"ON CONFLICT ({pk}) DO UPDATE SET {set_str} WHERE {where}"
-    )
+    where = " OR ".join(f"{_SCHEMA}.{tabela}.{c} IS DISTINCT FROM EXCLUDED.{c}" for c in cols if c != pk)
+    sql = text(f"INSERT INTO {_SCHEMA}.{tabela} ({col_str}) VALUES ({par_str}) " f"ON CONFLICT ({pk}) DO UPDATE SET {set_str} WHERE {where}")
     total = 0
     for i in range(0, len(rows), _BATCH):
-        conn.execute(sql, rows[i : i + _BATCH])
-        total += len(rows[i : i + _BATCH])
+        result = conn.execute(sql, rows[i : i + _BATCH])
+        total += int(result.rowcount or 0)
     return total
 
 
@@ -104,9 +96,7 @@ def _sync(
 
 
 def _sync_dominio_status(s: Connection, c: Connection) -> ResultadoTabela:
-    return _sync(
-        s, c, "dominio_status", "SELECT code, nome FROM dominio.status", "code", ["code", "nome"]
-    )
+    return _sync(s, c, "dominio_status", "SELECT code, nome FROM dominio.status", "code", ["code", "nome"])
 
 
 def _sync_dominio_tipo_situacao(s: Connection, c: Connection) -> ResultadoTabela:
@@ -203,8 +193,7 @@ def _sync_lote(s: Connection, c: Connection) -> ResultadoTabela:
         s,
         c,
         "macrocontrole_lote",
-        "SELECT id, nome, nome_abrev, denominador_escala, linha_producao_id, "
-        "projeto_id, descricao, status_id FROM macrocontrole.lote",
+        "SELECT id, nome, nome_abrev, denominador_escala, linha_producao_id, " "projeto_id, descricao, status_id FROM macrocontrole.lote",
         "id",
         [
             "id",
@@ -307,8 +296,7 @@ def _sync_perfil_producao_etapa(s: Connection, c: Connection) -> ResultadoTabela
         s,
         c,
         "macrocontrole_perfil_producao_etapa",
-        "SELECT id, perfil_producao_id, subfase_id, tipo_etapa_id, prioridade "
-        "FROM macrocontrole.perfil_producao_etapa",
+        "SELECT id, perfil_producao_id, subfase_id, tipo_etapa_id, prioridade " "FROM macrocontrole.perfil_producao_etapa",
         "id",
         ["id", "perfil_producao_id", "subfase_id", "tipo_etapa_id", "prioridade"],
     )
@@ -364,11 +352,7 @@ def sincronizar_sap_para_snapshot(
 
 def limpar_snapshot(engine_cp: Engine) -> int:
     """Remove atividades finalizadas há mais de 180 dias do snapshot."""
-    sql = text(
-        f"DELETE FROM {_SCHEMA}.macrocontrole_atividade "
-        "WHERE data_fim IS NOT NULL "
-        "AND data_fim < (now() - interval '180 days')"
-    )
+    sql = text(f"DELETE FROM {_SCHEMA}.macrocontrole_atividade " "WHERE data_fim IS NOT NULL " "AND data_fim < (now() - interval '180 days')")
     with engine_cp.begin() as conn:
         result = conn.execute(sql)
         return int(result.rowcount or 0)

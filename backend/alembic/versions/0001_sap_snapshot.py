@@ -89,9 +89,7 @@ def upgrade() -> None:
         sa.Column("ordem", sa.Integer(), nullable=False),
         schema="sap_snapshot",
     )
-    op.create_index(
-        "ix_snap_subfase_fase_id", "macrocontrole_subfase", ["fase_id"], schema="sap_snapshot"
-    )
+    op.create_index("ix_snap_subfase_fase_id", "macrocontrole_subfase", ["fase_id"], schema="sap_snapshot")
     op.create_table(
         "macrocontrole_projeto",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -113,9 +111,7 @@ def upgrade() -> None:
         sa.Column("status_id", sa.SmallInteger(), nullable=False),
         schema="sap_snapshot",
     )
-    op.create_index(
-        "ix_snap_lote_projeto_id", "macrocontrole_lote", ["projeto_id"], schema="sap_snapshot"
-    )
+    op.create_index("ix_snap_lote_projeto_id", "macrocontrole_lote", ["projeto_id"], schema="sap_snapshot")
     op.create_table(
         "macrocontrole_bloco",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -125,9 +121,7 @@ def upgrade() -> None:
         sa.Column("lote_id", sa.Integer(), nullable=False),
         schema="sap_snapshot",
     )
-    op.create_index(
-        "ix_snap_bloco_lote_id", "macrocontrole_bloco", ["lote_id"], schema="sap_snapshot"
-    )
+    op.create_index("ix_snap_bloco_lote_id", "macrocontrole_bloco", ["lote_id"], schema="sap_snapshot")
     op.create_table(
         "macrocontrole_etapa",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -137,12 +131,8 @@ def upgrade() -> None:
         sa.Column("ordem", sa.Integer(), nullable=False),
         schema="sap_snapshot",
     )
-    op.create_index(
-        "ix_snap_etapa_subfase_id", "macrocontrole_etapa", ["subfase_id"], schema="sap_snapshot"
-    )
-    op.create_index(
-        "ix_snap_etapa_lote_id", "macrocontrole_etapa", ["lote_id"], schema="sap_snapshot"
-    )
+    op.create_index("ix_snap_etapa_subfase_id", "macrocontrole_etapa", ["subfase_id"], schema="sap_snapshot")
+    op.create_index("ix_snap_etapa_lote_id", "macrocontrole_etapa", ["lote_id"], schema="sap_snapshot")
     op.create_table(
         "macrocontrole_unidade_trabalho",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -154,9 +144,7 @@ def upgrade() -> None:
         sa.Column("bloco_id", sa.Integer(), nullable=False),
         sa.Column("disponivel", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("dificuldade", sa.Integer(), nullable=False, server_default=sa.text("0")),
-        sa.Column(
-            "tempo_estimado_minutos", sa.Integer(), nullable=False, server_default=sa.text("0")
-        ),
+        sa.Column("tempo_estimado_minutos", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column("prioridade", sa.Integer(), nullable=False),
         sa.Column("observacao", sa.Text(), nullable=True),
         schema="sap_snapshot",
@@ -195,9 +183,7 @@ def upgrade() -> None:
         sa.Column("observacao", sa.Text(), nullable=True),
         schema="sap_snapshot",
     )
-    op.create_index(
-        "ix_snap_atv_etapa_id", "macrocontrole_atividade", ["etapa_id"], schema="sap_snapshot"
-    )
+    op.create_index("ix_snap_atv_etapa_id", "macrocontrole_atividade", ["etapa_id"], schema="sap_snapshot")
     op.create_index(
         "ix_snap_atv_ut_id",
         "macrocontrole_atividade",
@@ -210,9 +196,7 @@ def upgrade() -> None:
         ["usuario_id"],
         schema="sap_snapshot",
     )
-    op.create_index(
-        "ix_snap_atv_data_fim", "macrocontrole_atividade", ["data_fim"], schema="sap_snapshot"
-    )
+    op.create_index("ix_snap_atv_data_fim", "macrocontrole_atividade", ["data_fim"], schema="sap_snapshot")
 
     # ------------------------------------------------------------------
     # Perfis de produção

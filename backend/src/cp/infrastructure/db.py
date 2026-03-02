@@ -12,3 +12,7 @@ def criar_engine_cp(settings: Settings) -> Engine:
 
 def criar_engine_sap(settings: Settings) -> Engine:
     return create_engine(settings.sap_db_url, pool_pre_ping=True)
+
+
+def criar_engine_sap_test(settings: Settings) -> Engine:
+    return create_engine(settings.sap_test_db_url, pool_pre_ping=True)

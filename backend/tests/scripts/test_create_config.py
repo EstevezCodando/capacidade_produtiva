@@ -53,9 +53,7 @@ class TestVerifyAuthServer:
         mock_conn = MagicMock()
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.read.return_value = (
-            b'{"message": "Servi\xc3\xa7o de autentica\xc3\xa7\xc3\xa3o operacional"}'
-        )
+        mock_response.read.return_value = b'{"message": "Servi\xc3\xa7o de autentica\xc3\xa7\xc3\xa3o operacional"}'
         mock_conn.getresponse.return_value = mock_response
 
         with patch("http.client.HTTPConnection", return_value=mock_conn):
@@ -138,9 +136,7 @@ class TestAsk:
         monkeypatch.setattr("builtins.input", lambda _: "")
         assert cc._ask("Campo", default="valor") == "valor"
 
-    def test_campo_obrigatorio_vazio_levanta_value_error(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_campo_obrigatorio_vazio_levanta_value_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr("builtins.input", lambda _: "")
         with pytest.raises(ValueError, match="Campo obrigatório não informado"):
             cc._ask("Campo sem default")
@@ -160,9 +156,7 @@ class TestVerifyAuthServerHttps:
         mock_conn = MagicMock()
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.read.return_value = (
-            b'{"message": "Servi\xc3\xa7o de autentica\xc3\xa7\xc3\xa3o operacional"}'
-        )
+        mock_response.read.return_value = b'{"message": "Servi\xc3\xa7o de autentica\xc3\xa7\xc3\xa3o operacional"}'
         mock_conn.getresponse.return_value = mock_response
 
         with patch("cp.cli.create_config.http.client.HTTPSConnection", return_value=mock_conn):
@@ -221,9 +215,7 @@ class TestGetAuthUserDataErroRede:
 
 
 class TestWriteConfigEnv:
-    def test_cria_arquivo_com_todas_as_variáveis(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_cria_arquivo_com_todas_as_variáveis(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Redireciona _SERVER_DIR e _CONFIG_ENV para tmp_path
         monkeypatch.setattr(cc, "_SERVER_DIR", tmp_path / "server")
         monkeypatch.setattr(cc, "_CONFIG_ENV", tmp_path / "server" / "config.env")
@@ -268,9 +260,7 @@ class TestWriteConfigEnv:
         assert "APP_PORT=8000" in content
         assert "LOG_LEVEL=INFO" in content
 
-    def test_cria_diretório_server_se_não_existir(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_cria_diretório_server_se_não_existir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         server_dir = tmp_path / "server"
         assert not server_dir.exists()
 
@@ -524,9 +514,7 @@ class TestCreateConfigFlow:
 
         args = self._make_args()
 
-        with patch.object(
-            cc, "verify_sap_connection", side_effect=RuntimeError("conexão recusada")
-        ):
+        with patch.object(cc, "verify_sap_connection", side_effect=RuntimeError("conexão recusada")):
             with pytest.raises(SystemExit) as exc_info:
                 cc.create_config(args)
         assert exc_info.value.code == 1
@@ -564,9 +552,7 @@ class TestCreateConfigFlow:
         with (
             patch.object(cc, "verify_sap_connection"),
             patch.object(cc, "verify_auth_server"),
-            patch.object(
-                cc, "login_auth_server", side_effect=RuntimeError("credenciais inválidas")
-            ),
+            patch.object(cc, "login_auth_server", side_effect=RuntimeError("credenciais inválidas")),
         ):
             with pytest.raises(SystemExit) as exc_info:
                 cc.create_config(args)
