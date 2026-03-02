@@ -10,103 +10,183 @@ Sistema de gestão operacional que une produção (SAP) e capacidade (agenda).
 - Acesso ao Serviço de Autenticação em execução
 - Arquivo `server/config.env` do SAP (para extrair o `JWT_SECRET`)
 
-## Primeiro uso — configuração do ambiente
+## Primeiro uso
 
-Antes de rodar a aplicação pela primeira vez é necessário gerar o arquivo
-`server/config.env` com as credenciais do SAP e do Serviço de Autenticação.
+Entre na pasta do backend.
 
 ```powershell
-# 1. Entre na pasta do backend
 cd backend
-
-# 2. Instale as dependências (cria .venv automaticamente)
-uv sync
-
-# 3. Execute o assistente de configuração
-uv run create-config
 ```
 
-O assistente irá solicitar interativamente:
-
-| Campo                                       | Descrição                              |
-| ------------------------------------------- | -------------------------------------- |
-| CP DB host / port / name / user / password  | Banco auxiliar do CapacidadeProdutiva  |
-| SAP DB host / port / name / user / password | Banco do SAP (usuário somente leitura) |
-| URL do Serviço de Autenticação              | Ex: `http://192.168.0.10:3010`         |
-| Caminho para o `config.env` do SAP          | Para extrair o `JWT_SECRET`            |
-
-Todas as flags também podem ser passadas diretamente (útil em automação):
+Instale as dependências.
 
 ```powershell
-uv run create-config `
-  --cp-db-host localhost --cp-db-port 5432 --cp-db-name capacidade_produtiva `
-  --cp-db-user cp_user --cp-db-password **** `
-  --sap-db-host [IP] --sap-db-port 5432 --sap-db-name sap `
-  --sap-db-user sap_readonly --sap-db-password **** `
-  --auth-server-url http://[IP]:3010 `
-  --sap-config-env C:\sap\server\config.env
+uv sync
 ```
 
-O script valida as conexões antes de gravar e, ao final, cria `server/config.env`.
-Esse arquivo **não deve ser commitado** — já está no `.gitignore`.
+Execute o assistente principal de inicialização.
 
-Próximo passo após a configuração:
+```powershell
+uv run inicializar
+```
+
+Esse comando gera o `config.env` e pode criar o banco do CP (opcional).
+
+Depois aplique as migrações.
 
 ```powershell
 uv run alembic upgrade head
 ```
 
-Para limpar
+Em seguida, execute a sincronização do SAP para o snapshot do CP.
 
 ```powershell
-& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -d capacidade_produtiva -c "DELETE FROM alembic_version;"
+uv run sincronizar-sap
 ```
 
-## Comandos do dia a dia
+## Fluxo normal de desenvolvimento
+
+Rodar a aplicação.
 
 ```powershell
-# Rodar testes com cobertura
-uv run pytest
-
-# Lint
-uv run ruff check .
-
-# Formatar código
-uv run ruff format .
-
-# Type check
-uv run mypy src
-
-# Rodar a aplicação
 uv run uvicorn cp.main:app --reload
 ```
 
-## Docker
+Rodar testes.
 
 ```powershell
-# Build
-docker build -t capacidade-prod-backend .
-
-# Rodar a aplicação
-docker run -p 8000:8000 capacidade-prod-backend
-
-# Rodar o assistente de configuração dentro do container
-docker run --rm -it capacidade-prod-backend uv run create-config
+uv run pytest
 ```
+
+Lint.
+
+```powershell
+uv run ruff check .
+```
+
+Formatar código.
+
+```powershell
+uv run ruff format .
+```
+
+Type check.
+
+```powershell
+uv run mypy src
+```
+
+## Sobre o config.env
+
+O arquivo fica em `backend/config.env`. Ele é lido pelo `Settings` e não deve ir para o git.
+
+Exemplo mínimo para ambiente local.
+
+```env
+ENVIRONMENT=local
+
+CP_DB_HOST=localhost
+CP_DB_PORT=5432
+CP_DB_NAME=cp_teste
+CP_DB_USER=postgres
+CP_DB_PASSWORD=postgres
+
+SAP_DB_HOST=localhost
+SAP_DB_PORT=5432
+SAP_DB_NAME=sap
+SAP_DB_USER=postgres
+SAP_DB_PASSWORD=postgres
+
+SAP_TEST_DB_HOST=localhost
+SAP_TEST_DB_PORT=5432
+SAP_TEST_DB_NAME=sap_test
+SAP_TEST_DB_USER=postgres
+SAP_TEST_DB_PASSWORD=postgres
+```
+
+O CI materializa um `config.env` temporário automaticamente apenas para testes. O CI não precisa de auth.
+
+## Docker
+
+Build da imagem, execute na pasta `backend`.
+
+```powershell
+docker build -t capacidade-prod-backend .
+```
+
+Rodar a aplicação.
+
+```powershell
+docker run -p 8000:8000 capacidade-prod-backend
+```
+
+O container não gera `config.env`. As variáveis devem ser fornecidas via `--env-file`, `-e`, Docker Compose ou secrets do deploy.
+
+## Solução de problemas e limpeza de cache
+
+Se aparecer erro de ambiente ou dependências inconsistentes, primeiro valide que você está no diretório `backend`.
+
+### Limpar cache e recriar o ambiente uv
+
+Remove o ambiente virtual e recria do zero.
+
+```powershell
+cd backend
+Remove-Item -Recurse -Force .venv
+uv sync
+```
+
+Se o `uv sync` reclamar de lock desatualizado, gere lock e sincronize.
+
+```powershell
+cd backend
+uv lock
+uv sync
+```
+
+### Limpar caches do uv e do pip
+
+Em casos raros de download corrompido ou cache inconsistente.
+
+```powershell
+cd backend
+uv cache clean
+python -m pip cache purge
+```
+
+### Limpar artefatos do pytest e cobertura
+
+```powershell
+cd backend
+Remove-Item -Recurse -Force .pytest_cache, .coverage, htmlcov -ErrorAction SilentlyContinue
+```
+
+### Resetar migrações em ambiente de teste
+
+Se você apagou o banco ou criou do zero e ficou com estado de migração estranho, o correto é recriar o banco e rodar `alembic upgrade head`. Evite apagar `alembic_version` em ambiente real.
+
+Para desenvolvimento local, se precisar limpar versão de migração manualmente.
+
+```powershell
+# Ajuste o caminho do psql conforme sua instalação
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -d cp_teste -c "DELETE FROM alembic_version;"
+uv run alembic upgrade head
+```
+
+### Limpar snapshot
+
+Se o snapshot estiver inconsistente durante desenvolvimento, você pode truncar as tabelas do schema `sap_snapshot` e rodar `sincronizar-sap` novamente. Faça isso apenas em ambiente local ou de teste.
 
 ## Estrutura do projeto
 
-```
-scripts/
-  create_config.py  → assistente de configuração inicial (gera server/config.env)
-src/cp/             → código-fonte do pacote instalável
-  domain/           → entidades e regras de negócio (Sprint 2+)
-  application/      → casos de uso (Sprint 2+)
-  infrastructure/   → banco, SAP, auth (Sprint 2+)
-  api/              → endpoints FastAPI (Sprint 3+)
-  config/           → configurações e settings (Sprint 2+)
+```text
+src/cp/
+  domain/
+  application/
+  infrastructure/
+  api/
+  config/
+
 tests/
-  scripts/          → testes do assistente de configuração
-server/
-  config.env        → gerado por create-config (não commitado)
+  fixtures/
 ```

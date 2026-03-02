@@ -15,12 +15,13 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
 ]
 
+
 [project.scripts]
-bootstrap = "cp.cli.bootstrap:main"
-bootstrap-db = "cp.cli.bootstrap_db:main"
-bootstrap-config = "cp.cli.bootstrap_config:main"
-create-config = "cp.cli.create_config:main"
-sync-sap = "cp.cli.sync_sap:main"
+inicializar = "cp.cli.bootstrap:main"
+inicializar-db = "cp.cli.bootstrap_db:main"
+inicializar-config = "cp.cli.bootstrap_config:main"
+gerar-config = "cp.cli.create_config:main"
+sincronizar-sap = "cp.cli.sync_sap:main"
 
 [dependency-groups]
 dev = [
