@@ -35,6 +35,17 @@ _SNAPSHOT_TABLES = [
 
 @pytest.fixture(scope="session")
 def settings() -> Settings:
+    """Carrega Settings de forma determinística.
+
+    No desenvolvimento, o usuário costuma ter um `backend/config.env`.
+    No CI, nós materializamos esse arquivo antes de rodar os testes.
+
+    Usar `_env_file` aqui evita depender do diretório corrente do runner.
+    """
+    backend_root = Path(__file__).resolve().parents[1]
+    env_file = backend_root / "config.env"
+    if env_file.exists():
+        return Settings(_env_file=env_file)
     return Settings()
 
 
@@ -64,6 +75,6 @@ def sap_seed(engine_cp: Engine, settings: Settings) -> None:
         f"dbname={settings.sap_test_db_name} user={settings.sap_test_db_user} "
         f"password={settings.sap_test_db_password}"
     )
-    with psycopg.connect(dsn) as conn:
+    with psycopg.connect(dsn, autocommit=True) as conn:
         with conn.cursor() as cur:
             cur.execute(sql)

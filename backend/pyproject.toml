@@ -15,6 +15,23 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
 ]
 
+[project.scripts]
+bootstrap = "cp.cli.bootstrap:main"
+bootstrap-db = "cp.cli.bootstrap_db:main"
+bootstrap-config = "cp.cli.bootstrap_config:main"
+create-config = "cp.cli.create_config:main"
+sync-sap = "cp.cli.sync_sap:main"
+
+[dependency-groups]
+dev = [
+    "httpx==0.28.1",
+    "mypy==1.18.2",
+    "pytest==8.4.2",
+    "pytest-cov==7.0.0",
+    "ruff==0.13.1",
+    "types-psycopg2==2.9.21.20250915",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -22,12 +39,7 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/cp"]
 
-[project.scripts]
-bootstrap = "cp.cli.bootstrap:main"
-bootstrap-db = "cp.cli.bootstrap_db:main"
-bootstrap-config = "cp.cli.bootstrap_config:main"
-create-config = "cp.cli.create_config:main"
-sync-sap = "cp.cli.sync_sap:main"
+
 
 [tool.ruff]
 line-length = 150
@@ -56,21 +68,15 @@ addopts = "--cov=cp --cov-report=term-missing --cov-fail-under=80"
 testpaths = ["tests"]
 
 [tool.coverage.report]
+fail_under = 80
+show_missing = true
 exclude_lines = [
     "if __name__ == .__main__.:",
 ]
-[tool.coverage.run]
-source = ["src"]
-omit = [
-  "src/cp/cli/*",
-]
 
-[dependency-groups]
-dev = [
-    "httpx>=0.27.0",
-    "mypy==1.10.0",
-    "pytest==8.2.0",
-    "pytest-cov==5.0.0",
-    "ruff==0.4.4",
-    "types-psycopg2",
-]
+
+[tool.coverage.run]
+branch = true
+source = ["src/cp"]
+omit = ["src/cp/cli/*"]
+
