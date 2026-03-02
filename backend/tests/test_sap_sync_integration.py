@@ -8,9 +8,7 @@ from cp.infrastructure.sap_sync.sync import limpar_snapshot, sincronizar_sap_par
 
 def _contar(engine_cp: Engine, tabela: str) -> int:
     with engine_cp.connect() as conn:
-        return conn.execute(
-            text(f"SELECT COUNT(*) FROM sap_snapshot.{tabela}")
-        ).scalar_one()
+        return conn.execute(text(f"SELECT COUNT(*) FROM sap_snapshot.{tabela}")).scalar_one()
 
 
 def test_sync_idempotente(engine_sap: Engine, engine_cp: Engine, sap_seed: None) -> None:
@@ -32,7 +30,8 @@ def test_limpeza_remove_finalizadas_antigas(
 
     # Insere diretamente no snapshot um registro antigo (fora da janela do sync)
     with engine_cp.begin() as conn:
-        conn.execute(text("""
+        conn.execute(
+            text("""
             INSERT INTO sap_snapshot.macrocontrole_atividade
                 (id, etapa_id, unidade_trabalho_id, usuario_id, tipo_situacao_id,
                  data_inicio, data_fim, observacao)
@@ -42,7 +41,8 @@ def test_limpeza_remove_finalizadas_antigas(
                  now() - interval '181 days',
                  'teste: registro antigo para limpeza')
             ON CONFLICT (id) DO NOTHING
-        """))
+        """)
+        )
 
     apagadas = limpar_snapshot(engine_cp)
     assert apagadas >= 1

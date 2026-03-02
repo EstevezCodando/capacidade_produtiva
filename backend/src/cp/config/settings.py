@@ -48,6 +48,7 @@ class Settings(BaseSettings):
             f"postgresql+psycopg://{self.sap_db_user}:{self.sap_db_password}"
             f"@{self.sap_db_host}:{self.sap_db_port}/{self.sap_db_name}"
         )
+
     @property
     def sap_test_db_url(self) -> str:
         return (

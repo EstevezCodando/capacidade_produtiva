@@ -4,9 +4,11 @@ Revision ID: 0001
 Revises: -
 Create Date: 2025-01-01
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "0001"
@@ -161,15 +163,21 @@ def upgrade() -> None:
     )
     op.create_index(
         "ix_snap_ut_subfase_id",
-        "macrocontrole_unidade_trabalho", ["subfase_id"], schema="sap_snapshot",
+        "macrocontrole_unidade_trabalho",
+        ["subfase_id"],
+        schema="sap_snapshot",
     )
     op.create_index(
         "ix_snap_ut_bloco_id",
-        "macrocontrole_unidade_trabalho", ["bloco_id"], schema="sap_snapshot",
+        "macrocontrole_unidade_trabalho",
+        ["bloco_id"],
+        schema="sap_snapshot",
     )
     op.create_index(
         "ix_snap_ut_lote_id",
-        "macrocontrole_unidade_trabalho", ["lote_id"], schema="sap_snapshot",
+        "macrocontrole_unidade_trabalho",
+        ["lote_id"],
+        schema="sap_snapshot",
     )
 
     # ------------------------------------------------------------------
@@ -192,11 +200,15 @@ def upgrade() -> None:
     )
     op.create_index(
         "ix_snap_atv_ut_id",
-        "macrocontrole_atividade", ["unidade_trabalho_id"], schema="sap_snapshot",
+        "macrocontrole_atividade",
+        ["unidade_trabalho_id"],
+        schema="sap_snapshot",
     )
     op.create_index(
         "ix_snap_atv_usuario_id",
-        "macrocontrole_atividade", ["usuario_id"], schema="sap_snapshot",
+        "macrocontrole_atividade",
+        ["usuario_id"],
+        schema="sap_snapshot",
     )
     op.create_index(
         "ix_snap_atv_data_fim", "macrocontrole_atividade", ["data_fim"], schema="sap_snapshot"
@@ -222,11 +234,15 @@ def upgrade() -> None:
     )
     op.create_index(
         "ix_snap_ppe_perfil_id",
-        "macrocontrole_perfil_producao_etapa", ["perfil_producao_id"], schema="sap_snapshot",
+        "macrocontrole_perfil_producao_etapa",
+        ["perfil_producao_id"],
+        schema="sap_snapshot",
     )
     op.create_index(
         "ix_snap_ppe_subfase_id",
-        "macrocontrole_perfil_producao_etapa", ["subfase_id"], schema="sap_snapshot",
+        "macrocontrole_perfil_producao_etapa",
+        ["subfase_id"],
+        schema="sap_snapshot",
     )
     op.create_table(
         "macrocontrole_perfil_producao_operador",
@@ -237,7 +253,9 @@ def upgrade() -> None:
     )
     op.create_index(
         "ix_snap_ppo_usuario_id",
-        "macrocontrole_perfil_producao_operador", ["usuario_id"], schema="sap_snapshot",
+        "macrocontrole_perfil_producao_operador",
+        ["usuario_id"],
+        schema="sap_snapshot",
     )
 
 
