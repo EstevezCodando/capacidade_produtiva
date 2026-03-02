@@ -56,6 +56,12 @@ Próximo passo após a configuração:
 uv run alembic upgrade head
 ```
 
+Para limpar
+
+```powershell
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -d capacidade_produtiva -c "DELETE FROM alembic_version;"
+```
+
 ## Comandos do dia a dia
 
 ```powershell
