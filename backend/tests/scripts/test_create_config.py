@@ -7,74 +7,35 @@ e que erros são propagados de forma legível.
 """
 
 import argparse
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import create_config as cc
 import pytest
+
+import cp.cli.create_config as cc
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
-def fake_sap_config_env(tmp_path: Path) -> Path:
-    """Cria um config.env falso do SAP com JWT_SECRET válido."""
-    config_file = tmp_path / "config.env"
-    config_file.write_text(
-        "NODE_TLS_REJECT_UNAUTHORIZED=0\n"
-        "PORT=3013\n"
-        "DB_SERVER=localhost\n"
-        "JWT_SECRET=abc123secret_reaproveitado\n"
-        "AUTH_SERVER=http://localhost:3010\n",
-        encoding="utf-8",
-    )
-    return config_file
-
-
-@pytest.fixture()
-def fake_sap_config_env_no_secret(tmp_path: Path) -> Path:
-    """Config.env do SAP sem JWT_SECRET."""
-    config_file = tmp_path / "config.env"
-    config_file.write_text("PORT=3013\n", encoding="utf-8")
-    return config_file
-
-
-@pytest.fixture()
-def fake_sap_config_env_empty_secret(tmp_path: Path) -> Path:
-    """Config.env do SAP com JWT_SECRET vazio."""
-    config_file = tmp_path / "config.env"
-    config_file.write_text("JWT_SECRET=\n", encoding="utf-8")
-    return config_file
-
-
 # ---------------------------------------------------------------------------
-# read_jwt_secret_from_sap_config
+# generate_jwt_secret
 # ---------------------------------------------------------------------------
 
 
-class TestReadJwtSecret:
-    def test_lê_secret_com_sucesso(self, fake_sap_config_env: Path) -> None:
-        secret = cc.read_jwt_secret_from_sap_config(fake_sap_config_env)
-        assert secret == "abc123secret_reaproveitado"
+class TestGenerateJwtSecret:
+    def test_retorna_string_de_128_chars(self) -> None:
+        secret = cc.generate_jwt_secret()
+        assert isinstance(secret, str)
+        assert len(secret) == 128  # 64 bytes = 128 hex chars
 
-    def test_arquivo_inexistente_levanta_file_not_found(self, tmp_path: Path) -> None:
-        with pytest.raises(FileNotFoundError, match="não encontrado"):
-            cc.read_jwt_secret_from_sap_config(tmp_path / "nao_existe.env")
+    def test_apenas_caracteres_hex(self) -> None:
+        secret = cc.generate_jwt_secret()
+        assert all(c in "0123456789abcdef" for c in secret)
 
-    def test_arquivo_sem_jwt_secret_levanta_key_error(
-        self, fake_sap_config_env_no_secret: Path
-    ) -> None:
-        with pytest.raises(KeyError, match="JWT_SECRET não encontrado"):
-            cc.read_jwt_secret_from_sap_config(fake_sap_config_env_no_secret)
-
-    def test_jwt_secret_vazio_levanta_value_error(
-        self, fake_sap_config_env_empty_secret: Path
-    ) -> None:
-        with pytest.raises(ValueError, match="JWT_SECRET está vazio"):
-            cc.read_jwt_secret_from_sap_config(fake_sap_config_env_empty_secret)
+    def test_secrets_diferentes_a_cada_chamada(self) -> None:
+        assert cc.generate_jwt_secret() != cc.generate_jwt_secret()
 
 
 # ---------------------------------------------------------------------------
@@ -145,51 +106,118 @@ class TestVerifyAuthServer:
 
 
 class TestVerifySapConnection:
-    def test_conexão_bem_sucedida_não_levanta(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_conexão_bem_sucedida_não_levanta(self) -> None:
         mock_conn = MagicMock()
         mock_cur = MagicMock()
         mock_conn.cursor.return_value = mock_cur
 
-        mock_psycopg2 = MagicMock()
-        mock_psycopg2.connect.return_value = mock_conn
-        monkeypatch.setitem(sys.modules, "psycopg2", mock_psycopg2)
-
-        cc.verify_sap_connection("localhost", 5432, "sap", "user", "pass")
+        with patch("cp.cli.create_config.psycopg2") as mock_pg:
+            mock_pg.connect.return_value = mock_conn
+            cc.verify_sap_connection("localhost", 5432, "sap", "user", "pass")
 
         mock_cur.execute.assert_called_once_with("SELECT 1")
         mock_cur.close.assert_called_once()
         mock_conn.close.assert_called_once()
 
-    def test_falha_de_conexão_levanta_runtime_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        mock_psycopg2 = MagicMock()
-        mock_psycopg2.OperationalError = Exception
-        mock_psycopg2.connect.side_effect = Exception("connection refused")
-        monkeypatch.setitem(sys.modules, "psycopg2", mock_psycopg2)
+    def test_falha_de_conexão_levanta_runtime_error(self) -> None:
+        with patch("cp.cli.create_config.psycopg2") as mock_pg:
+            mock_pg.OperationalError = Exception
+            mock_pg.connect.side_effect = Exception("connection refused")
 
-        with pytest.raises(RuntimeError, match="Falha ao conectar no banco SAP"):
-            cc.verify_sap_connection("localhost", 5432, "sap", "user", "senha_errada")
+            with pytest.raises(RuntimeError, match="Falha ao conectar no banco SAP"):
+                cc.verify_sap_connection("localhost", 5432, "sap", "user", "senha_errada")
 
-    def test_psycopg2_nao_instalado_levanta_runtime_error(
+
+# ---------------------------------------------------------------------------
+# _ask
+# ---------------------------------------------------------------------------
+
+
+class TestAsk:
+    def test_retorna_default_quando_entrada_vazia(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("builtins.input", lambda _: "")
+        assert cc._ask("Campo", default="valor") == "valor"
+
+    def test_campo_obrigatorio_vazio_levanta_value_error(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Simula ambiente sem psycopg2 instalado."""
-        import builtins
+        monkeypatch.setattr("builtins.input", lambda _: "")
+        with pytest.raises(ValueError, match="Campo obrigatório não informado"):
+            cc._ask("Campo sem default")
 
-        real_import = builtins.__import__
-
-        def mock_import(name: str, *args: object, **kwargs: object) -> object:
-            if name == "psycopg2":
-                raise ImportError("No module named 'psycopg2'")
-            return real_import(name, *args, **kwargs)
-
-        monkeypatch.setattr(builtins, "__import__", mock_import)
-        with pytest.raises(RuntimeError, match="psycopg2-binary não está instalado"):
-            cc.verify_sap_connection("localhost", 5432, "sap", "user", "pass")
+    def test_secret_usa_getpass(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("cp.cli.create_config.getpass.getpass", lambda _: "senha")
+        assert cc._ask("Senha", secret=True) == "senha"
 
 
 # ---------------------------------------------------------------------------
-# write_config_env
+# verify_auth_server — branch HTTPS
 # ---------------------------------------------------------------------------
+
+
+class TestVerifyAuthServerHttps:
+    def test_url_https_conecta_via_ssl(self) -> None:
+        mock_conn = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = (
+            b'{"message": "Servi\xc3\xa7o de autentica\xc3\xa7\xc3\xa3o operacional"}'
+        )
+        mock_conn.getresponse.return_value = mock_response
+
+        with patch("cp.cli.create_config.http.client.HTTPSConnection", return_value=mock_conn):
+            cc.verify_auth_server("https://auth:3010")
+
+        mock_conn.request.assert_called_once_with("GET", "/api")
+
+
+# ---------------------------------------------------------------------------
+# _http_request — branches HTTPS e erros
+# ---------------------------------------------------------------------------
+
+
+class TestHttpRequest:
+    def test_erro_de_rede_levanta_runtime_error(self) -> None:
+        with patch("cp.cli.create_config.http.client.HTTPConnection") as mock_cls:
+            mock_cls.return_value.request.side_effect = OSError("timeout")
+            with pytest.raises(RuntimeError, match="Erro de rede"):
+                cc._http_request("GET", "http://host:80/api")
+
+    def test_resposta_nao_json_levanta_runtime_error(self) -> None:
+        mock_conn = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = b"not json"
+        mock_conn.getresponse.return_value = mock_response
+
+        with patch("cp.cli.create_config.http.client.HTTPConnection", return_value=mock_conn):
+            with pytest.raises(RuntimeError, match="não-JSON"):
+                cc._http_request("GET", "http://host:80/api")
+
+    def test_https_usa_https_connection(self) -> None:
+        mock_conn = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = b'{"ok": true}'
+        mock_conn.getresponse.return_value = mock_response
+
+        with patch("cp.cli.create_config.http.client.HTTPSConnection", return_value=mock_conn):
+            status, data = cc._http_request("GET", "https://host:443/api")
+
+        assert status == 200
+        assert data == {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# get_auth_user_data — erro de rede
+# ---------------------------------------------------------------------------
+
+
+class TestGetAuthUserDataErroRede:
+    def test_erro_de_rede_levanta_runtime_error(self) -> None:
+        with patch.object(cc, "_http_request", side_effect=RuntimeError("timeout")):
+            with pytest.raises(RuntimeError, match="Erro ao buscar dados"):
+                cc.get_auth_user_data("http://auth:3010", "tok", "uuid")
 
 
 class TestWriteConfigEnv:
@@ -215,6 +243,9 @@ class TestWriteConfigEnv:
             jwt_secret="super_secret_token",
             app_port=8000,
             log_level="INFO",
+            operator_uuid="uuid-123",
+            operator_login="op.login",
+            operator_nome="Operador",
         )
 
         config_path = tmp_path / "server" / "config.env"
@@ -261,6 +292,9 @@ class TestWriteConfigEnv:
             jwt_secret="s",
             app_port=8000,
             log_level="INFO",
+            operator_uuid="uuid-x",
+            operator_login="login",
+            operator_nome="Nome",
         )
 
         assert server_dir.exists()
@@ -299,8 +333,6 @@ class TestArgumentParser:
                 "sap_pass",
                 "--auth-server-url",
                 "http://auth:3010",
-                "--sap-config-env",
-                "/opt/sap/server/config.env",
                 "--app-port",
                 "8000",
                 "--log-level",
@@ -329,6 +361,58 @@ class TestArgumentParser:
 # ---------------------------------------------------------------------------
 
 
+_FAKE_USER_DATA = {
+    "uuid": "uuid-operador-123",
+    "login": "operador.teste",
+    "nome": "Operador Teste",
+    "tipo_posto_grad_id": 1,
+    "tipo_turno_id": 2,
+}
+
+
+class TestLoginAuthServer:
+    def test_login_bem_sucedido_retorna_token_e_uuid(self) -> None:
+        status = 201
+        body = {
+            "success": True,
+            "dados": {"token": "tok123", "uuid": "uuid-abc"},
+        }
+        with patch.object(cc, "_http_request", return_value=(status, body)):
+            token, uuid = cc.login_auth_server("http://auth:3010", "user", "pass")
+        assert token == "tok123"
+        assert uuid == "uuid-abc"
+
+    def test_credenciais_invalidas_levanta_runtime_error(self) -> None:
+        with patch.object(cc, "_http_request", return_value=(401, {"success": False})):
+            with pytest.raises(RuntimeError, match="Login no Serviço de Autenticação falhou"):
+                cc.login_auth_server("http://auth:3010", "user", "errada")
+
+    def test_falha_de_rede_levanta_runtime_error(self) -> None:
+        with patch.object(cc, "_http_request", side_effect=RuntimeError("timeout")):
+            with pytest.raises(RuntimeError, match="Erro ao se comunicar"):
+                cc.login_auth_server("http://auth:3010", "user", "pass")
+
+
+class TestGetAuthUserData:
+    def test_busca_dados_com_sucesso(self) -> None:
+        body = {"dados": _FAKE_USER_DATA}
+        with patch.object(cc, "_http_request", return_value=(200, body)):
+            data = cc.get_auth_user_data("http://auth:3010", "tok123", "uuid-abc")
+        assert data["login"] == "operador.teste"
+        assert data["nome"] == "Operador Teste"
+        assert data["uuid"] == "uuid-operador-123"
+
+    def test_status_nao_200_levanta_runtime_error(self) -> None:
+        with patch.object(cc, "_http_request", return_value=(403, {})):
+            with pytest.raises(RuntimeError, match="HTTP 403"):
+                cc.get_auth_user_data("http://auth:3010", "tok123", "uuid-abc")
+
+    def test_dados_ausentes_levanta_runtime_error(self) -> None:
+        with patch.object(cc, "_http_request", return_value=(200, {"outro": "campo"})):
+            with pytest.raises(RuntimeError, match="HTTP 200"):
+                cc.get_auth_user_data("http://auth:3010", "tok123", "uuid-abc")
+
+
 class TestCreateConfigFlow:
     def _make_args(self, overwrite: bool = False, **kwargs: str) -> argparse.Namespace:
         """Cria um namespace de args com todos os campos preenchidos."""
@@ -344,7 +428,8 @@ class TestCreateConfigFlow:
             "sap_db_user": "sap_user",
             "sap_db_password": "sap_pass",
             "auth_server_url": "http://auth:3010",
-            "sap_config_env": None,  # será preenchido em cada teste
+            "auth_user": "operador",
+            "auth_password": "senha123",
             "app_port": "8000",
             "log_level": "INFO",
             "overwrite": overwrite,
@@ -352,33 +437,43 @@ class TestCreateConfigFlow:
         defaults.update(kwargs)
         return argparse.Namespace(**defaults)
 
+    def _mock_auth(self) -> tuple[object, object, object]:
+        """Retorna mocks prontos para verify_auth_server, login e get_user."""
+        return (
+            patch.object(cc, "verify_auth_server"),
+            patch.object(cc, "login_auth_server", return_value=("tok123", "uuid-operador-123")),
+            patch.object(cc, "get_auth_user_data", return_value=_FAKE_USER_DATA),
+        )
+
     def test_fluxo_completo_grava_config_env(
         self,
         tmp_path: Path,
-        fake_sap_config_env: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         server_dir = tmp_path / "server"
         monkeypatch.setattr(cc, "_SERVER_DIR", server_dir)
         monkeypatch.setattr(cc, "_CONFIG_ENV", server_dir / "config.env")
 
-        args = self._make_args(sap_config_env=str(fake_sap_config_env))
+        args = self._make_args()
+        m_verify, m_login, m_user = self._mock_auth()
 
-        with (
-            patch.object(cc, "verify_sap_connection"),
-            patch.object(cc, "verify_auth_server"),
-        ):
+        with patch.object(cc, "verify_sap_connection"), m_verify, m_login, m_user:
             cc.create_config(args)
 
-        assert (server_dir / "config.env").exists()
         content = (server_dir / "config.env").read_text()
-        assert "JWT_SECRET=abc123secret_reaproveitado" in content
+        assert "JWT_SECRET=" in content
+        jwt_line = next(line for line in content.splitlines() if line.startswith("JWT_SECRET="))
+        jwt_value = jwt_line.split("=", 1)[1]
+        assert len(jwt_value) == 128
+        assert all(c in "0123456789abcdef" for c in jwt_value)
         assert "AUTH_SERVER=http://auth:3010" in content
+        assert "OPERATOR_UUID=uuid-operador-123" in content
+        assert "OPERATOR_LOGIN=operador.teste" in content
+        assert "OPERATOR_NOME=Operador Teste" in content
 
     def test_config_env_existente_sem_overwrite_termina_com_exit(
         self,
         tmp_path: Path,
-        fake_sap_config_env: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         server_dir = tmp_path / "server"
@@ -389,7 +484,7 @@ class TestCreateConfigFlow:
         monkeypatch.setattr(cc, "_SERVER_DIR", server_dir)
         monkeypatch.setattr(cc, "_CONFIG_ENV", existing)
 
-        args = self._make_args(sap_config_env=str(fake_sap_config_env))
+        args = self._make_args()
 
         with pytest.raises(SystemExit) as exc_info:
             cc.create_config(args)
@@ -398,7 +493,6 @@ class TestCreateConfigFlow:
     def test_config_env_existente_com_overwrite_sobrescreve(
         self,
         tmp_path: Path,
-        fake_sap_config_env: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         server_dir = tmp_path / "server"
@@ -409,12 +503,10 @@ class TestCreateConfigFlow:
         monkeypatch.setattr(cc, "_SERVER_DIR", server_dir)
         monkeypatch.setattr(cc, "_CONFIG_ENV", existing)
 
-        args = self._make_args(overwrite=True, sap_config_env=str(fake_sap_config_env))
+        args = self._make_args(overwrite=True)
+        m_verify, m_login, m_user = self._mock_auth()
 
-        with (
-            patch.object(cc, "verify_sap_connection"),
-            patch.object(cc, "verify_auth_server"),
-        ):
+        with patch.object(cc, "verify_sap_connection"), m_verify, m_login, m_user:
             cc.create_config(args)
 
         content = existing.read_text()
@@ -424,14 +516,13 @@ class TestCreateConfigFlow:
     def test_falha_na_conexao_sap_termina_com_exit(
         self,
         tmp_path: Path,
-        fake_sap_config_env: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         server_dir = tmp_path / "server"
         monkeypatch.setattr(cc, "_SERVER_DIR", server_dir)
         monkeypatch.setattr(cc, "_CONFIG_ENV", server_dir / "config.env")
 
-        args = self._make_args(sap_config_env=str(fake_sap_config_env))
+        args = self._make_args()
 
         with patch.object(
             cc, "verify_sap_connection", side_effect=RuntimeError("conexão recusada")
@@ -443,14 +534,13 @@ class TestCreateConfigFlow:
     def test_falha_no_auth_server_termina_com_exit(
         self,
         tmp_path: Path,
-        fake_sap_config_env: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         server_dir = tmp_path / "server"
         monkeypatch.setattr(cc, "_SERVER_DIR", server_dir)
         monkeypatch.setattr(cc, "_CONFIG_ENV", server_dir / "config.env")
 
-        args = self._make_args(sap_config_env=str(fake_sap_config_env))
+        args = self._make_args()
 
         with (
             patch.object(cc, "verify_sap_connection"),
@@ -460,10 +550,31 @@ class TestCreateConfigFlow:
                 cc.create_config(args)
         assert exc_info.value.code == 1
 
+    def test_falha_no_login_termina_com_exit(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        server_dir = tmp_path / "server"
+        monkeypatch.setattr(cc, "_SERVER_DIR", server_dir)
+        monkeypatch.setattr(cc, "_CONFIG_ENV", server_dir / "config.env")
+
+        args = self._make_args()
+
+        with (
+            patch.object(cc, "verify_sap_connection"),
+            patch.object(cc, "verify_auth_server"),
+            patch.object(
+                cc, "login_auth_server", side_effect=RuntimeError("credenciais inválidas")
+            ),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                cc.create_config(args)
+        assert exc_info.value.code == 1
+
     def test_auth_url_tem_barra_final_removida(
         self,
         tmp_path: Path,
-        fake_sap_config_env: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """URL com barra final deve ser normalizada antes de gravar."""
@@ -471,15 +582,10 @@ class TestCreateConfigFlow:
         monkeypatch.setattr(cc, "_SERVER_DIR", server_dir)
         monkeypatch.setattr(cc, "_CONFIG_ENV", server_dir / "config.env")
 
-        args = self._make_args(
-            auth_server_url="http://auth:3010/",
-            sap_config_env=str(fake_sap_config_env),
-        )
+        args = self._make_args(auth_server_url="http://auth:3010/")
+        m_verify, m_login, m_user = self._mock_auth()
 
-        with (
-            patch.object(cc, "verify_sap_connection"),
-            patch.object(cc, "verify_auth_server"),
-        ):
+        with patch.object(cc, "verify_sap_connection"), m_verify, m_login, m_user:
             cc.create_config(args)
 
         content = (server_dir / "config.env").read_text()
