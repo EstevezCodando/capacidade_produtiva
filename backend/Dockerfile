@@ -24,6 +24,7 @@ RUN pip install uv && uv sync --frozen --no-dev
 # Copia o código-fonte depois das dependências (cache mais eficiente)
 COPY src ./src
 
+
 # PYTHONPATH aponta para src/ para que `import cp` funcione
 # mesmo sem `uv pip install -e .` dentro do container.
 ENV PYTHONPATH=/app/src
@@ -31,5 +32,6 @@ ENV PYTHONPATH=/app/src
 # Troca para usuário não-root
 USER appuser
 
-# Entrypoint: executa cp.main como módulo Python
-CMD ["python", "-m", "cp.main"]
+# Entrypoint: uvicorn serve a aplicação FastAPI.
+# --host 0.0.0.0 é obrigatório em container — 127.0.0.1 não é acessível de fora.
+CMD ["uv", "run", "uvicorn", "cp.main:app", "--host", "0.0.0.0", "--port", "8000"]
