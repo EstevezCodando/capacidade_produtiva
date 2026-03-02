@@ -1,6 +1,5 @@
 name: CI
 
-# Dispara em: push para main, e em qualquer pull request
 on:
   push:
     branches: [main]
@@ -10,9 +9,22 @@ jobs:
   quality:
     name: Lint + Type Check + Test
     runs-on: ubuntu-latest
-
-    # Limita a 15min para evitar jobs pendurados consumindo créditos
     timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgis/postgis:14-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
       - name: Checkout código
@@ -26,23 +38,72 @@ jobs:
       - name: Instalar uv
         run: pip install uv
 
-      # uv sync instala dev dependencies (pytest, ruff, mypy).
-      # --frozen garante que ninguém rodou `uv add` sem commitar o lock.
       - name: Instalar dependências (com dev)
         working-directory: backend
         run: uv sync --frozen
 
-      # Ruff verifica estilo e lógica em < 1 segundo
       - name: Lint (ruff)
         working-directory: backend
         run: uv run ruff check .
 
-      # Mypy verifica tipos estritamente
       - name: Type check (mypy)
         working-directory: backend
         run: uv run mypy src
 
-      # Pytest com cobertura — falha se < 90%
+      - name: Instalar client do Postgres
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Criar config.env (somente bancos) para os testes
+        working-directory: backend
+        run: |
+          cat > config.env << 'EOF'
+          ENVIRONMENT=test
+
+          CP_DB_HOST=localhost
+          CP_DB_PORT=5432
+          CP_DB_NAME=cp_test
+          CP_DB_USER=postgres
+          CP_DB_PASSWORD=postgres
+
+          SAP_DB_HOST=localhost
+          SAP_DB_PORT=5432
+          SAP_DB_NAME=sap_test
+          SAP_DB_USER=postgres
+          SAP_DB_PASSWORD=postgres
+
+          SAP_TEST_DB_HOST=localhost
+          SAP_TEST_DB_PORT=5432
+          SAP_TEST_DB_NAME=sap_test
+          SAP_TEST_DB_USER=postgres
+          SAP_TEST_DB_PASSWORD=postgres
+          EOF
+
+      - name: Criar bancos (idempotente)
+        env:
+          PGPASSWORD: postgres
+        run: |
+          criar_db_se_nao_existir () {
+            local nome_db="$1"
+            local existe
+            existe=$(psql -h localhost -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${nome_db}'")
+            if [ "${existe}" != "1" ]; then
+              psql -h localhost -U postgres -d postgres -c "CREATE DATABASE \"${nome_db}\";"
+            fi
+          }
+
+          criar_db_se_nao_existir "cp_test"
+          criar_db_se_nao_existir "sap_test"
+
+      - name: Restaurar seed do SAP (sap_test)
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d sap_test -v ON_ERROR_STOP=1 -f backend/tests/fixtures/sap_seed.sql
+
+      - name: Rodar migrações (alembic) no CP (cp_test)
+        working-directory: backend
+        run: uv run alembic upgrade head
+
       - name: Testes + cobertura
         working-directory: backend
         run: uv run pytest
@@ -50,7 +111,6 @@ jobs:
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
-    # Só constrói o Docker se os testes passarem
     needs: quality
 
     steps:
@@ -58,4 +118,4 @@ jobs:
 
       - name: Build da imagem Docker
         working-directory: backend
-        run: docker build -t capacidade-prod-backend .
+        run: docker build -t capacidade-prod-backend 
