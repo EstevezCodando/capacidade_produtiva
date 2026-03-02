@@ -24,10 +24,6 @@ RUN pip install uv && uv sync --frozen --no-dev
 # Copia o código-fonte depois das dependências (cache mais eficiente)
 COPY src ./src
 
-# Copia o bootstrap de configuração.
-# O operador pode executar dentro do container com:
-#   docker run --rm -it capacidade-prod-backend uv run create-config
-COPY scripts ./scripts
 
 # PYTHONPATH aponta para src/ para que `import cp` funcione
 # mesmo sem `uv pip install -e .` dentro do container.
