@@ -1,37 +1,35 @@
-# --- Estágio único por ora (multi-stage virá quando houver build de assets) ---
-
-# python:3.12-slim é a imagem oficial mínima.
-# Não usar :latest — versão fixa garante reprodutibilidade.
+# Imagem base mínima e fixa para reprodutibilidade
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Cria usuário não-root antes de qualquer COPY.
-# Rodar como root em container é risco de segurança:
-# se houver exploração, o atacante ganha root no host em configurações padrão.
+# Usuário não-root
 RUN useradd -m appuser
 
-# Copia apenas os arquivos de dependência primeiro.
-# Motivo: Docker cacheia cada layer. Se só o código mudar (não o pyproject),
-# o `uv sync` não roda de novo — o build fica muito mais rápido.
+# Copia arquivos de dependência primeiro para aproveitar cache
 COPY pyproject.toml uv.lock README.md ./
 
-# Instala uv e sincroniza dependências com lock file.
-# --frozen: recusa instalar se uv.lock divergir do pyproject.toml
-# --no-dev: não instala pytest, ruff, mypy em produção
-RUN pip install uv && uv sync --frozen --no-dev
+# Instala uv com versão fixa
+RUN pip install --no-cache-dir "uv==0.5.0"
 
-# Copia o código-fonte depois das dependências (cache mais eficiente)
+# Define e cria o virtualenv do projeto
+ENV UV_PROJECT_ENVIRONMENT=/app/.venv
+RUN uv venv "$UV_PROJECT_ENVIRONMENT"
+
+# Instala dependências de produção (sem dev)
+RUN uv sync --frozen --no-dev
+
+# Copia o código depois das dependências
 COPY src ./src
 
-
-# PYTHONPATH aponta para src/ para que `import cp` funcione
-# mesmo sem `uv pip install -e .` dentro do container.
+# Imports a partir de src/
 ENV PYTHONPATH=/app/src
+
+# Garante que binários do venv sejam encontrados (uvicorn, etc.)
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Troca para usuário não-root
 USER appuser
 
-# Entrypoint: uvicorn serve a aplicação FastAPI.
-# --host 0.0.0.0 é obrigatório em container — 127.0.0.1 não é acessível de fora.
-CMD ["uv", "run", "uvicorn", "cp.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Executa uvicorn diretamente (o PATH já aponta para o venv)
+CMD ["uvicorn", "cp.main:app", "--host", "0.0.0.0", "--port", "8000"]

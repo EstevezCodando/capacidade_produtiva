@@ -83,10 +83,7 @@ def verify_sap_connection(
     password: str,
 ) -> None:
     """Verifica conexão read-only com o banco do SAP."""
-    dsn = (
-        f"host={host} port={port} dbname={dbname} "
-        f"user={user} password={password} connect_timeout=10"
-    )
+    dsn = f"host={host} port={port} dbname={dbname} " f"user={user} password={password} connect_timeout=10"
     try:
         conn = psycopg2.connect(dsn)
         cur = conn.cursor()
@@ -112,9 +109,7 @@ def verify_auth_server(url: str) -> None:
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            conn: http.client.HTTPConnection = http.client.HTTPSConnection(
-                host, port, timeout=10, context=ctx
-            )
+            conn: http.client.HTTPConnection = http.client.HTTPSConnection(host, port, timeout=10, context=ctx)
         else:
             conn = http.client.HTTPConnection(host, port, timeout=10)
 
@@ -123,9 +118,7 @@ def verify_auth_server(url: str) -> None:
         body = response.read().decode()
         conn.close()
     except OSError as exc:
-        raise RuntimeError(
-            f"Erro ao se comunicar com o Serviço de Autenticação ({url}): {exc}"
-        ) from exc
+        raise RuntimeError(f"Erro ao se comunicar com o Serviço de Autenticação ({url}): {exc}") from exc
 
     if response.status != 200:
         raise RuntimeError(f"Serviço de Autenticação retornou HTTP {response.status} em GET /api")
@@ -133,9 +126,7 @@ def verify_auth_server(url: str) -> None:
     try:
         data = json.loads(body)
     except json.JSONDecodeError as exc:
-        raise RuntimeError(
-            "Serviço de Autenticação retornou resposta não-JSON em GET /api"
-        ) from exc
+        raise RuntimeError("Serviço de Autenticação retornou resposta não-JSON em GET /api") from exc
 
     expected_message = "Serviço de autenticação operacional"
     if data.get("message") != expected_message:
@@ -158,9 +149,7 @@ def _http_request(
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            conn: http.client.HTTPConnection = http.client.HTTPSConnection(
-                host, port, timeout=10, context=ctx
-            )
+            conn: http.client.HTTPConnection = http.client.HTTPSConnection(host, port, timeout=10, context=ctx)
         else:
             conn = http.client.HTTPConnection(host, port, timeout=10)
 
@@ -205,13 +194,7 @@ def login_auth_server(
     except RuntimeError as exc:
         raise RuntimeError(f"Erro ao se comunicar com o Serviço de Autenticação: {exc}") from exc
 
-    if (
-        status != 201
-        or not data.get("success")
-        or "dados" not in data
-        or "token" not in data["dados"]
-        or "uuid" not in data["dados"]
-    ):
+    if status != 201 or not data.get("success") or "dados" not in data or "token" not in data["dados"] or "uuid" not in data["dados"]:
         raise RuntimeError("Login no Serviço de Autenticação falhou. " "Verifique usuário e senha.")
 
     return data["dados"]["token"], data["dados"]["uuid"]
@@ -233,9 +216,7 @@ def get_auth_user_data(url: str, token: str, uuid: str) -> dict[str, Any]:
     try:
         status, data = _http_request("GET", endpoint, headers=headers)
     except RuntimeError as exc:
-        raise RuntimeError(
-            f"Erro ao buscar dados do usuário no Serviço de Autenticação: {exc}"
-        ) from exc
+        raise RuntimeError(f"Erro ao buscar dados do usuário no Serviço de Autenticação: {exc}") from exc
 
     if status != 200 or "dados" not in data:
         raise RuntimeError(f"Não foi possível obter dados do usuário (HTTP {status}).")
@@ -342,51 +323,33 @@ def _collect_from_user(args: argparse.Namespace) -> dict[str, Any]:
 
     # -- Banco CP -----------------------------------------------------------
     print("--- Banco de dados CapacidadeProdutiva (banco auxiliar) ---")
-    params["cp_db_host"] = args.cp_db_host or _ask(
-        "Endereço do servidor PostgreSQL do CP", default="localhost"
-    )
+    params["cp_db_host"] = args.cp_db_host or _ask("Endereço do servidor PostgreSQL do CP", default="localhost")
     params["cp_db_port"] = int(args.cp_db_port or _ask("Porta PostgreSQL do CP", default="5432"))
-    params["cp_db_name"] = args.cp_db_name or _ask(
-        "Nome do banco de dados do CP", default="capacidade_produtiva"
-    )
+    params["cp_db_name"] = args.cp_db_name or _ask("Nome do banco de dados do CP", default="capacidade_produtiva")
     params["cp_db_user"] = args.cp_db_user or _ask("Usuário PostgreSQL do CP")
-    params["cp_db_password"] = args.cp_db_password or _ask(
-        "Senha do usuário PostgreSQL do CP", secret=True
-    )
+    params["cp_db_password"] = args.cp_db_password or _ask("Senha do usuário PostgreSQL do CP", secret=True)
 
     # -- Banco SAP ----------------------------------------------------------
     print()
     print("--- Banco de dados SAP (somente leitura) ---")
-    params["sap_db_host"] = args.sap_db_host or _ask(
-        "Endereço do servidor PostgreSQL do SAP", default="localhost"
-    )
+    params["sap_db_host"] = args.sap_db_host or _ask("Endereço do servidor PostgreSQL do SAP", default="localhost")
     params["sap_db_port"] = int(args.sap_db_port or _ask("Porta PostgreSQL do SAP", default="5432"))
     params["sap_db_name"] = args.sap_db_name or _ask("Nome do banco de dados do SAP", default="sap")
     params["sap_db_user"] = args.sap_db_user or _ask("Usuário PostgreSQL do SAP (somente leitura)")
-    params["sap_db_password"] = args.sap_db_password or _ask(
-        "Senha do usuário PostgreSQL do SAP", secret=True
-    )
+    params["sap_db_password"] = args.sap_db_password or _ask("Senha do usuário PostgreSQL do SAP", secret=True)
 
     # -- Serviço de Autenticação --------------------------------------------
     print()
     print("--- Serviço de Autenticação ---")
-    params["auth_server_url"] = args.auth_server_url or _ask(
-        "URL do Serviço de Autenticação (ex: http://192.168.0.10:3010)"
-    )
+    params["auth_server_url"] = args.auth_server_url or _ask("URL do Serviço de Autenticação (ex: http://192.168.0.10:3010)")
     params["auth_user"] = args.auth_user or _ask("Usuário do Serviço de Autenticação")
-    params["auth_password"] = args.auth_password or _ask(
-        "Senha do Serviço de Autenticação", secret=True
-    )
+    params["auth_password"] = args.auth_password or _ask("Senha do Serviço de Autenticação", secret=True)
 
     # -- Aplicação ----------------------------------------------------------
     print()
     print("--- Configuração da aplicação ---")
-    params["app_port"] = int(
-        args.app_port or _ask("Porta do servidor CapacidadeProdutiva", default="8000")
-    )
-    params["log_level"] = args.log_level or _ask(
-        "Nível de log (DEBUG/INFO/WARNING/ERROR)", default="INFO"
-    )
+    params["app_port"] = int(args.app_port or _ask("Porta do servidor CapacidadeProdutiva", default="8000"))
+    params["log_level"] = args.log_level or _ask("Nível de log (DEBUG/INFO/WARNING/ERROR)", default="INFO")
 
     return params
 
@@ -401,9 +364,7 @@ def create_config(args: argparse.Namespace) -> None:
     try:
         # Verificar se config.env já existe
         if _CONFIG_ENV.exists() and not args.overwrite:
-            raise FileExistsError(
-                f"Arquivo {_CONFIG_ENV} já existe. " "Use --overwrite para sobrescrever."
-            )
+            raise FileExistsError(f"Arquivo {_CONFIG_ENV} já existe. " "Use --overwrite para sobrescrever.")
 
         params = _collect_from_user(args)
 
