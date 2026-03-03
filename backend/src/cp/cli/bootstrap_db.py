@@ -23,10 +23,7 @@ _REGEX_NOME_BANCO = re.compile(r"^[A-Za-z0-9_]+$")
 
 def _validar_nome_banco(nome_banco: str) -> None:
     if not _REGEX_NOME_BANCO.fullmatch(nome_banco):
-        raise ValueError(
-            f"Nome de banco inválido: {nome_banco!r}. "
-            "Use apenas letras, números e underscore."
-        )
+        raise ValueError(f"Nome de banco inválido: {nome_banco!r}. Use apenas letras, números e underscore.")
 
 
 def _database_exists(engine: Engine, db_name: str) -> bool:
@@ -42,9 +39,7 @@ def _create_database(engine: Engine, db_name: str) -> None:
     _validar_nome_banco(db_name)
 
     with engine.connect() as conn:
-        conn.execution_options(isolation_level="AUTOCOMMIT").execute(
-            text(f'CREATE DATABASE "{db_name}"')
-        )
+        conn.execution_options(isolation_level="AUTOCOMMIT").execute(text(f'CREATE DATABASE "{db_name}"'))
 
 
 def _criar_schemas_cp(engine_cp: Engine) -> None:

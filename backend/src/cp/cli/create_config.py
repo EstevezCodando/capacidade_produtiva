@@ -83,7 +83,7 @@ def verify_sap_connection(
     password: str,
 ) -> None:
     """Verifica conexão read-only com o banco do SAP."""
-    dsn = f"host={host} port={port} dbname={dbname} " f"user={user} password={password} connect_timeout=10"
+    dsn = f"host={host} port={port} dbname={dbname} user={user} password={password} connect_timeout=10"
     try:
         conn = psycopg2.connect(dsn)
         cur = conn.cursor()
@@ -195,7 +195,7 @@ def login_auth_server(
         raise RuntimeError(f"Erro ao se comunicar com o Serviço de Autenticação: {exc}") from exc
 
     if status != 201 or not data.get("success") or "dados" not in data or "token" not in data["dados"] or "uuid" not in data["dados"]:
-        raise RuntimeError("Login no Serviço de Autenticação falhou. " "Verifique usuário e senha.")
+        raise RuntimeError("Login no Serviço de Autenticação falhou. Verifique usuário e senha.")
 
     return data["dados"]["token"], data["dados"]["uuid"]
 
@@ -364,7 +364,7 @@ def create_config(args: argparse.Namespace) -> None:
     try:
         # Verificar se config.env já existe
         if _CONFIG_ENV.exists() and not args.overwrite:
-            raise FileExistsError(f"Arquivo {_CONFIG_ENV} já existe. " "Use --overwrite para sobrescrever.")
+            raise FileExistsError(f"Arquivo {_CONFIG_ENV} já existe. Use --overwrite para sobrescrever.")
 
         params = _collect_from_user(args)
 
@@ -495,12 +495,12 @@ def _build_parser() -> argparse.ArgumentParser:
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:  # pragma: no cover
-    """Entry point declarado em pyproject.toml [project.scripts]."""
-    parser = _build_parser()
-    args = parser.parse_args()
-    create_config(args)
+#def main() -> None:  # pragma: no cover
+#   """Entry point declarado em pyproject.toml [project.scripts]."""
+#    parser = _build_parser()
+#    args = parser.parse_args()
+#    create_config(args)
+#
 
-
-if __name__ == "__main__":
-    main()
+#if __name__ == "__main__":
+#    main()
