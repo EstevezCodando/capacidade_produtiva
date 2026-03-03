@@ -4,7 +4,7 @@ from getpass import getpass
 from pathlib import Path
 
 from cp.cli.bootstrap_config import ConfigEnv, escrever_config_env
-from cp.cli.bootstrap_db import criar_banco_se_necessario
+from cp.cli.bootstrap_db import criar_banco_cp, criar_banco
 
 
 def _perguntar_texto(pergunta: str) -> str:
@@ -57,7 +57,7 @@ def main() -> None:
     if criar_cp:
         usuario_admin = _perguntar_texto("Qual o usuário admin do Postgres para criar banco (ex: postgres)? ")
         senha_admin = getpass("Qual a senha do usuário admin do Postgres? ").strip()
-        criado = criar_banco_se_necessario(cp_db_host, cp_db_port, usuario_admin, senha_admin, cp_db_name)
+        criado = criar_banco_cp(cp_db_host, cp_db_port, usuario_admin, senha_admin, cp_db_name)
         if criado:
             print(f"Banco '{cp_db_name}' criado com sucesso.")
         else:
@@ -92,7 +92,7 @@ def main() -> None:
         if criar_sap_test:
             usuario_admin = _perguntar_texto("Qual o usuário admin do Postgres para criar o SAP_TEST (ex: postgres)? ")
             senha_admin = getpass("Qual a senha do usuário admin do Postgres? ").strip()
-            criado = criar_banco_se_necessario(sap_test_db_host, sap_test_db_port, usuario_admin, senha_admin, sap_test_db_name)
+            criado = criar_banco(sap_test_db_host, sap_test_db_port, usuario_admin, senha_admin, sap_test_db_name)
             if criado:
                 print(f"Banco '{sap_test_db_name}' criado com sucesso.")
             else:
