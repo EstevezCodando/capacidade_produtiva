@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     # CP serviço
     cp_api_port: int = Field(default=3050, alias="CP_API_PORT")
     cp_secret_key: str = Field(default="dev-secret", alias="CP_SECRET_KEY")
+    # Logging
+    cp_log_level: str = Field(default="INFO", alias="CP_LOG_LEVEL")
+    cp_sql_log_level: str | None = Field(default=None, alias="CP_SQL_LOG_LEVEL")
 
     # SAP produção
     sap_db_host: str = Field(alias="SAP_DB_HOST")
