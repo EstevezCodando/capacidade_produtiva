@@ -23,9 +23,13 @@ class Settings(BaseSettings):
     cp_db_password: str = Field(alias="CP_DB_PASSWORD")
 
     # Pool CP (banco auxiliar, leitura e escrita)
+    # cp_pool_size: quantidade de conexões fixas no pool (unidade: conexões)
     cp_pool_size: int = Field(default=10, alias="CP_POOL_SIZE")
+    # cp_pool_max_overflow: conexões extras além do pool_size em pico (unidade: conexões)
     cp_pool_max_overflow: int = Field(default=10, alias="CP_POOL_MAX_OVERFLOW")
+    # cp_pool_timeout: tempo máximo esperando conexão do pool (unidade: segundos)
     cp_pool_timeout: int = Field(default=30, alias="CP_POOL_TIMEOUT")
+    # cp_connect_timeout: tempo máximo para conectar no banco (unidade: segundos)
     cp_connect_timeout: int = Field(default=5, alias="CP_CONNECT_TIMEOUT")
 
     # CP serviço
@@ -39,6 +43,16 @@ class Settings(BaseSettings):
     sap_db_user: str = Field(alias="SAP_DB_USER")
     sap_db_password: str = Field(alias="SAP_DB_PASSWORD")
 
+    # Pool SAP produção (conservador, pois é recurso compartilhado)
+    # sap_pool_size: quantidade de conexões fixas no pool (unidade: conexões)
+    sap_pool_size: int = Field(default=2, alias="SAP_POOL_SIZE")
+    # sap_pool_max_overflow: conexões extras além do pool_size em pico (unidade: conexões)
+    sap_pool_max_overflow: int = Field(default=0, alias="SAP_POOL_MAX_OVERFLOW")
+    # sap_pool_timeout: tempo máximo esperando conexão do pool (unidade: segundos)
+    sap_pool_timeout: int = Field(default=10, alias="SAP_POOL_TIMEOUT")
+    # sap_connect_timeout: tempo máximo para conectar no banco (unidade: segundos)
+    sap_connect_timeout: int = Field(default=5, alias="SAP_CONNECT_TIMEOUT")
+
     # SAP teste
     sap_test_db_host: str = Field(default="localhost", alias="SAP_TEST_DB_HOST")
     sap_test_db_port: int = Field(default=5432, alias="SAP_TEST_DB_PORT")
@@ -46,32 +60,14 @@ class Settings(BaseSettings):
     sap_test_db_user: str = Field(default="postgres", alias="SAP_TEST_DB_USER")
     sap_test_db_password: str = Field(default="postgres", alias="SAP_TEST_DB_PASSWORD")
 
-    # Pool SAP teste (ambiente CI/local)
-    # sap_test_pool_size:
-    #   Quantidade fixa de conexões mantidas abertas no pool.
-    #   Unidade: número inteiro de conexões.
-    #   Exemplo: 5 significa até 5 conexões reutilizáveis simultâneas.
+    # Pool SAP teste (pode ser mais permissivo em CI/local)
+    # sap_test_pool_size: quantidade de conexões fixas no pool (unidade: conexões)
     sap_test_pool_size: int = Field(default=5, alias="SAP_TEST_POOL_SIZE")
-
-    # sap_test_pool_max_overflow:
-    #   Quantidade máxima de conexões adicionais além do pool_size
-    #   que podem ser abertas em pico de concorrência.
-    #   Unidade: número inteiro de conexões.
-    #   Total máximo simultâneo = pool_size + max_overflow.
+    # sap_test_pool_max_overflow: conexões extras além do pool_size em pico (unidade: conexões)
     sap_test_pool_max_overflow: int = Field(default=5, alias="SAP_TEST_POOL_MAX_OVERFLOW")
-
-    # sap_test_pool_timeout:
-    #   Tempo máximo que a aplicação espera por uma conexão livre
-    #   quando o pool está esgotado antes de lançar erro.
-    #   Unidade: segundos.
-    #   Exemplo: 30 significa aguardar até 30 segundos.
+    # sap_test_pool_timeout: tempo máximo esperando conexão do pool (unidade: segundos)
     sap_test_pool_timeout: int = Field(default=30, alias="SAP_TEST_POOL_TIMEOUT")
-
-    # sap_test_connect_timeout:
-    #   Tempo máximo para estabelecer conexão TCP com o banco.
-    #   Não controla tempo de query, apenas tempo de conexão inicial.
-    #   Unidade: segundos.
-    #   Exemplo: 5 significa falhar se não conectar em até 5 segundos.
+    # sap_test_connect_timeout: tempo máximo para conectar no banco (unidade: segundos)
     sap_test_connect_timeout: int = Field(default=5, alias="SAP_TEST_CONNECT_TIMEOUT")
 
     # Auth opcional

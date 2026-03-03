@@ -495,12 +495,12 @@ def _build_parser() -> argparse.ArgumentParser:
 # ---------------------------------------------------------------------------
 
 
-#def main() -> None:  # pragma: no cover
+# def main() -> None:  # pragma: no cover
 #   """Entry point declarado em pyproject.toml [project.scripts]."""
 #    parser = _build_parser()
 #    args = parser.parse_args()
 #    create_config(args)
 #
 
-#if __name__ == "__main__":
+# if __name__ == "__main__":
 #    main()
