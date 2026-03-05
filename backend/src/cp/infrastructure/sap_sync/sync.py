@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 
+from cp.infrastructure.sap_sync.analytics_manager import atualizar_views_analytics
+
 _SCHEMA = "sap_snapshot"
 _BATCH = 5_000
 
@@ -342,11 +344,16 @@ def sincronizar_sap_para_snapshot(
     engine_sap: Engine,
     engine_cp: Engine,
 ) -> list[ResultadoTabela]:
-    """Executa o pipeline completo dentro de uma única transação no CP."""
+    """Executa o pipeline completo dentro de uma única transação no CP.
+
+    Após a ingestão de todos os dados, as views analíticas (sap_analytics)
+    são re-aplicadas na mesma transação para garantir consistência.
+    """
     resultados: list[ResultadoTabela] = []
     with engine_cp.begin() as conn_cp, engine_sap.connect() as conn_sap:
         for fn in _PIPELINE:
             resultados.append(fn(conn_sap, conn_cp))
+        atualizar_views_analytics(conn_cp)
     return resultados
 
 

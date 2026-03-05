@@ -7,8 +7,11 @@ import re
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
+from cp.infrastructure.sap_sync.analytics_manager import garantir_views_analytics
+
 _SCHEMAS_CP: tuple[str, ...] = (
     "sap_snapshot",
+    "sap_analytics",
     "auth_snapshot",
     "kpi",
     "agregacao",
@@ -73,10 +76,10 @@ def criar_banco_cp(
     senha_admin: str,
     nome_banco: str,
 ) -> bool:
-    """Bootstrap do CP: garante banco e schemas iniciais (idempotente).
+    """Bootstrap do CP: garante banco, schemas iniciais e views analíticas (idempotente).
 
     Retorna True se o banco foi criado agora.
-    Se o banco já existir, ainda assim garante os schemas e retorna False.
+    Se o banco já existir, ainda assim garante os schemas/views e retorna False.
     """
     criado_agora = criar_banco(
         host=host,
@@ -91,5 +94,6 @@ def criar_banco_cp(
     dsn_cp = f"postgresql+psycopg2://{usuario_admin}:{senha_admin}@{host}:{port}/{nome_banco}"
     engine_cp = create_engine(dsn_cp, future=True)
     _criar_schemas_cp(engine_cp)
+    garantir_views_analytics(engine_cp)
 
     return criado_agora
