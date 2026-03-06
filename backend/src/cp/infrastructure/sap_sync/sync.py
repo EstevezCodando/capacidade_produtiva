@@ -19,6 +19,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 
 from cp.infrastructure.sap_sync.analytics_manager import atualizar_views_analytics
+from cp.infrastructure.sap_sync.kpi_manager import materializar_fato_ut_subfase
 
 _SCHEMA = "sap_snapshot"
 _BATCH = 5_000
@@ -354,6 +355,7 @@ def sincronizar_sap_para_snapshot(
         for fn in _PIPELINE:
             resultados.append(fn(conn_sap, conn_cp))
         atualizar_views_analytics(conn_cp)
+        materializar_fato_ut_subfase(conn_cp)
     return resultados
 
 

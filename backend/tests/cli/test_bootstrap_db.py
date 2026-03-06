@@ -88,7 +88,7 @@ def test_criar_banco_cp_cria_schemas_mesmo_se_banco_ja_existe(monkeypatch: pytes
     def criar_banco_fake(**_kwargs: object) -> bool:
         return False
 
-    chamadas: dict[str, int] = {"schemas": 0, "views": 0}
+    chamadas: dict[str, int] = {"schemas": 0, "views": 0, "kpi": 0}
 
     def criar_schemas_fake(_engine_cp: object) -> None:
         chamadas["schemas"] += 1
@@ -96,12 +96,16 @@ def test_criar_banco_cp_cria_schemas_mesmo_se_banco_ja_existe(monkeypatch: pytes
     def garantir_views_fake(_engine_cp: object) -> None:
         chamadas["views"] += 1
 
+    def garantir_kpi_fake(_engine_cp: object) -> None:
+        chamadas["kpi"] += 1
+
     def create_engine_fake(_dsn: str, future: bool = True) -> object:
         return object()
 
     monkeypatch.setattr(bootstrap_db, "criar_banco", criar_banco_fake)
     monkeypatch.setattr(bootstrap_db, "_criar_schemas_cp", criar_schemas_fake)
     monkeypatch.setattr(bootstrap_db, "garantir_views_analytics", garantir_views_fake)
+    monkeypatch.setattr(bootstrap_db, "garantir_fato_ut_subfase", garantir_kpi_fake)
     monkeypatch.setattr(bootstrap_db, "create_engine", create_engine_fake)
 
     criado_agora = bootstrap_db.criar_banco_cp(
@@ -115,13 +119,14 @@ def test_criar_banco_cp_cria_schemas_mesmo_se_banco_ja_existe(monkeypatch: pytes
     assert criado_agora is False
     assert chamadas["schemas"] == 1
     assert chamadas["views"] == 1
+    assert chamadas["kpi"] == 1
 
 
 def test_criar_banco_cp_retorna_true_quando_criou_banco_e_garante_schemas(monkeypatch: pytest.MonkeyPatch) -> None:
     def criar_banco_fake(**_kwargs: object) -> bool:
         return True
 
-    chamadas: dict[str, int] = {"schemas": 0, "views": 0}
+    chamadas: dict[str, int] = {"schemas": 0, "views": 0, "kpi": 0}
 
     def criar_schemas_fake(_engine_cp: object) -> None:
         chamadas["schemas"] += 1
@@ -129,12 +134,16 @@ def test_criar_banco_cp_retorna_true_quando_criou_banco_e_garante_schemas(monkey
     def garantir_views_fake(_engine_cp: object) -> None:
         chamadas["views"] += 1
 
+    def garantir_kpi_fake(_engine_cp: object) -> None:
+        chamadas["kpi"] += 1
+
     def create_engine_fake(_dsn: str, future: bool = True) -> object:
         return object()
 
     monkeypatch.setattr(bootstrap_db, "criar_banco", criar_banco_fake)
     monkeypatch.setattr(bootstrap_db, "_criar_schemas_cp", criar_schemas_fake)
     monkeypatch.setattr(bootstrap_db, "garantir_views_analytics", garantir_views_fake)
+    monkeypatch.setattr(bootstrap_db, "garantir_fato_ut_subfase", garantir_kpi_fake)
     monkeypatch.setattr(bootstrap_db, "create_engine", create_engine_fake)
 
     criado_agora = bootstrap_db.criar_banco_cp(
@@ -148,6 +157,7 @@ def test_criar_banco_cp_retorna_true_quando_criou_banco_e_garante_schemas(monkey
     assert criado_agora is True
     assert chamadas["schemas"] == 1
     assert chamadas["views"] == 1
+    assert chamadas["kpi"] == 1
 
 
 def test_schemas_cp_contem_agregacao_e_dominio() -> None:

@@ -8,6 +8,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from cp.infrastructure.sap_sync.analytics_manager import garantir_views_analytics
+from cp.infrastructure.sap_sync.kpi_manager import garantir_fato_ut_subfase
 
 _SCHEMAS_CP: tuple[str, ...] = (
     "sap_snapshot",
@@ -95,5 +96,6 @@ def criar_banco_cp(
     engine_cp = create_engine(dsn_cp, future=True)
     _criar_schemas_cp(engine_cp)
     garantir_views_analytics(engine_cp)
+    garantir_fato_ut_subfase(engine_cp)
 
     return criado_agora
