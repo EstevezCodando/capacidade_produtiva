@@ -15,12 +15,14 @@ from __future__ import annotations
 
 import logging
 import logging.config
+import pathlib
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
-from cp.api.rotas import health, usuarios
+from cp.api.rotas import agenda, atividades, capacidade, health, kpi, log, relatorios, sync, usuarios
 from cp.config.settings import Settings
 from cp.infrastructure.db import criar_engine_cp, criar_engine_sap
 
@@ -83,18 +85,43 @@ app = FastAPI(
     description=("Backend que expõe KPIs, relatórios e pontuação operacional consumindo dados do SAP."),
     version="0.1.0",
     lifespan=_lifespan,
+    # Swagger UI disponível em /api/docs  (ReDoc em /api/redoc)
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
 # ---------------------------------------------------------------------------
 # Routers
 #
 # Convenção de prefixo e proteção:
-#   /health          — público
-#   /usuarios/me     — autenticado (operador ou admin)
-#   /usuarios        — somente admin
-#   /kpis/**         — autenticado (a implementar)
-#   /relatorios/**   — autenticado (a implementar)
+#   /health             — público
+#   /sync/**            — admin
+#   /usuarios/**        — autenticado / admin
+#   /kpi/**             — autenticado / admin
+#   /atividades/**      — autenticado
+#   /distribuicao-pontos — autenticado
+#   /agenda/**          — autenticado / admin
+#   /capacidade/**      — autenticado / admin
+#   /relatorios/**      — autenticado
+#   /log/**             — admin
 # ---------------------------------------------------------------------------
 
 app.include_router(health.router, prefix="/api")
+app.include_router(sync.router, prefix="/api")
 app.include_router(usuarios.router, prefix="/api")
+app.include_router(kpi.router, prefix="/api")
+app.include_router(atividades.router, prefix="/api")
+app.include_router(agenda.router, prefix="/api")
+app.include_router(capacidade.router, prefix="/api")
+app.include_router(relatorios.router, prefix="/api")
+app.include_router(log.router, prefix="/api")
+
+# ---------------------------------------------------------------------------
+# Documentação interativa — servida em /api-docs/
+# Arquivos: backend/docs/{index.html, api.css, api.js}
+# ---------------------------------------------------------------------------
+# __file__ = src/cp/main.py → parent = src/cp → ×2 = src → ×3 = backend
+_docs_dir = pathlib.Path(__file__).parent.parent.parent / "docs"
+if _docs_dir.exists():
+    app.mount("/api-docs", StaticFiles(directory=str(_docs_dir), html=True), name="api-docs")
