@@ -98,6 +98,11 @@ def main() -> None:
             else:
                 print(f"Banco '{sap_test_db_name}' já existia, nada a fazer.")
 
+    print("\nChave JWT do servico de autenticacao")
+    print("  Esta chave deve ser identica ao JWT_SECRET configurado no servico_autenticacao.")
+    print("  O CP nao gera esta chave - ele apenas a usa para verificar tokens emitidos pelo auth.")
+    jwt_secret = getpass("Informe o JWT_SECRET do servico_autenticacao: ").strip()
+
     cfg = ConfigEnv(
         cp_db_host=cp_db_host,
         cp_db_port=cp_db_port,
@@ -113,6 +118,7 @@ def main() -> None:
         auth_url=auth_url,
         auth_admin_user=auth_admin_user,
         auth_admin_password=auth_admin_password,
+        jwt_secret=jwt_secret,
         incluir_sap_test=incluir_sap_test,
         sap_test_db_host=sap_test_db_host,
         sap_test_db_port=sap_test_db_port,
