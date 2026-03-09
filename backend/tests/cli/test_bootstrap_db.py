@@ -105,7 +105,7 @@ def test_criar_banco_cp_cria_schemas_mesmo_se_banco_ja_existe(monkeypatch: pytes
     monkeypatch.setattr(bootstrap_db, "criar_banco", criar_banco_fake)
     monkeypatch.setattr(bootstrap_db, "_criar_schemas_cp", criar_schemas_fake)
     monkeypatch.setattr(bootstrap_db, "garantir_views_analytics", garantir_views_fake)
-    monkeypatch.setattr(bootstrap_db, "garantir_fato_ut_subfase", garantir_kpi_fake)
+    monkeypatch.setattr(bootstrap_db, "garantir_tabelas_kpi", garantir_kpi_fake)
     monkeypatch.setattr(bootstrap_db, "create_engine", create_engine_fake)
 
     criado_agora = bootstrap_db.criar_banco_cp(
@@ -143,7 +143,7 @@ def test_criar_banco_cp_retorna_true_quando_criou_banco_e_garante_schemas(monkey
     monkeypatch.setattr(bootstrap_db, "criar_banco", criar_banco_fake)
     monkeypatch.setattr(bootstrap_db, "_criar_schemas_cp", criar_schemas_fake)
     monkeypatch.setattr(bootstrap_db, "garantir_views_analytics", garantir_views_fake)
-    monkeypatch.setattr(bootstrap_db, "garantir_fato_ut_subfase", garantir_kpi_fake)
+    monkeypatch.setattr(bootstrap_db, "garantir_tabelas_kpi", garantir_kpi_fake)
     monkeypatch.setattr(bootstrap_db, "create_engine", create_engine_fake)
 
     criado_agora = bootstrap_db.criar_banco_cp(

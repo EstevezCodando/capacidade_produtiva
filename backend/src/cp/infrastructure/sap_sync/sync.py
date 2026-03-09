@@ -19,7 +19,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 
 from cp.infrastructure.sap_sync.analytics_manager import atualizar_views_analytics
-from cp.infrastructure.sap_sync.kpi_manager import materializar_fato_ut_subfase
+from cp.infrastructure.sap_sync.kpi_manager import garantir_tabelas_kpi, materializar_kpi
 
 _SCHEMA = "sap_snapshot"
 _BATCH = 5_000
@@ -351,11 +351,14 @@ def sincronizar_sap_para_snapshot(
     são re-aplicadas na mesma transação para garantir consistência.
     """
     resultados: list[ResultadoTabela] = []
+    # Garante que as tabelas kpi.* existem com o DDL atual antes de materializar.
+    # Idempotente: DROP + CREATE fora da transação principal para suportar DDL.
+    garantir_tabelas_kpi(engine_cp)
     with engine_cp.begin() as conn_cp, engine_sap.connect() as conn_sap:
         for fn in _PIPELINE:
             resultados.append(fn(conn_sap, conn_cp))
         atualizar_views_analytics(conn_cp)
-        materializar_fato_ut_subfase(conn_cp)
+        materializar_kpi(conn_cp)
     return resultados
 
 

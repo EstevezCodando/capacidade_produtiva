@@ -10,7 +10,7 @@ from sqlalchemy.engine import Engine
 from cp.config.settings import Settings
 from cp.infrastructure.db import criar_engine_cp, criar_engine_sap_test
 from cp.infrastructure.sap_sync.analytics_manager import garantir_views_analytics
-from cp.infrastructure.sap_sync.kpi_manager import garantir_fato_ut_subfase
+from cp.infrastructure.sap_sync.kpi_manager import garantir_tabelas_kpi
 
 _FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -70,7 +70,7 @@ def analytics_views_bootstrap(engine_cp: Engine) -> None:
     desatualizados de execucoes anteriores.
     """
     garantir_views_analytics(engine_cp)
-    garantir_fato_ut_subfase(engine_cp)
+    garantir_tabelas_kpi(engine_cp)
 
 
 @pytest.fixture()
