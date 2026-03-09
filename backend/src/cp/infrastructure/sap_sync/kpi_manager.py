@@ -7,7 +7,7 @@ Isso garante que o estado da tabela reflita exatamente o snapshot atual,
 sem acúmulo de linhas obsoletas e sem lógica de diff.
 
 Também expõe garantir_fato_ut_subfase(engine) para uso no bootstrap,
-que cria a tabela se ainda não existir (idempotente).
+que recria a tabela se o schema mudou (DROP + CREATE, idempotente).
 """
 
 from __future__ import annotations
@@ -24,12 +24,17 @@ _TABELA = "kpi.fato_ut_subfase"
 
 
 def garantir_fato_ut_subfase(engine_cp: Engine) -> None:
-    """Cria a tabela kpi.fato_ut_subfase se não existir (idempotente).
+    """Recria kpi.fato_ut_subfase com o DDL atual (idempotente).
 
-    Chamado no bootstrap do banco — garante que a estrutura existe antes
-    do primeiro sync.
+    Usa DROP TABLE IF EXISTS antes do CREATE para garantir que mudanças de
+    schema (colunas, tipos, chave primária) sejam sempre aplicadas, mesmo
+    em bancos que rodaram uma versão anterior desta migration.
+
+    Chamado no bootstrap do banco — safe para rodar a qualquer momento.
     """
     with engine_cp.begin() as conn:
+        conn.execute(text("CREATE SCHEMA IF NOT EXISTS kpi;"))
+        conn.execute(text(f"DROP TABLE IF EXISTS {_TABELA};"))
         conn.execute(text(DDL_TABELA_FATO_UT_SUBFASE))
 
 

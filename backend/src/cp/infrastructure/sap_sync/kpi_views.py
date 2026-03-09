@@ -15,19 +15,13 @@ _SCHEMA_SNAPSHOT = "sap_snapshot"
 
 DDL_TABELA_FATO_UT_SUBFASE = f"""
 CREATE TABLE IF NOT EXISTS {_SCHEMA_KPI}.fato_ut_subfase (
-    -- Hierarquia
-    projeto_id                              integer         NOT NULL,
+    -- Hierarquia (nomes, sem IDs de FK)
     projeto_nome                            text            NOT NULL,
-    lote_id                                 integer         NOT NULL,
     lote_nome                               text            NOT NULL,
-    bloco_id                                integer         NOT NULL,
     bloco_nome                              text            NOT NULL,
-    fase_id                                 integer         NOT NULL,
     fase_nome                               text            NOT NULL,
-    subfase_id                              integer         NOT NULL,
     subfase_nome                            text            NOT NULL,
     ut_id                                   integer         NOT NULL,
-    ut_nome                                 text            NOT NULL,
 
     -- Atributos da UT
     ut_disponivel                           boolean,
@@ -45,26 +39,19 @@ CREATE TABLE IF NOT EXISTS {_SCHEMA_KPI}.fato_ut_subfase (
 
     -- Execução
     exec_atividade_id                       integer,
-    usuario_executor_id                     integer,
     usuario_executor_nome                   text,
     usuario_executor_exibicao               text,
     executor_tipo_situacao_id               integer,
     executor_tipo_situacao_nome             text,
 
-    -- Revisão (vigente — pode ser tipo 2 ou tipo 5 dependendo do ciclo)
+    -- Revisão vigente (tipo 2, 4 ou 5 dependendo do ciclo)
     rev_atividade_id                        integer,
-    usuario_revisor_id                      integer,
     usuario_revisor_nome                    text,
-    usuario_revisor_exibicao                text,
     revisao_vigente_tipo_situacao_id        integer,
     revisao_vigente_tipo_situacao_nome      text,
 
     -- Correção (somente CICLO_1_PADRAO)
-    cor_atividade_id                        integer,
-    usuario_corretor_id                     integer,
     usuario_corretor_nome                   text,
-    usuario_corretor_exibicao               text,
-    corretor_tipo_situacao_id               integer,
     corretor_tipo_situacao_nome             text,
 
     -- Nota e classificação
@@ -84,7 +71,7 @@ CREATE TABLE IF NOT EXISTS {_SCHEMA_KPI}.fato_ut_subfase (
     pontos_corretor                         numeric(10, 4),
 
     -- Chave primária natural
-    PRIMARY KEY (ut_id, subfase_id)
+    PRIMARY KEY (ut_id)
 );
 """.strip()
 
@@ -92,21 +79,22 @@ CREATE TABLE IF NOT EXISTS {_SCHEMA_KPI}.fato_ut_subfase (
 # SELECT de carga — usado no INSERT INTO ... SELECT
 #
 # Ciclos suportados:
-#   CICLO_1_PADRAO            : Exec(4) → Rev(4) → Cor(4)          nota na Cor
-#   CICLO_2_REVISAO_CORRECAO  : Exec(4) → RevCor(4)                nota na RevCor
-#   CICLO_3_SEM_CORRECAO      : Exec(4) → Rev(4)                   sem nota
-#   CICLO_4_REVISAO_FINAL     : Exec(4) → [Rev(4) →] [Cor(4) →] RevFinal(4)
-#                               tipo_etapa_id=5, sem nota, 40/60 fixo
+#   CICLO_1_PADRAO            : Exec(1) → Rev(2) → Cor(3)          nota na Cor
+#   CICLO_2_REVISAO_CORRECAO  : Exec(1) → RevCor(4)                nota na RevCor
+#   CICLO_3_SEM_CORRECAO      : Exec(1) → Rev(2)                   sem nota
+#   CICLO_4_REVISAO_FINAL     : Exec(1) → [Rev(2) →] [Cor(3) →] RevFinal(5)
+#                               sem nota, 40/60 fixo
 #
-# Variantes x.1/x.2/x.3 (Não Finalizada intermediária) são capturadas por
-# possui_nao_finalizada_no_historico e somente_finalizada_ou_nao_finalizada.
+# ATENÇÃO — bug de NULL em SQL:
+#   NOT (NULL BETWEEN 1 AND 9)  →  NULL  (não TRUE)
+#   Por isso as condições de nota inválida usam:
+#   nota IS NULL OR nota NOT BETWEEN 1 AND 9
 # ---------------------------------------------------------------------------
 
 SQL_SELECT_FATO_UT_SUBFASE = f"""
 WITH ut_base AS (
     SELECT
         ut.id                                                  AS ut_id,
-        ut.nome                                                AS ut_nome,
         ut.lote_id,
         ut.bloco_id,
         ut.subfase_id,
@@ -117,7 +105,6 @@ WITH ut_base AS (
         sf.nome                                                AS subfase_nome,
         fase.id                                                AS fase_id,
         tf.nome                                                AS fase_nome,
-        proj.id                                                AS projeto_id,
         proj.nome                                              AS projeto_nome
     FROM {_SCHEMA_SNAPSHOT}.macrocontrole_unidade_trabalho ut
     JOIN {_SCHEMA_SNAPSHOT}.macrocontrole_lote lote
@@ -229,8 +216,6 @@ historico_ut_subfase AS (
         COUNT(*) FILTER (WHERE atv.tipo_situacao_id = 5)       AS total_nao_finalizadas,
         COUNT(*) FILTER (WHERE atv.tipo_situacao_id IN (1, 2, 3)) AS total_pendentes,
         BOOL_OR(atv.tipo_situacao_id = 5)                      AS possui_nao_finalizada_no_historico,
-        -- TRUE quando todas as atividades são Finalizada(4) ou Não finalizada(5):
-        -- sinal de que não há mais trabalho em andamento nesta UT/subfase.
         BOOL_AND(atv.tipo_situacao_id IN (4, 5))               AS somente_finalizada_ou_nao_finalizada,
         STRING_AGG(
             CASE
@@ -262,14 +247,12 @@ pivot_vigente AS (
         MAX(CASE WHEN av.tipo_etapa_id = 1 THEN av.usuario_id END)          AS exec_usuario_id,
         MAX(CASE WHEN av.tipo_etapa_id = 1 THEN av.tipo_situacao_id END)    AS exec_tipo_situacao_id,
         MAX(CASE WHEN av.tipo_etapa_id = 1 THEN av.tipo_situacao_nome END)  AS exec_tipo_situacao_nome,
-        MAX(CASE WHEN av.tipo_etapa_id = 1 THEN av.observacao END)          AS exec_observacao,
         BOOL_OR(CASE WHEN av.tipo_etapa_id = 1 THEN av.etapa_canonica_ambigua ELSE FALSE END) AS exec_ambigua,
 
         MAX(CASE WHEN av.tipo_etapa_id = 2 THEN av.atividade_id END)        AS rev_atividade_id,
         MAX(CASE WHEN av.tipo_etapa_id = 2 THEN av.usuario_id END)          AS rev_usuario_id,
         MAX(CASE WHEN av.tipo_etapa_id = 2 THEN av.tipo_situacao_id END)    AS rev_tipo_situacao_id,
         MAX(CASE WHEN av.tipo_etapa_id = 2 THEN av.tipo_situacao_nome END)  AS rev_tipo_situacao_nome,
-        MAX(CASE WHEN av.tipo_etapa_id = 2 THEN av.observacao END)          AS rev_observacao,
         BOOL_OR(CASE WHEN av.tipo_etapa_id = 2 THEN av.etapa_canonica_ambigua ELSE FALSE END) AS rev_ambigua,
 
         MAX(CASE WHEN av.tipo_etapa_id = 3 THEN av.atividade_id END)        AS cor_atividade_id,
@@ -290,7 +273,6 @@ pivot_vigente AS (
         MAX(CASE WHEN av.tipo_etapa_id = 5 THEN av.usuario_id END)          AS revfinal_usuario_id,
         MAX(CASE WHEN av.tipo_etapa_id = 5 THEN av.tipo_situacao_id END)    AS revfinal_tipo_situacao_id,
         MAX(CASE WHEN av.tipo_etapa_id = 5 THEN av.tipo_situacao_nome END)  AS revfinal_tipo_situacao_nome,
-        MAX(CASE WHEN av.tipo_etapa_id = 5 THEN av.observacao END)          AS revfinal_observacao,
         BOOL_OR(CASE WHEN av.tipo_etapa_id = 5 THEN av.etapa_canonica_ambigua ELSE FALSE END) AS revfinal_ambigua
 
     FROM atividade_vigente av
@@ -350,20 +332,15 @@ usuarios AS (
 ),
 consolidado_base AS (
     SELECT
-        ub.projeto_id,
-        ub.projeto_nome,
-        ub.lote_id,
-        ub.lote_nome,
-        ub.bloco_id,
-        ub.bloco_nome,
-        ub.fase_id,
-        ub.fase_nome,
-        ub.subfase_id,
-        ub.subfase_nome,
         ub.ut_id,
-        ub.ut_nome,
+        ub.subfase_id,
         ub.ut_disponivel,
         ub.ut_dificuldade,
+        ub.lote_nome,
+        ub.bloco_nome,
+        ub.subfase_nome,
+        ub.fase_nome,
+        ub.projeto_nome,
 
         hs.total_atividades,
         hs.total_finalizada_ou_nao_finalizada,
@@ -410,10 +387,10 @@ consolidado_base AS (
         nrc.texto_nota_revisao_correcao,
 
         CASE
-            WHEN COALESCE(pv.exec_ambigua,    FALSE)
-              OR COALESCE(pv.rev_ambigua,     FALSE)
-              OR COALESCE(pv.cor_ambigua,     FALSE)
-              OR COALESCE(pv.revcor_ambigua,  FALSE)
+            WHEN COALESCE(pv.exec_ambigua,     FALSE)
+              OR COALESCE(pv.rev_ambigua,      FALSE)
+              OR COALESCE(pv.cor_ambigua,      FALSE)
+              OR COALESCE(pv.revcor_ambigua,   FALSE)
               OR COALESCE(pv.revfinal_ambigua, FALSE)
             THEN 'INCONSISTENTE_CICLO'
             -- Ciclo 1: Exec + Rev + Cor, sem RevCor e sem RevFinal
@@ -423,21 +400,21 @@ consolidado_base AS (
              AND pv.revcor_atividade_id   IS NULL
              AND pv.revfinal_atividade_id IS NULL
             THEN 'CICLO_1_PADRAO'
-            -- Ciclo 2: Exec + RevCor, sem Rev e sem Cor e sem RevFinal
+            -- Ciclo 2: Exec + RevCor, sem Rev/Cor/RevFinal
             WHEN pv.exec_atividade_id     IS NOT NULL
              AND pv.rev_atividade_id      IS NULL
              AND pv.cor_atividade_id      IS NULL
              AND pv.revcor_atividade_id   IS NOT NULL
              AND pv.revfinal_atividade_id IS NULL
             THEN 'CICLO_2_REVISAO_CORRECAO'
-            -- Ciclo 3: Exec + Rev, sem Cor e sem RevCor e sem RevFinal
+            -- Ciclo 3: Exec + Rev, sem Cor/RevCor/RevFinal
             WHEN pv.exec_atividade_id     IS NOT NULL
              AND pv.rev_atividade_id      IS NOT NULL
              AND pv.cor_atividade_id      IS NULL
              AND pv.revcor_atividade_id   IS NULL
              AND pv.revfinal_atividade_id IS NULL
             THEN 'CICLO_3_SEM_CORRECAO'
-            -- Ciclo 4: Exec + RevFinal (com ou sem Rev e/ou Cor intermediários)
+            -- Ciclo 4: Exec + RevFinal (com ou sem Rev/Cor intermediários), sem RevCor
             WHEN pv.exec_atividade_id     IS NOT NULL
              AND pv.revcor_atividade_id   IS NULL
              AND pv.revfinal_atividade_id IS NOT NULL
@@ -455,7 +432,7 @@ consolidado_base AS (
       ON nc.ut_id      = ub.ut_id
      AND nc.subfase_id = ub.subfase_id
     LEFT JOIN nota_revisao_correcao nrc
-      ON nrc.ut_id     = ub.ut_id
+      ON nrc.ut_id      = ub.ut_id
      AND nrc.subfase_id = ub.subfase_id
     LEFT JOIN usuarios ue  ON ue.usuario_id  = pv.exec_usuario_id
     LEFT JOIN usuarios ur  ON ur.usuario_id  = pv.rev_usuario_id
@@ -467,8 +444,8 @@ consolidado_regras AS (
     SELECT
         cb.*,
 
-        -- nota_qualidade: nota de 1-9 extraída da observação da etapa revisora
-        -- (Correção no ciclo 1, RevCor no ciclo 2; ciclos 3 e 4 não têm nota)
+        -- nota_qualidade: nota 1-9 extraída da observação da etapa revisora.
+        -- Ciclos 3 e 4 não têm nota (NULL esperado).
         CASE
             WHEN cb.ciclo_modelo = 'CICLO_1_PADRAO'           THEN cb.nota_correcao
             WHEN cb.ciclo_modelo = 'CICLO_2_REVISAO_CORRECAO' THEN cb.nota_revisao_correcao
@@ -481,18 +458,12 @@ consolidado_regras AS (
             ELSE NULL
         END                                                     AS texto_qualidade,
 
-        -- usuario_revisor_id / nome: quem fez a revisão final de cada ciclo
-        CASE
-            WHEN cb.ciclo_modelo = 'CICLO_2_REVISAO_CORRECAO' THEN cb.revcor_usuario_id
-            WHEN cb.ciclo_modelo = 'CICLO_4_REVISAO_FINAL'    THEN cb.revfinal_usuario_id
-            ELSE cb.rev_usuario_id
-        END                                                     AS usuario_revisor_id,
-
+        -- usuario_revisor_nome: quem executou a etapa revisora final do ciclo
         CASE
             WHEN cb.ciclo_modelo = 'CICLO_2_REVISAO_CORRECAO' THEN cb.usuario_revisor_nome_revisao_correcao
             WHEN cb.ciclo_modelo = 'CICLO_4_REVISAO_FINAL'    THEN cb.usuario_revisor_final_nome
             ELSE cb.usuario_revisor_nome_revisao
-        END                                                     AS usuario_revisor_nome,
+        END                                                     AS usuario_revisor_nome_vigente,
 
         CASE
             WHEN cb.ciclo_modelo = 'CICLO_2_REVISAO_CORRECAO' THEN cb.revcor_tipo_situacao_id
@@ -506,8 +477,7 @@ consolidado_regras AS (
             ELSE cb.rev_tipo_situacao_nome
         END                                                     AS revisao_vigente_tipo_situacao_nome,
 
-        -- concluida: todas as etapas do ciclo finalizadas (id=4)
-        -- + confirmação via somente_finalizada_ou_nao_finalizada (sem trabalho em andamento)
+        -- concluida: etapas do ciclo finalizadas + sem trabalho em andamento
         CASE
             WHEN cb.ciclo_modelo = 'CICLO_1_PADRAO'
              AND cb.exec_tipo_situacao_id = 4
@@ -528,7 +498,7 @@ consolidado_regras AS (
              AND COALESCE(cb.somente_finalizada_ou_nao_finalizada, FALSE)
             THEN TRUE
             WHEN cb.ciclo_modelo = 'CICLO_4_REVISAO_FINAL'
-             AND cb.exec_tipo_situacao_id    = 4
+             AND cb.exec_tipo_situacao_id     = 4
              AND cb.revfinal_tipo_situacao_id = 4
              AND COALESCE(cb.somente_finalizada_ou_nao_finalizada, FALSE)
             THEN TRUE
@@ -537,60 +507,62 @@ consolidado_regras AS (
 
         CASE
             WHEN cb.ut_disponivel IS FALSE
-            THEN 'UT BLOQUEADA'
+                THEN 'UT BLOQUEADA'
             WHEN COALESCE(cb.ut_dificuldade, 0) = 0
-            THEN 'INCONSISTENTE_DIFICULDADE'
+                THEN 'INCONSISTENTE_DIFICULDADE'
             WHEN cb.ciclo_modelo = 'INCONSISTENTE_CICLO'
-            THEN 'INCONSISTENTE_CICLO'
+                THEN 'INCONSISTENTE_CICLO'
             WHEN COALESCE(cb.exec_tipo_situacao_id, 0) <> 4
-            THEN 'PENDENTE_EXECUCAO'
+                THEN 'PENDENTE_EXECUCAO'
             -- Pendente revisão por ciclo
             WHEN cb.ciclo_modelo IN ('CICLO_1_PADRAO', 'CICLO_3_SEM_CORRECAO')
              AND COALESCE(cb.rev_tipo_situacao_id, 0) <> 4
-            THEN 'PENDENTE_REVISAO'
+                THEN 'PENDENTE_REVISAO'
             WHEN cb.ciclo_modelo = 'CICLO_2_REVISAO_CORRECAO'
              AND COALESCE(cb.revcor_tipo_situacao_id, 0) <> 4
-            THEN 'PENDENTE_REVISAO'
+                THEN 'PENDENTE_REVISAO'
             WHEN cb.ciclo_modelo = 'CICLO_4_REVISAO_FINAL'
              AND COALESCE(cb.revfinal_tipo_situacao_id, 0) <> 4
-            THEN 'PENDENTE_REVISAO'
+                THEN 'PENDENTE_REVISAO'
             -- Pendente correção (somente ciclo 1)
             WHEN cb.ciclo_modelo = 'CICLO_1_PADRAO'
              AND cb.rev_tipo_situacao_id = 4
              AND COALESCE(cb.cor_tipo_situacao_id, 0) <> 4
-            THEN 'PENDENTE_CORRECAO'
-            -- Nota inválida (ciclos com nota obrigatória)
+                THEN 'PENDENTE_CORRECAO'
+            -- Nota inválida — usa IS NULL OR NOT BETWEEN para tratar NULL corretamente
+            -- (NOT (NULL BETWEEN 1 AND 9) = NULL em SQL, não TRUE)
             WHEN cb.ciclo_modelo = 'CICLO_1_PADRAO'
              AND cb.cor_tipo_situacao_id = 4
-             AND NOT (cb.nota_correcao BETWEEN 1 AND 9)
-            THEN 'INCONSISTENTE_NOTA'
+             AND (cb.nota_correcao IS NULL OR cb.nota_correcao NOT BETWEEN 1 AND 9)
+                THEN 'INCONSISTENTE_NOTA'
             WHEN cb.ciclo_modelo = 'CICLO_2_REVISAO_CORRECAO'
              AND cb.revcor_tipo_situacao_id = 4
-             AND NOT (cb.nota_revisao_correcao BETWEEN 1 AND 9)
-            THEN 'INCONSISTENTE_NOTA'
-            -- Concluídas com Não Finalizada no histórico
+             AND (cb.nota_revisao_correcao IS NULL OR cb.nota_revisao_correcao NOT BETWEEN 1 AND 9)
+                THEN 'INCONSISTENTE_NOTA'
+            -- Concluídas ciclos sem nota (3 e 4)
             WHEN cb.ciclo_modelo = 'CICLO_3_SEM_CORRECAO'
              AND cb.exec_tipo_situacao_id = 4
              AND cb.rev_tipo_situacao_id  = 4
              AND COALESCE(cb.somente_finalizada_ou_nao_finalizada, FALSE)
              AND COALESCE(cb.possui_nao_finalizada_no_historico, FALSE)
-            THEN 'CONCLUIDA_COM_N_Finalizada'
+                THEN 'CONCLUIDA_COM_N_Finalizada'
             WHEN cb.ciclo_modelo = 'CICLO_3_SEM_CORRECAO'
              AND cb.exec_tipo_situacao_id = 4
              AND cb.rev_tipo_situacao_id  = 4
              AND COALESCE(cb.somente_finalizada_ou_nao_finalizada, FALSE)
-            THEN 'CONCLUIDA_SEM_CORRECAO'
+                THEN 'CONCLUIDA_SEM_CORRECAO'
             WHEN cb.ciclo_modelo = 'CICLO_4_REVISAO_FINAL'
-             AND cb.exec_tipo_situacao_id    = 4
+             AND cb.exec_tipo_situacao_id     = 4
              AND cb.revfinal_tipo_situacao_id = 4
              AND COALESCE(cb.somente_finalizada_ou_nao_finalizada, FALSE)
              AND COALESCE(cb.possui_nao_finalizada_no_historico, FALSE)
-            THEN 'CONCLUIDA_COM_N_Finalizada'
+                THEN 'CONCLUIDA_COM_N_Finalizada'
             WHEN cb.ciclo_modelo = 'CICLO_4_REVISAO_FINAL'
-             AND cb.exec_tipo_situacao_id    = 4
+             AND cb.exec_tipo_situacao_id     = 4
              AND cb.revfinal_tipo_situacao_id = 4
              AND COALESCE(cb.somente_finalizada_ou_nao_finalizada, FALSE)
-            THEN 'CONCLUIDA_SEM_CORRECAO'
+                THEN 'CONCLUIDA_SEM_CORRECAO'
+            -- Concluídas ciclos com nota (1 e 2)
             WHEN cb.ciclo_modelo IN ('CICLO_1_PADRAO', 'CICLO_2_REVISAO_CORRECAO')
              AND COALESCE(cb.somente_finalizada_ou_nao_finalizada, FALSE)
              AND (
@@ -605,7 +577,7 @@ consolidado_regras AS (
                      AND cb.nota_revisao_correcao BETWEEN 1 AND 9)
              )
              AND COALESCE(cb.possui_nao_finalizada_no_historico, FALSE)
-            THEN 'CONCLUIDA_COM_N_Finalizada'
+                THEN 'CONCLUIDA_COM_N_Finalizada'
             WHEN cb.ciclo_modelo IN ('CICLO_1_PADRAO', 'CICLO_2_REVISAO_CORRECAO')
              AND COALESCE(cb.somente_finalizada_ou_nao_finalizada, FALSE)
              AND (
@@ -619,24 +591,18 @@ consolidado_regras AS (
                      AND cb.revcor_tipo_situacao_id = 4
                      AND cb.nota_revisao_correcao BETWEEN 1 AND 9)
              )
-            THEN 'CONCLUIDA_COM_CORRECAO'
+                THEN 'CONCLUIDA_COM_CORRECAO'
             ELSE 'INCONSISTENTE_CICLO'
         END                                                     AS estado_ut_subfase
     FROM consolidado_base cb
 )
 SELECT
-    cr.projeto_id,
     cr.projeto_nome,
-    cr.lote_id,
     cr.lote_nome,
-    cr.bloco_id,
     cr.bloco_nome,
-    cr.fase_id,
     cr.fase_nome,
-    cr.subfase_id,
     cr.subfase_nome,
     cr.ut_id,
-    cr.ut_nome,
 
     cr.ut_disponivel,
     cr.ut_dificuldade,
@@ -651,7 +617,6 @@ SELECT
     cr.observacoes_concatenadas,
 
     cr.exec_atividade_id,
-    cr.exec_usuario_id                                         AS usuario_executor_id,
     cr.usuario_executor_nome,
     CASE
         WHEN cr.exec_atividade_id IS NULL
@@ -662,33 +627,11 @@ SELECT
     cr.exec_tipo_situacao_nome                                 AS executor_tipo_situacao_nome,
 
     cr.rev_atividade_id,
-    cr.usuario_revisor_id,
-    cr.usuario_revisor_nome,
-    CASE
-        WHEN cr.ciclo_modelo = 'CICLO_2_REVISAO_CORRECAO'
-         AND (cr.revcor_atividade_id IS NULL OR cr.revisao_vigente_tipo_situacao_id = 1)
-        THEN 'Não iniciada'
-        WHEN cr.ciclo_modelo = 'CICLO_4_REVISAO_FINAL'
-         AND (cr.revfinal_atividade_id IS NULL OR cr.revisao_vigente_tipo_situacao_id = 1)
-        THEN 'Não iniciada'
-        WHEN cr.ciclo_modelo NOT IN ('CICLO_2_REVISAO_CORRECAO', 'CICLO_4_REVISAO_FINAL')
-         AND (cr.rev_atividade_id IS NULL OR cr.revisao_vigente_tipo_situacao_id = 1)
-        THEN 'Não iniciada'
-        ELSE COALESCE(cr.usuario_revisor_nome, 'Sem usuário')
-    END                                                        AS usuario_revisor_exibicao,
+    cr.usuario_revisor_nome_vigente                            AS usuario_revisor_nome,
     cr.revisao_vigente_tipo_situacao_id,
     cr.revisao_vigente_tipo_situacao_nome,
 
-    cr.cor_atividade_id,
-    cr.cor_usuario_id                                          AS usuario_corretor_id,
     cr.usuario_corretor_nome,
-    CASE
-        WHEN cr.ciclo_modelo <> 'CICLO_1_PADRAO'               THEN NULL
-        WHEN cr.cor_atividade_id IS NULL
-          OR cr.cor_tipo_situacao_id = 1                       THEN 'Não iniciada'
-        ELSE COALESCE(cr.usuario_corretor_nome, 'Sem usuário')
-    END                                                        AS usuario_corretor_exibicao,
-    cr.cor_tipo_situacao_id                                    AS corretor_tipo_situacao_id,
     cr.cor_tipo_situacao_nome                                  AS corretor_tipo_situacao_nome,
 
     cr.nota_qualidade,
@@ -698,22 +641,21 @@ SELECT
     cr.estado_ut_subfase,
     cr.concluida,
 
-    -- percentual_producao_revisor: fração da dificuldade que vai para o revisor
-    -- Ciclos 3 e 4 (sem nota): 40% fixo
-    -- Ciclos 1 e 2 (com nota): fórmula decrescente — nota alta = mais para o executor
+    -- Ciclos 3 e 4 (sem nota): 40% revisor / 60% executor fixo
+    -- Ciclos 1 e 2 (com nota): fórmula decrescente — nota alta = mais para executor
     CASE
         WHEN cr.ciclo_modelo IN ('CICLO_3_SEM_CORRECAO', 'CICLO_4_REVISAO_FINAL')
-        THEN 0.40
+            THEN 0.40
         WHEN cr.nota_qualidade BETWEEN 1 AND 9
-        THEN ROUND((0.4875 - (0.0375 * cr.nota_qualidade))::numeric, 6)
+            THEN ROUND((0.4875 - (0.0375 * cr.nota_qualidade))::numeric, 6)
         ELSE NULL
     END                                                        AS percentual_producao_revisor,
 
     CASE
         WHEN cr.ciclo_modelo IN ('CICLO_3_SEM_CORRECAO', 'CICLO_4_REVISAO_FINAL')
-        THEN 0.60
+            THEN 0.60
         WHEN cr.nota_qualidade BETWEEN 1 AND 9
-        THEN ROUND((1 - (0.4875 - (0.0375 * cr.nota_qualidade)))::numeric, 6)
+            THEN ROUND((1 - (0.4875 - (0.0375 * cr.nota_qualidade)))::numeric, 6)
         ELSE NULL
     END                                                        AS percentual_producao_executor,
 
@@ -722,14 +664,14 @@ SELECT
             'CONCLUIDA_SEM_CORRECAO', 'CONCLUIDA_COM_CORRECAO', 'CONCLUIDA_COM_N_Finalizada'
         ) THEN NULL
         WHEN cr.ciclo_modelo IN ('CICLO_3_SEM_CORRECAO', 'CICLO_4_REVISAO_FINAL')
-        THEN ROUND((cr.ut_dificuldade * 0.60)::numeric, 4)
+            THEN ROUND((cr.ut_dificuldade * 0.60)::numeric, 4)
         WHEN cr.nota_qualidade BETWEEN 1 AND 9
          AND cr.exec_usuario_id IS NOT NULL
          AND cr.cor_usuario_id  IS NOT NULL
          AND cr.exec_usuario_id = cr.cor_usuario_id
-        THEN ROUND((cr.ut_dificuldade * (1 - (0.4875 - (0.0375 * cr.nota_qualidade))))::numeric, 4)
+            THEN ROUND((cr.ut_dificuldade * (1 - (0.4875 - (0.0375 * cr.nota_qualidade))))::numeric, 4)
         WHEN cr.nota_qualidade BETWEEN 1 AND 9
-        THEN ROUND((cr.ut_dificuldade * (1 - (0.4875 - (0.0375 * cr.nota_qualidade))) * (cr.nota_qualidade::numeric / 9.0))::numeric, 4)
+            THEN ROUND((cr.ut_dificuldade * (1 - (0.4875 - (0.0375 * cr.nota_qualidade))) * (cr.nota_qualidade::numeric / 9.0))::numeric, 4)
         ELSE NULL
     END                                                        AS pontos_executor,
 
@@ -738,9 +680,9 @@ SELECT
             'CONCLUIDA_SEM_CORRECAO', 'CONCLUIDA_COM_CORRECAO', 'CONCLUIDA_COM_N_Finalizada'
         ) THEN NULL
         WHEN cr.ciclo_modelo IN ('CICLO_3_SEM_CORRECAO', 'CICLO_4_REVISAO_FINAL')
-        THEN ROUND((cr.ut_dificuldade * 0.40)::numeric, 4)
+            THEN ROUND((cr.ut_dificuldade * 0.40)::numeric, 4)
         WHEN cr.nota_qualidade BETWEEN 1 AND 9
-        THEN ROUND((cr.ut_dificuldade * (0.4875 - (0.0375 * cr.nota_qualidade)))::numeric, 4)
+            THEN ROUND((cr.ut_dificuldade * (0.4875 - (0.0375 * cr.nota_qualidade)))::numeric, 4)
         ELSE NULL
     END                                                        AS pontos_revisor,
 
@@ -748,14 +690,15 @@ SELECT
         WHEN cr.estado_ut_subfase NOT IN (
             'CONCLUIDA_COM_CORRECAO', 'CONCLUIDA_COM_N_Finalizada'
         ) THEN NULL
-        WHEN cr.ciclo_modelo <> 'CICLO_1_PADRAO'               THEN NULL
+        WHEN cr.ciclo_modelo <> 'CICLO_1_PADRAO'
+            THEN NULL
         WHEN cr.nota_qualidade BETWEEN 1 AND 9
          AND cr.exec_usuario_id IS NOT NULL
          AND cr.cor_usuario_id  IS NOT NULL
          AND cr.exec_usuario_id = cr.cor_usuario_id
-        THEN 0.0000::numeric
+            THEN 0.0000::numeric
         WHEN cr.nota_qualidade BETWEEN 1 AND 9
-        THEN ROUND((cr.ut_dificuldade * (1 - (0.4875 - (0.0375 * cr.nota_qualidade))) * (1 - (cr.nota_qualidade::numeric / 9.0)))::numeric, 4)
+            THEN ROUND((cr.ut_dificuldade * (1 - (0.4875 - (0.0375 * cr.nota_qualidade))) * (1 - (cr.nota_qualidade::numeric / 9.0)))::numeric, 4)
         ELSE NULL
     END                                                        AS pontos_corretor
 

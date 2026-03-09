@@ -10,6 +10,7 @@ from sqlalchemy.engine import Engine
 from cp.config.settings import Settings
 from cp.infrastructure.db import criar_engine_cp, criar_engine_sap_test
 from cp.infrastructure.sap_sync.analytics_manager import garantir_views_analytics
+from cp.infrastructure.sap_sync.kpi_manager import garantir_fato_ut_subfase
 
 _FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -62,12 +63,14 @@ def engine_sap(settings: Settings) -> Engine:
 
 @pytest.fixture(scope="session", autouse=True)
 def analytics_views_bootstrap(engine_cp: Engine) -> None:
-    """Garante que as views analíticas existam antes de qualquer teste.
+    """Garante que as views analíticas e a tabela KPI existam antes de qualquer teste.
 
     Escopo de sessão: executa uma única vez por suite de testes.
-    Idempotente — seguro rodar mesmo que as views já existam.
+    Idempotente — recria views e tabela com o DDL atual, corrigindo schemas
+    desatualizados de execucoes anteriores.
     """
     garantir_views_analytics(engine_cp)
+    garantir_fato_ut_subfase(engine_cp)
 
 
 @pytest.fixture()
