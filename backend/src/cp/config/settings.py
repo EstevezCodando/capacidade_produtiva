@@ -34,7 +34,13 @@ class Settings(BaseSettings):
 
     # CP serviço
     cp_api_port: int = Field(default=3050, alias="CP_API_PORT")
+    # Chave interna do CP — usada para assinar cookies de sessão, CSRF, etc.
+    # Gerada automaticamente pelo `uv run configurar` e nunca compartilhada.
     cp_secret_key: str = Field(default="dev-secret", alias="CP_SECRET_KEY")
+    # Chave do servico_autenticacao — o CP não a gera, apenas a recebe.
+    # Deve ser idêntica ao JWT_SECRET do serviço de autenticação SAP para
+    # que a verificação de assinatura dos tokens funcione corretamente.
+    jwt_secret: str = Field(default="dev-secret", alias="JWT_SECRET")
 
     # SAP produção
     sap_db_host: str = Field(alias="SAP_DB_HOST")
@@ -84,6 +90,8 @@ class Settings(BaseSettings):
         if self.environment.lower() == "production":
             if self.cp_secret_key == "dev-secret":
                 raise ValueError("CP_SECRET_KEY deve ser definido em produção.")
+            if self.jwt_secret == "dev-secret":
+                raise ValueError("JWT_SECRET deve ser definido em produção.")
             if not self.auth_url:
                 raise ValueError("AUTH_URL deve ser definido em produção.")
             if not self.auth_admin_user or not self.auth_admin_password:

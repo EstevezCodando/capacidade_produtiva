@@ -136,13 +136,15 @@ def _sync_dominio_tipo_fase(s: Connection, c: Connection) -> ResultadoTabela:
 
 
 def _sync_dgeo_usuario(s: Connection, c: Connection) -> ResultadoTabela:
+    # uuid é o identificador usado no JWT emitido pelo serviço de autenticação.
+    # administrador é necessário para o middleware verifyAdmin.
     return _sync(
         s,
         c,
         "dgeo_usuario",
-        "SELECT id, login, nome, nome_guerra, tipo_posto_grad_id, ativo FROM dgeo.usuario",
+        "SELECT id, login, nome, nome_guerra, tipo_turno_id, tipo_posto_grad_id, administrador, ativo, uuid FROM dgeo.usuario",
         "id",
-        ["id", "login", "nome", "nome_guerra", "tipo_posto_grad_id", "ativo"],
+        ["id", "login", "nome", "nome_guerra", "tipo_turno_id", "tipo_posto_grad_id", "administrador", "ativo", "uuid"],
     )
 
 

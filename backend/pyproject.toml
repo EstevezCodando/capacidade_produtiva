@@ -13,11 +13,13 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "sqlalchemy>=2.0.0",
     "uvicorn[standard]>=0.32.0",
+    "PyJWT>=2.8.0",
 ]
 
 
 [project.scripts]
-inicializar = "cp.cli.bootstrap:main"
+configurar = "cp.cli.bootstrap:main"
+inicializar = "cp.cli.inicializar:main"
 inicializar-db = "cp.cli.bootstrap_db:main"
 inicializar-config = "cp.cli.bootstrap_config:main"
 gerar-config = "cp.cli.create_config:main"
@@ -81,4 +83,5 @@ exclude_lines = [
 branch = true
 source = ["src/cp"]
 omit = ["src/cp/cli/*"]
+
 
