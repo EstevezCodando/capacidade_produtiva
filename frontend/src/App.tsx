@@ -10,6 +10,8 @@ import BlocosProjeto   from '@/pages/BlocosProjeto'
 import Atividades      from '@/pages/Atividades'
 import Exportar        from '@/pages/Exportar'
 import Perfil          from '@/pages/Perfil'
+import AgendaPrevista  from '@/pages/AgendaPrevista'
+import AgendaRealizada from '@/pages/AgendaRealizada'
 
 // Rota protegida — redireciona para /login se não autenticado
 function Protected({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
@@ -42,6 +44,8 @@ export default function App() {
                 <Route path="atividades"    element={<Atividades />} />
                 <Route path="exportar"      element={<Exportar />} />
                 <Route path="agenda"        element={<MinhaAgenda />} />
+                <Route path="agenda-prevista" element={<AgendaPrevista />} />
+                <Route path="agenda-realizada" element={<AgendaRealizada />} />
                 <Route path="agendas"       element={<Protected adminOnly><GerenciarAgendas /></Protected>} />
                 <Route path="operadores"    element={<Protected adminOnly><Operadores /></Protected>} />
                 <Route path="perfil"        element={<Perfil />} />

@@ -20,11 +20,13 @@ const TABS_COMUNS = [
 ]
 
 const TABS_OPERADOR = [
-  { path: '/agenda',     label: 'Minha Agenda'     },
+  { path: '/agenda-prevista',  label: 'Agenda Prevista'  },
+  { path: '/agenda-realizada', label: 'Agenda Realizada' },
 ]
 
 const TABS_ADMIN = [
-  { path: '/agendas',    label: 'Gerenciar Agendas' },
+  { path: '/agenda-prevista',  label: 'Agenda Prevista'  },
+  { path: '/agenda-realizada', label: 'Agenda Realizada' },
   { path: '/operadores', label: 'Operadores'        },
 ]
 

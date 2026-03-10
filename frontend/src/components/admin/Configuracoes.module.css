@@ -1,0 +1,109 @@
+/* ============================================================
+   ConfiguracoesAdmin — Styles
+   ============================================================ */
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.configGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.statBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--bg-raised);
+  border: 1px solid var(--bd-faint);
+  border-radius: var(--r-md);
+}
+
+.statDetail {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--tx-muted);
+}
+
+.vigencia {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-raised);
+  border-radius: var(--r-md);
+}
+
+.vigenciaLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tx-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.vigenciaValue {
+  font-size: 12px;
+  color: var(--tx-secondary);
+}
+
+.erro {
+  padding: 10px 14px;
+  background: var(--error-bg);
+  border: 1px solid rgba(224,82,82,0.3);
+  border-radius: var(--r-md);
+  font-size: 12px;
+  color: var(--error);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.info {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--info-bg);
+  border: 1px solid rgba(91,141,238,0.2);
+  border-radius: var(--r-md);
+  color: var(--tx-secondary);
+}
+
+.info svg {
+  flex-shrink: 0;
+  color: var(--info);
+  margin-top: 2px;
+}
+
+.info p {
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  .configGrid {
+    grid-template-columns: 1fr;
+  }
+}
