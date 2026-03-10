@@ -4,7 +4,7 @@ from getpass import getpass
 from pathlib import Path
 
 from cp.cli.bootstrap_config import ConfigEnv, escrever_config_env
-from cp.cli.bootstrap_db import criar_banco, criar_banco_cp
+from cp.cli.db import criar_banco, criar_banco_cp
 
 
 def _perguntar_texto(pergunta: str) -> str:

@@ -45,6 +45,7 @@ def _token(extra: dict | None = None) -> str:
         payload.update(extra)
     return jwt.encode(payload, _SECRET, algorithm=_ALGORITMO)
 
+
 @pytest.fixture()
 def client() -> TestClient:
     """App de teste isolada — sem lifespan, sem banco, sem config.env.
@@ -66,7 +67,7 @@ def client() -> TestClient:
 
     # Injeta MockAuthProvider diretamente
     test_app.state.auth_provider = MockAuthProvider(jwt_secret=_SECRET)
-    
+
     # Injeta um mock para a engine do banco
     test_app.state.engine_cp = MagicMock()
 
@@ -83,13 +84,14 @@ def client() -> TestClient:
 
     mock_conn = MagicMock()
     mock_result = MagicMock()
-    
+
     mock_result.fetchone.return_value = MockRow()
     mock_conn.execute.return_value = mock_result
     test_app.state.engine_cp.connect.return_value.__enter__.return_value = mock_conn
 
     with TestClient(test_app, raise_server_exceptions=True) as c:
         yield c
+
 
 # ---------------------------------------------------------------------------
 # /health — publico
