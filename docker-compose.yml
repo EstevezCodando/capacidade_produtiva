@@ -1,0 +1,85 @@
+# docker-compose.yml — CapacidadeProdutiva
+#
+# Servicos:
+#   cp_db   — PostgreSQL do CP (banco auxiliar, schemas sap_snapshot + kpi)
+#   backend — API FastAPI + pipeline de inicializacao
+#
+# O SAP (banco de origem) nao e gerenciado aqui — e externo e somente-leitura.
+# Suas credenciais sao fornecidas via variaveis de ambiente SAP_DB_*.
+#
+# Uso rapido:
+#   cp .env.example .env          # editar com suas credenciais
+#   docker compose up --build
+#
+# O servico backend aguarda o cp_db estar saudavel antes de iniciar
+# e entao executa o pipeline completo:
+#   check -> alembic upgrade head -> sincronizar-sap -> uvicorn
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Banco de dados do CP
+  # ---------------------------------------------------------------------------
+  cp_db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${CP_DB_NAME:-capacidade_produtiva}
+      POSTGRES_USER:     ${CP_DB_USER:-cp_user}
+      POSTGRES_PASSWORD: ${CP_DB_PASSWORD}
+    volumes:
+      - cp_db_data:/var/lib/postgresql/data
+    ports:
+      # Expoe somente em loopback para nao abrir o banco para a rede
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CP_DB_USER:-cp_user} -d ${CP_DB_NAME:-capacidade_produtiva}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # Backend — API + pipeline de inicializacao
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      cp_db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+
+      # Banco CP — aponta para o servico cp_db desta stack
+      CP_DB_HOST:     cp_db
+      CP_DB_PORT:     5432
+      CP_DB_NAME:     ${CP_DB_NAME:-capacidade_produtiva}
+      CP_DB_USER:     ${CP_DB_USER:-cp_user}
+      CP_DB_PASSWORD: ${CP_DB_PASSWORD}
+      CP_API_PORT:    ${CP_API_PORT:-3050}
+
+      # Banco SAP — externo, somente leitura
+      SAP_DB_HOST:     ${SAP_DB_HOST}
+      SAP_DB_PORT:     ${SAP_DB_PORT:-5432}
+      SAP_DB_NAME:     ${SAP_DB_NAME}
+      SAP_DB_USER:     ${SAP_DB_USER}
+      SAP_DB_PASSWORD: ${SAP_DB_PASSWORD}
+
+      # Auth
+      JWT_SECRET:           ${JWT_SECRET}
+      AUTH_URL:             ${AUTH_URL}
+      AUTH_ADMIN_USER:      ${AUTH_ADMIN_USER}
+      AUTH_ADMIN_PASSWORD:  ${AUTH_ADMIN_PASSWORD}
+
+    ports:
+      - "${CP_API_PORT:-3050}:${CP_API_PORT:-3050}"
+
+    # Pipeline completo: qualidade -> migracoes -> sync -> API
+    command: ["uv", "run", "inicializar"]
+
+volumes:
+  cp_db_data:
+    driver: local

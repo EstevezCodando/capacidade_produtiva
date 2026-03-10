@@ -1,102 +1,250 @@
-# CapacidadeProdutiva Backend
+# CapacidadeProdutiva — Backend
 
-Backend do CapacidadeProdutiva.
+Backend que expõe KPIs, relatórios e pontuação operacional, consumindo dados do SAP via snapshot em PostgreSQL.
 
-Responsável por manter um snapshot no schema `sap_snapshot` a partir do banco SAP, desacoplando leitura analítica do banco transacional.
+## Visão geral
 
-O arquivo `config.env` é gerado localmente e **não deve ser commitado**.
+```
+SAP (externo, read-only)
+        │  sincronizar-sap
+        ▼
+  sap_snapshot  ──►  kpi.*  ──►  API /api/...
+  (banco CP)
+```
+
+A API roda na porta **3050** e todas as rotas ficam sob o prefixo `/api`.
+
+---
 
 ## Pré-requisitos
 
-Python 3.12, uv instalado, PostgreSQL acessível, acesso ao banco do SAP (somente leitura).
+| Ferramenta | Versão mínima |
+|------------|---------------|
+| Python     | 3.12          |
+| uv         | 0.5+          |
+| Docker + Compose | qualquer versão recente |
+| PostgreSQL | 16 (ou via Docker) |
 
-## Primeiro uso
+Acesso de leitura ao banco SAP é obrigatório para o sync.
 
-Entre na pasta do backend.
+---
 
-```powershell
+## Execução com Docker Compose (recomendado)
+
+### 1. Configurar variáveis de ambiente
+
+```bash
+cp .env.example .env
+# Editar .env com as credenciais reais
+```
+
+Variáveis obrigatórias no `.env`:
+
+| Variável | Descrição |
+|---|---|
+| `CP_DB_PASSWORD` | Senha do banco CP (criado pelo Compose) |
+| `SAP_DB_HOST` | Host do banco SAP externo |
+| `SAP_DB_NAME` | Nome do banco SAP |
+| `SAP_DB_USER` | Usuário SAP (somente leitura) |
+| `SAP_DB_PASSWORD` | Senha do SAP |
+| `JWT_SECRET` | Chave compartilhada com o serviço de autenticação |
+| `AUTH_URL` | URL do serviço de autenticação |
+| `AUTH_ADMIN_USER` | Usuário admin no serviço de auth |
+| `AUTH_ADMIN_PASSWORD` | Senha do admin no serviço de auth |
+
+Gerar um `JWT_SECRET` seguro:
+
+```bash
+openssl rand -base64 48
+```
+
+### 2. Subir
+
+```bash
+docker compose up --build
+```
+
+Na primeira execução, o serviço `backend` vai automaticamente:
+
+1. Rodar os testes e verificações de qualidade (`check`)
+2. Aplicar as migrações do banco CP (`alembic upgrade head`)
+3. Sincronizar o snapshot do SAP (`sincronizar-sap`)
+4. Subir a API em `http://localhost:3050`
+
+### 3. Verificar
+
+```bash
+curl http://localhost:3050/api/health
+# {"status":"ok"}
+```
+
+Documentação interativa: [http://localhost:3050/docs](http://localhost:3050/docs)
+
+---
+
+## Execução local (desenvolvimento)
+
+### 1. Entrar na pasta do backend
+
+```bash
 cd backend
 ```
 
-Instale as dependências.
+### 2. Instalar dependências
 
-```powershell
+```bash
 uv sync
 ```
 
-Execute o assistente principal de inicialização.
+### 3. Gerar o config.env interativamente
 
-```powershell
-uv run inicializar
+O assistente pergunta todos os parâmetros de conexão e cria o `config.env`:
+
+```bash
+uv run configurar
 ```
 
-Esse comando gera o `config.env` e pode criar o banco do CP (opcional).
+> **Nota:** O comando que antes se chamava `inicializar` passou a se chamar `configurar`.  
+> O novo `inicializar` executa o pipeline completo (veja abaixo).
 
-Depois aplique as migrações.
+### 4. Aplicar migrações
 
-```powershell
+```bash
 uv run alembic upgrade head
 ```
 
-Em seguida, execute a sincronização do SAP para o snapshot do CP.
+### 5. Sincronizar o SAP
 
-```powershell
+```bash
 uv run sincronizar-sap
 ```
 
-## Fluxo normal de desenvolvimento
+### 6. Subir a API
 
-Rodar a aplicação.
-
-```powershell
-uv run uvicorn cp.main:app --reload
+```bash
+uv run uvicorn cp.main:app --reload --port 3050
 ```
 
-Rodar testes.
+### Ou: pipeline completo de uma vez
 
-```powershell
+```bash
+uv run inicializar
+```
+
+Executa na ordem: `check` → `alembic upgrade head` → `sincronizar-sap` → `uvicorn`.
+
+---
+
+## Rotas da API
+
+| Método | Rota | Autenticação | Descrição |
+|--------|------|---|---|
+| `GET` | `/api/health` | — | Health check |
+| `GET` | `/api/usuarios/me` | Token JWT | Dados do usuário autenticado |
+| `GET` | `/api/usuarios` | Admin | Lista usuários (admin only) |
+
+### Autenticação
+
+O token JWT é emitido pelo serviço de autenticação SAP. Enviar no header:
+
+```
+Authorization: Bearer <token>
+# ou sem prefixo:
+Authorization: <token>
+```
+
+Respostas de erro:
+
+| Código | Situação |
+|--------|----------|
+| 401 | Token ausente, inválido ou expirado |
+| 403 | Rota restrita a administradores |
+
+---
+
+## Desenvolvimento
+
+### Comandos úteis
+
+```bash
+# Verificacao completa (testes + lint + type-check)
+uv run check
+
+# Somente testes
 uv run pytest
-```
 
-Lint.
-
-```powershell
+# Lint
 uv run ruff check .
-```
 
-Formatar código.
-
-```powershell
+# Formatar
 uv run ruff format .
-```
 
-Type check.
-
-```powershell
+# Type check
 uv run mypy src
 ```
 
-## Sobre o config.env
+### Scripts disponíveis
 
-O arquivo fica em `backend/config.env`. Ele é lido pelo `Settings` e não deve ir para o git.
+| Comando | Descrição |
+|---|---|
+| `uv run configurar` | Assistente interativo para gerar `config.env` |
+| `uv run inicializar` | Pipeline completo: check + migrações + sync + API |
+| `uv run sincronizar-sap` | Sincroniza SAP → sap_snapshot |
+| `uv run check` | Testes + lint + mypy |
+| `uv run alembic upgrade head` | Aplica migrações pendentes |
 
-Exemplo mínimo para ambiente local.
+---
+
+## Estrutura do projeto
+
+```
+proj/
+├── docker-compose.yml          # Stack completa (cp_db + backend)
+├── .env.example                # Template de variáveis de ambiente
+└── backend/
+    ├── Dockerfile              # Multi-stage: builder + runtime
+    ├── pyproject.toml
+    ├── alembic/                # Migrações do banco CP
+    └── src/cp/
+        ├── api/
+        │   ├── deps.py         # verifyLogin, verifyAdmin, aliases tipados
+        │   └── rotas/          # Controllers (sem lógica de negócio)
+        ├── domain/             # Modelos e regras de domínio
+        ├── infrastructure/     # DB, auth JWT, sap_sync
+        ├── application/        # Serviços de aplicação
+        ├── config/             # Settings (pydantic-settings)
+        └── cli/                # Entrypoints CLI
+```
+
+---
+
+## Variáveis de ambiente completas
 
 ```env
-ENVIRONMENT=local
+ENVIRONMENT=production           # production | local
 
-CP_DB_HOST=localhost
+# Banco CP
+CP_DB_HOST=cp_db
 CP_DB_PORT=5432
-CP_DB_NAME=cp_teste
-CP_DB_USER=postgres
-CP_DB_PASSWORD=postgres
+CP_DB_NAME=capacidade_produtiva
+CP_DB_USER=cp_user
+CP_DB_PASSWORD=...
+CP_API_PORT=3050
 
-SAP_DB_HOST=localhost
+# Banco SAP (externo)
+SAP_DB_HOST=...
 SAP_DB_PORT=5432
-SAP_DB_NAME=sap
-SAP_DB_USER=postgres
-SAP_DB_PASSWORD=postgres
+SAP_DB_NAME=...
+SAP_DB_USER=...
+SAP_DB_PASSWORD=...
 
+# Auth
+JWT_SECRET=...                   # Mesma chave do serviço de autenticação
+AUTH_URL=http://sap-auth:3001
+AUTH_ADMIN_USER=...
+AUTH_ADMIN_PASSWORD=...
+
+# SAP de teste (dev/CI apenas)
 SAP_TEST_DB_HOST=localhost
 SAP_TEST_DB_PORT=5432
 SAP_TEST_DB_NAME=sap_test
@@ -104,91 +252,37 @@ SAP_TEST_DB_USER=postgres
 SAP_TEST_DB_PASSWORD=postgres
 ```
 
-O CI materializa um `config.env` temporário automaticamente apenas para testes. O CI não precisa de auth.
+---
 
-## Docker
+## Solução de problemas
 
-Build da imagem, execute na pasta `backend`.
+### Limpar e recriar ambiente uv
 
-```powershell
-docker build -t capacidade-prod-backend .
-```
-
-Rodar a aplicação.
-
-```powershell
-docker run -p 8000:8000 capacidade-prod-backend
-```
-
-O container não gera `config.env`. As variáveis devem ser fornecidas via `--env-file`, `-e`, Docker Compose ou secrets do deploy.
-
-## Solução de problemas e limpeza de cache
-
-Se aparecer erro de ambiente ou dependências inconsistentes, primeiro valide que você está no diretório `backend`.
-
-### Limpar cache e recriar o ambiente uv
-
-Remove o ambiente virtual e recria do zero.
-
-```powershell
+```bash
 cd backend
-Remove-Item -Recurse -Force .venv
-uv sync
+# Windows
+Remove-Item -Recurse -Force .venv && uv sync
+# Linux/macOS
+rm -rf .venv && uv sync
 ```
 
-Se o `uv sync` reclamar de lock desatualizado, gere lock e sincronize.
+### Resetar migrações em dev
 
-```powershell
-cd backend
-uv lock
-uv sync
-```
-
-### Limpar caches do uv e do pip
-
-Em casos raros de download corrompido ou cache inconsistente.
-
-```powershell
-cd backend
-uv cache clean
-python -m pip cache purge
-```
-
-### Limpar artefatos do pytest e cobertura
-
-```powershell
-cd backend
-Remove-Item -Recurse -Force .pytest_cache, .coverage, htmlcov -ErrorAction SilentlyContinue
-```
-
-### Resetar migrações em ambiente de teste
-
-Se você apagou o banco ou criou do zero e ficou com estado de migração estranho, o correto é recriar o banco e rodar `alembic upgrade head`. Evite apagar `alembic_version` em ambiente real.
-
-Para desenvolvimento local, se precisar limpar versão de migração manualmente.
-
-```powershell
-# Ajuste o caminho do psql conforme sua instalação
-& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -d cp_teste -c "DELETE FROM alembic_version;"
+```bash
+# Apagar versão e reaplicar do zero
+psql -U postgres -d capacidade_produtiva -c "DELETE FROM alembic_version;"
 uv run alembic upgrade head
 ```
 
-### Limpar snapshot
+### Limpar snapshot inconsistente
 
-Se o snapshot estiver inconsistente durante desenvolvimento, você pode truncar as tabelas do schema `sap_snapshot` e rodar `sincronizar-sap` novamente. Faça isso apenas em ambiente local ou de teste.
+Truncar e resincronizar (somente em dev/local):
 
-## Estrutura do projeto
-
-```text
-src/cp/
-  domain/
-  application/
-  infrastructure/
-  api/
-  config/
-
-tests/
-  fixtures/
+```bash
+psql -U postgres -d capacidade_produtiva -c "
+  TRUNCATE sap_snapshot.macrocontrole_atividade,
+           sap_snapshot.macrocontrole_unidade_trabalho
+  CASCADE;
+"
+uv run sincronizar-sap
 ```
-
-O snapshot do SAP é gravado no schema `sap_snapshot` do banco CP.
