@@ -15,10 +15,6 @@ import re
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-<<<<<<< HEAD:backend/src/cp/cli/bootstrap_db.py
-from cp.infrastructure.sap_sync.analytics_manager import garantir_views_analytics
-=======
->>>>>>> feature/front:backend/src/cp/cli/db.py
 from cp.infrastructure.sap_sync.kpi_manager import garantir_tabelas_kpi
 
 _SCHEMAS_CP: tuple[str, ...] = (
@@ -106,15 +102,11 @@ def criar_banco_cp(
     dsn_cp = f"postgresql+psycopg2://{usuario_admin}:{senha_admin}@{host}:{port}/{nome_banco}"
     engine_cp = create_engine(dsn_cp, future=True)
     _criar_schemas_cp(engine_cp)
-<<<<<<< HEAD:backend/src/cp/cli/bootstrap_db.py
-    garantir_views_analytics(engine_cp)
-=======
     # Nota: garantir_views_analytics NÃO é chamado aqui.
     # As views do sap_analytics fazem JOIN nas tabelas do sap_snapshot,
     # que só existem após a primeira execução do pipeline de sync SAP.
     # As views são criadas/atualizadas automaticamente pelo sync.py
     # ao final de cada ingestão (atualizar_views_analytics).
->>>>>>> feature/front:backend/src/cp/cli/db.py
     garantir_tabelas_kpi(engine_cp)
 
     return criado_agora

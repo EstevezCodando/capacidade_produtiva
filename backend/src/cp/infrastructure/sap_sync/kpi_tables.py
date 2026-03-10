@@ -1124,17 +1124,6 @@ CREATE TABLE IF NOT EXISTS {_K}.distribuicao_pontos (
     ut_id               integer     NOT NULL,
     pontos_ut           numeric,
     ciclo_modelo        text        NOT NULL,
-<<<<<<< HEAD
-    nota                integer,
-    nota_valida         boolean     NOT NULL,
-
-    nome_executor       text,
-    pontos_executor     numeric(10, 4),
-
-    nome_corretor       text,
-    pontos_corretor     numeric(10, 4),
-
-=======
     nota_final          integer,
     texto_nota          text,
     nota_valida         boolean     NOT NULL,
@@ -1148,7 +1137,6 @@ CREATE TABLE IF NOT EXISTS {_K}.distribuicao_pontos (
     pontos_corretor     numeric(10, 4),
 
     revisor_id          integer,
->>>>>>> feature/front
     nome_revisor        text,
     pontos_revisor      numeric(10, 4),
 
@@ -1162,15 +1150,6 @@ flu AS (SELECT * FROM {_K}.fluxo_ut),
 vn  AS (SELECT * FROM {_K}.validacao_nota),
 pu  AS (SELECT * FROM {_K}.pontos_usuario),
 executor AS (
-<<<<<<< HEAD
-    SELECT ut_id, usuario_nome, pontos FROM pu WHERE papel = 'EXECUTOR'
-),
-revisor AS (
-    SELECT ut_id, usuario_nome, pontos FROM pu WHERE papel = 'REVISOR'
-),
-corretor AS (
-    SELECT ut_id, usuario_nome, pontos FROM pu WHERE papel = 'CORRETOR'
-=======
     SELECT ut_id, usuario_id, usuario_nome, pontos FROM pu WHERE papel = 'EXECUTOR'
 ),
 revisor AS (
@@ -1178,7 +1157,6 @@ revisor AS (
 ),
 corretor AS (
     SELECT ut_id, usuario_id, usuario_nome, pontos FROM pu WHERE papel = 'CORRETOR'
->>>>>>> feature/front
 )
 SELECT
     f.projeto_nome,
@@ -1186,17 +1164,6 @@ SELECT
     f.ut_id,
     f.ut_dificuldade                                           AS pontos_ut,
     f.ciclo_modelo,
-<<<<<<< HEAD
-    vn.nota_qualidade                                          AS nota,
-    vn.nota_valida,
-
-    ex.usuario_nome                                            AS nome_executor,
-    ex.pontos                                                  AS pontos_executor,
-
-    co.usuario_nome                                            AS nome_corretor,
-    co.pontos                                                  AS pontos_corretor,
-
-=======
     vn.nota_qualidade                                          AS nota_final,
     vn.texto_qualidade                                         AS texto_nota,
     vn.nota_valida,
@@ -1210,7 +1177,6 @@ SELECT
     co.pontos                                                  AS pontos_corretor,
 
     rv.usuario_id                                              AS revisor_id,
->>>>>>> feature/front
     rv.usuario_nome                                            AS nome_revisor,
     rv.pontos                                                  AS pontos_revisor
 

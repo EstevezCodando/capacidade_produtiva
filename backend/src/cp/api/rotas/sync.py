@@ -7,14 +7,6 @@ Politica de autorizacao:
 
 from __future__ import annotations
 
-<<<<<<< HEAD
-from fastapi import APIRouter
-from pydantic import BaseModel
-
-from cp.api.deps import SomenteAdmin
-
-router = APIRouter(prefix="/sync", tags=["sync"])
-=======
 import logging
 from datetime import datetime
 from typing import cast
@@ -35,7 +27,6 @@ _ultima_execucao: dict[str, str | None] = {
     "timestamp": None,
     "status": "nao_executado",
 }
->>>>>>> feature/front
 
 
 class SyncStatus(BaseModel):
@@ -48,16 +39,6 @@ class SyncIniciado(BaseModel):
     detail: str
 
 
-<<<<<<< HEAD
-@router.get("/status", summary="Status da ultima sincronizacao")
-def sync_status(_: SomenteAdmin) -> SyncStatus:
-    """Retorna timestamp e resultado do ultimo pipeline SAP -> sap_snapshot -> kpi."""
-    # Stub — implementacao real consulta log.ingestao_execucao
-    return SyncStatus(
-        sap_snapshot_atualizado_em=None,
-        kpi_calculado_em=None,
-        ultima_execucao_status="nao_executado",
-=======
 def _obter_timestamp_snapshot(engine_cp: Engine) -> str | None:
     """Obtém timestamp da última atualização do snapshot."""
     sql = text("""
@@ -130,17 +111,10 @@ def sync_status(_: SomenteAdmin, request: Request) -> SyncStatus:
         sap_snapshot_atualizado_em=_obter_timestamp_snapshot(engine_cp),
         kpi_calculado_em=_obter_timestamp_kpi(engine_cp),
         ultima_execucao_status=_ultima_execucao.get("status", "nao_executado"),
->>>>>>> feature/front
     )
 
 
 @router.post("/executar", summary="Disparar sincronizacao manual", status_code=202)
-<<<<<<< HEAD
-def sync_executar(_: SomenteAdmin) -> SyncIniciado:
-    """Aciona o pipeline completo de forma imediata (botao Sincronizar SAP)."""
-    # Stub — implementacao real enfileira job APScheduler
-    return SyncIniciado(detail="sincronizacao enfileirada")
-=======
 def sync_executar(
     _: SomenteAdmin,
     request: Request,
@@ -154,4 +128,3 @@ def sync_executar(
     background_tasks.add_task(_executar_sync_background, engine_sap, engine_cp)
 
     return SyncIniciado(detail="sincronização enfileirada")
->>>>>>> feature/front

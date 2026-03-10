@@ -7,17 +7,12 @@ Política de autorização:
 
 from __future__ import annotations
 
-<<<<<<< HEAD
-from fastapi import APIRouter
-from pydantic import BaseModel
-=======
 from typing import Any
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
->>>>>>> feature/front
 
 from cp.api.deps import SomenteAdmin, UsuarioLogado
 
@@ -25,20 +20,6 @@ router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
 
 class UsuarioMe(BaseModel):
-<<<<<<< HEAD
-    usuario_id: int
-    usuario_uuid: str
-    administrador: bool
-
-
-@router.get("/me", summary="Dados do usuário autenticado")
-def me(usuario: UsuarioLogado) -> UsuarioMe:
-    """Retorna o contexto do usuário extraído do JWT."""
-    return UsuarioMe(
-        usuario_id=usuario.usuario_id,
-        usuario_uuid=usuario.usuario_uuid,
-        administrador=usuario.administrador,
-=======
     """Dados do usuário autenticado."""
 
     uuid: str
@@ -101,7 +82,6 @@ def me(usuario: UsuarioLogado, request: Request) -> UsuarioMe:
         administrador=usuario.administrador,
         usuario_id=usuario.usuario_id,
         usuario_uuid=usuario.usuario_uuid,
->>>>>>> feature/front
     )
 
 

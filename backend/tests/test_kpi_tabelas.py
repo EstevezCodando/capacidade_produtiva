@@ -702,11 +702,7 @@ _CAMPOS_DISTRIBUICAO = {
     "ut_id",
     "pontos_ut",
     "ciclo_modelo",
-<<<<<<< HEAD
-    "nota",
-=======
     "nota_final",
->>>>>>> feature/front
     "nota_valida",
     "nome_executor",
     "pontos_executor",

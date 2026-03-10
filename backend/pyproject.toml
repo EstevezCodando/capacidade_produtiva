@@ -19,16 +19,8 @@ dependencies = [
 
 
 [project.scripts]
-<<<<<<< HEAD
-configurar = "cp.cli.bootstrap:main"
-inicializar = "cp.cli.inicializar:main"
-inicializar-db = "cp.cli.bootstrap_db:main"
-inicializar-config = "cp.cli.bootstrap_config:main"
-gerar-config = "cp.cli.create_config:main"
-=======
 configurar = "cp.cli.configurar:main"
 inicializar = "cp.cli.inicializar:main"
->>>>>>> feature/front
 sincronizar-sap = "cp.cli.sync_sap:main"
 check = "cp.cli.check:main"
 

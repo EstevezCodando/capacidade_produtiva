@@ -88,14 +88,10 @@ def test_criar_banco_retorna_true_quando_cria(monkeypatch: pytest.MonkeyPatch) -
 def test_criar_banco_cp_cria_schemas_e_kpi_mesmo_se_banco_ja_existe(monkeypatch: pytest.MonkeyPatch) -> None:
     """Quando o banco já existe, ainda assim garante schemas e tabelas KPI."""
 
-<<<<<<< HEAD:backend/tests/cli/test_bootstrap_db.py
-    chamadas: dict[str, int] = {"schemas": 0, "views": 0, "kpi": 0}
-=======
     def criar_banco_fake(**_kwargs: object) -> bool:
         return False  # Banco já existia
 
     chamadas: dict[str, int] = {"schemas": 0, "kpi": 0}
->>>>>>> feature/front:backend/tests/cli/test_db.py
 
     def criar_schemas_fake(_engine_cp: object) -> None:
         chamadas["schemas"] += 1
@@ -103,24 +99,13 @@ def test_criar_banco_cp_cria_schemas_e_kpi_mesmo_se_banco_ja_existe(monkeypatch:
     def garantir_kpi_fake(_engine_cp: object) -> None:
         chamadas["kpi"] += 1
 
-    def garantir_kpi_fake(_engine_cp: object) -> None:
-        chamadas["kpi"] += 1
-
     def create_engine_fake(_dsn: str, future: bool = True) -> object:
         return object()
 
-<<<<<<< HEAD:backend/tests/cli/test_bootstrap_db.py
-    monkeypatch.setattr(bootstrap_db, "criar_banco", criar_banco_fake)
-    monkeypatch.setattr(bootstrap_db, "_criar_schemas_cp", criar_schemas_fake)
-    monkeypatch.setattr(bootstrap_db, "garantir_views_analytics", garantir_views_fake)
-    monkeypatch.setattr(bootstrap_db, "garantir_tabelas_kpi", garantir_kpi_fake)
-    monkeypatch.setattr(bootstrap_db, "create_engine", create_engine_fake)
-=======
     monkeypatch.setattr(db, "criar_banco", criar_banco_fake)
     monkeypatch.setattr(db, "_criar_schemas_cp", criar_schemas_fake)
     monkeypatch.setattr(db, "garantir_tabelas_kpi", garantir_kpi_fake)
     monkeypatch.setattr(db, "create_engine", create_engine_fake)
->>>>>>> feature/front:backend/tests/cli/test_db.py
 
     criado_agora = db.criar_banco_cp(
         host="localhost",
@@ -132,24 +117,16 @@ def test_criar_banco_cp_cria_schemas_e_kpi_mesmo_se_banco_ja_existe(monkeypatch:
 
     assert criado_agora is False
     assert chamadas["schemas"] == 1
-<<<<<<< HEAD:backend/tests/cli/test_bootstrap_db.py
-    assert chamadas["views"] == 1
-=======
->>>>>>> feature/front:backend/tests/cli/test_db.py
     assert chamadas["kpi"] == 1
 
 
 def test_criar_banco_cp_retorna_true_quando_criou_banco_e_garante_schemas(monkeypatch: pytest.MonkeyPatch) -> None:
     """Quando o banco é criado, retorna True e garante schemas e tabelas KPI."""
 
-<<<<<<< HEAD:backend/tests/cli/test_bootstrap_db.py
-    chamadas: dict[str, int] = {"schemas": 0, "views": 0, "kpi": 0}
-=======
     def criar_banco_fake(**_kwargs: object) -> bool:
         return True  # Banco criado agora
 
     chamadas: dict[str, int] = {"schemas": 0, "kpi": 0}
->>>>>>> feature/front:backend/tests/cli/test_db.py
 
     def criar_schemas_fake(_engine_cp: object) -> None:
         chamadas["schemas"] += 1
@@ -157,24 +134,13 @@ def test_criar_banco_cp_retorna_true_quando_criou_banco_e_garante_schemas(monkey
     def garantir_kpi_fake(_engine_cp: object) -> None:
         chamadas["kpi"] += 1
 
-    def garantir_kpi_fake(_engine_cp: object) -> None:
-        chamadas["kpi"] += 1
-
     def create_engine_fake(_dsn: str, future: bool = True) -> object:
         return object()
 
-<<<<<<< HEAD:backend/tests/cli/test_bootstrap_db.py
-    monkeypatch.setattr(bootstrap_db, "criar_banco", criar_banco_fake)
-    monkeypatch.setattr(bootstrap_db, "_criar_schemas_cp", criar_schemas_fake)
-    monkeypatch.setattr(bootstrap_db, "garantir_views_analytics", garantir_views_fake)
-    monkeypatch.setattr(bootstrap_db, "garantir_tabelas_kpi", garantir_kpi_fake)
-    monkeypatch.setattr(bootstrap_db, "create_engine", create_engine_fake)
-=======
     monkeypatch.setattr(db, "criar_banco", criar_banco_fake)
     monkeypatch.setattr(db, "_criar_schemas_cp", criar_schemas_fake)
     monkeypatch.setattr(db, "garantir_tabelas_kpi", garantir_kpi_fake)
     monkeypatch.setattr(db, "create_engine", create_engine_fake)
->>>>>>> feature/front:backend/tests/cli/test_db.py
 
     criado_agora = db.criar_banco_cp(
         host="localhost",
@@ -186,10 +152,6 @@ def test_criar_banco_cp_retorna_true_quando_criou_banco_e_garante_schemas(monkey
 
     assert criado_agora is True
     assert chamadas["schemas"] == 1
-<<<<<<< HEAD:backend/tests/cli/test_bootstrap_db.py
-    assert chamadas["views"] == 1
-=======
->>>>>>> feature/front:backend/tests/cli/test_db.py
     assert chamadas["kpi"] == 1
 
 

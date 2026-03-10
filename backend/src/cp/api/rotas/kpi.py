@@ -6,32 +6,22 @@ Politica de autorizacao:
     GET /kpi/subfase/{id}          — autenticado
     GET /kpi/uts/{id}              — autenticado
     GET /kpi/inconsistencias       — admin
-<<<<<<< HEAD
-=======
     GET /kpi/dashboard             — autenticado (novo - dashboard completo)
->>>>>>> feature/front
 """
 
 from __future__ import annotations
 
-<<<<<<< HEAD
-from fastapi import APIRouter
-from pydantic import BaseModel
-=======
 from typing import Any
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from sqlalchemy import text
->>>>>>> feature/front
 
 from cp.api.deps import SomenteAdmin, UsuarioLogado
 
 router = APIRouter(prefix="/kpi", tags=["kpi"])
 
 
-<<<<<<< HEAD
-=======
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -71,7 +61,6 @@ def _get_sync_timestamps(engine_cp: Any) -> tuple[str | None, str | None]:
 # ---------------------------------------------------------------------------
 
 
->>>>>>> feature/front
 class KpiProjeto(BaseModel):
     projeto_id: int
     nome: str
@@ -88,19 +77,6 @@ class KpiProjetosResponse(BaseModel):
     projetos: list[KpiProjeto]
 
 
-<<<<<<< HEAD
-@router.get("/projetos", summary="KPI agregado por projeto")
-def kpi_projetos(_: UsuarioLogado) -> KpiProjetosResponse:
-    """Progresso percentual, pontos totais e concluidos por projeto ativo."""
-    return KpiProjetosResponse(
-        sap_snapshot_atualizado_em=None,
-        kpi_calculado_em=None,
-        projetos=[],
-    )
-
-
-=======
->>>>>>> feature/front
 class KpiSubfase(BaseModel):
     subfase_id: int
     subfase_nome: str
@@ -115,38 +91,19 @@ class KpiBloco(BaseModel):
     subfases: list[KpiSubfase]
 
 
-<<<<<<< HEAD
-=======
 class KpiLote(BaseModel):
     lote_id: int
     lote_nome: str
     blocos: list[KpiBloco]
 
 
->>>>>>> feature/front
 class KpiProjetoDetalhe(BaseModel):
     projeto_id: int
     projeto_nome: str
     sap_snapshot_atualizado_em: str | None
     kpi_calculado_em: str | None
-<<<<<<< HEAD
-    blocos: list[KpiBloco]
-
-
-@router.get("/projetos/{projeto_id}", summary="KPI do projeto por bloco e subfase")
-def kpi_projeto_detalhe(projeto_id: int, _: UsuarioLogado) -> KpiProjetoDetalhe:
-    """Drill-down do projeto: progresso por bloco e subfase."""
-    return KpiProjetoDetalhe(
-        projeto_id=projeto_id,
-        projeto_nome="",
-        sap_snapshot_atualizado_em=None,
-        kpi_calculado_em=None,
-        blocos=[],
-    )
-=======
     lotes: list[KpiLote]
     blocos: list[KpiBloco]  # Mantido para compatibilidade
->>>>>>> feature/front
 
 
 class KpiUt(BaseModel):
@@ -173,21 +130,6 @@ class KpiSubfaseDetalhe(BaseModel):
     uts: list[KpiUt]
 
 
-<<<<<<< HEAD
-@router.get("/subfase/{subfase_id}", summary="UTs de uma subfase")
-def kpi_subfase(subfase_id: int, _: UsuarioLogado) -> KpiSubfaseDetalhe:
-    """Listagem completa das UTs da subfase com estado, ciclo, nota e pontos."""
-    return KpiSubfaseDetalhe(
-        subfase_id=subfase_id,
-        subfase_nome="",
-        sap_snapshot_atualizado_em=None,
-        kpi_calculado_em=None,
-        uts=[],
-    )
-
-
-=======
->>>>>>> feature/front
 class KpiUtDetalhe(BaseModel):
     ut_id: int
     ciclo_modelo: str
@@ -209,11 +151,6 @@ class KpiUtDetalhe(BaseModel):
     kpi_calculado_em: str | None
 
 
-<<<<<<< HEAD
-@router.get("/uts/{ut_id}", summary="Detalhe completo de uma UT")
-def kpi_ut(ut_id: int, _: UsuarioLogado) -> KpiUtDetalhe:
-    """Estado completo da UT: ciclo, fluxo, nota, participantes e pontos."""
-=======
 class Inconsistencia(BaseModel):
     ut_id: int
     ocorrencia: str
@@ -597,7 +534,6 @@ def kpi_ut(ut_id: int, _: UsuarioLogado, request: Request) -> KpiUtDetalhe:
     except Exception:
         pass
 
->>>>>>> feature/front
     return KpiUtDetalhe(
         ut_id=ut_id,
         ciclo_modelo="",
@@ -615,35 +551,6 @@ def kpi_ut(ut_id: int, _: UsuarioLogado, request: Request) -> KpiUtDetalhe:
         nome_executor=None,
         nome_revisor=None,
         nome_corretor=None,
-<<<<<<< HEAD
-        sap_snapshot_atualizado_em=None,
-        kpi_calculado_em=None,
-    )
-
-
-class Inconsistencia(BaseModel):
-    ut_id: int
-    ocorrencia: str
-    projeto_nome: str | None
-    subfase_nome: str | None
-    ciclo_modelo: str
-    nome_executor: str | None
-
-
-class InconsistenciasResponse(BaseModel):
-    total: int
-    sap_snapshot_atualizado_em: str | None
-    itens: list[Inconsistencia]
-
-
-@router.get("/inconsistencias", summary="Alertas e inconsistencias de nota e ciclo")
-def kpi_inconsistencias(_: SomenteAdmin) -> InconsistenciasResponse:
-    """UTs com NOTA_AUSENTE, NOTA_INVALIDA, INCONSISTENTE_CICLO ou INCONSISTENTE_DIFICULDADE."""
-    return InconsistenciasResponse(
-        total=0,
-        sap_snapshot_atualizado_em=None,
-        itens=[],
-=======
         sap_snapshot_atualizado_em=snapshot_ts,
         kpi_calculado_em=kpi_ts,
     )
@@ -955,5 +862,4 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
         top_revisor=top_revisor,
         top_executores_subfase=top_executores_subfase,
         top_revisores_subfase=top_revisores_subfase,
->>>>>>> feature/front
     )

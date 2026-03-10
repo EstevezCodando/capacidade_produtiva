@@ -1,16 +1,10 @@
 """Testes unitários do serviço de autenticação JWT.
 
 Sem banco de dados, sem FastAPI — testa apenas a lógica de domínio:
-<<<<<<< HEAD
-  - extrair_token: parsing do header Authorization
-  - validar_token: verificação de assinatura e extração de claims
-  - autenticar: pipeline completo
-=======
   - _extrair_token_bruto: parsing do header Authorization
   - validar_token: verificação de assinatura e extração de claims
   - MockAuthProvider: autenticação em modo teste
   - RealAuthProvider: validação de tokens
->>>>>>> feature/front
 """
 
 from __future__ import annotations
@@ -20,9 +14,6 @@ import time
 import jwt
 import pytest
 
-<<<<<<< HEAD
-from cp.infrastructure.auth import TokenInvalido, autenticar, extrair_token, validar_token
-=======
 from cp.infrastructure.auth_provider import (
     CredenciaisInvalidas,
     MockAuthProvider,
@@ -31,7 +22,6 @@ from cp.infrastructure.auth_provider import (
     UsuarioAutenticado,
     _extrair_token_bruto,
 )
->>>>>>> feature/front
 
 _SECRET = "segredo-de-teste"
 _ALGORITMO = "HS256"
@@ -54,27 +44,12 @@ def _payload_valido(extra: dict | None = None) -> dict:
 
 
 # ---------------------------------------------------------------------------
-<<<<<<< HEAD
-# extrair_token
-=======
 # _extrair_token_bruto
->>>>>>> feature/front
 # ---------------------------------------------------------------------------
 
 
 def test_extrair_token_sem_bearer() -> None:
     token = "eyJtoken"
-<<<<<<< HEAD
-    assert extrair_token(token) == "eyJtoken"
-
-
-def test_extrair_token_com_bearer() -> None:
-    assert extrair_token("Bearer eyJtoken") == "eyJtoken"
-
-
-def test_extrair_token_bearer_case_insensitive() -> None:
-    assert extrair_token("BEARER eyJtoken") == "eyJtoken"
-=======
     assert _extrair_token_bruto(token) == "eyJtoken"
 
 
@@ -84,45 +59,27 @@ def test_extrair_token_com_bearer() -> None:
 
 def test_extrair_token_bearer_case_insensitive() -> None:
     assert _extrair_token_bruto("BEARER eyJtoken") == "eyJtoken"
->>>>>>> feature/front
 
 
 def test_extrair_token_header_none() -> None:
     with pytest.raises(TokenInvalido, match="ausente"):
-<<<<<<< HEAD
-        extrair_token(None)
-=======
         _extrair_token_bruto(None)
->>>>>>> feature/front
 
 
 def test_extrair_token_header_vazio() -> None:
     with pytest.raises(TokenInvalido):
-<<<<<<< HEAD
-        extrair_token("")
-
-
-# ---------------------------------------------------------------------------
-# validar_token
-=======
         _extrair_token_bruto("")
 
 
 # ---------------------------------------------------------------------------
 # RealAuthProvider.validar_token
->>>>>>> feature/front
 # ---------------------------------------------------------------------------
 
 
 def test_validar_token_valido() -> None:
-<<<<<<< HEAD
-    token = _make_token(_payload_valido())
-    usuario = validar_token(token, _SECRET)
-=======
     provider = RealAuthProvider(auth_url="http://dummy", jwt_secret=_SECRET)
     token = _make_token(_payload_valido())
     usuario = provider.validar_token(token)
->>>>>>> feature/front
     assert usuario.usuario_id == 42
     assert usuario.usuario_uuid == "550e8400-e29b-41d4-a716-446655440000"
     assert usuario.administrador is False
@@ -130,34 +87,14 @@ def test_validar_token_valido() -> None:
 
 
 def test_validar_token_admin() -> None:
-<<<<<<< HEAD
-    token = _make_token(_payload_valido({"administrador": True}))
-    usuario = validar_token(token, _SECRET)
-=======
     provider = RealAuthProvider(auth_url="http://dummy", jwt_secret=_SECRET)
     token = _make_token(_payload_valido({"administrador": True}))
     usuario = provider.validar_token(token)
->>>>>>> feature/front
     assert usuario.administrador is True
     assert usuario.eh_admin is True
 
 
 def test_validar_token_expirado() -> None:
-<<<<<<< HEAD
-    payload = _payload_valido({"exp": int(time.time()) - 1})
-    token = _make_token(payload)
-    with pytest.raises(TokenInvalido, match="expirado"):
-        validar_token(token, _SECRET)
-
-
-def test_validar_token_assinatura_invalida() -> None:
-    token = _make_token(_payload_valido(), secret="outro-segredo")
-    with pytest.raises(TokenInvalido, match="inválido"):
-        validar_token(token, _SECRET)
-
-
-def test_validar_token_claim_id_ausente() -> None:
-=======
     provider = RealAuthProvider(auth_url="http://dummy", jwt_secret=_SECRET)
     payload = _payload_valido({"exp": int(time.time()) - 1})
     token = _make_token(payload)
@@ -174,73 +111,33 @@ def test_validar_token_assinatura_invalida() -> None:
 
 def test_validar_token_claim_id_ausente() -> None:
     provider = RealAuthProvider(auth_url="http://dummy", jwt_secret=_SECRET)
->>>>>>> feature/front
     payload = _payload_valido()
     del payload["id"]
     token = _make_token(payload)
     with pytest.raises(TokenInvalido, match="Claims"):
-<<<<<<< HEAD
-        validar_token(token, _SECRET)
-
-
-def test_validar_token_claim_uuid_ausente() -> None:
-=======
         provider.validar_token(token)
 
 
 def test_validar_token_claim_uuid_ausente() -> None:
     provider = RealAuthProvider(auth_url="http://dummy", jwt_secret=_SECRET)
->>>>>>> feature/front
     payload = _payload_valido()
     del payload["uuid"]
     token = _make_token(payload)
     with pytest.raises(TokenInvalido, match="Claims"):
-<<<<<<< HEAD
-        validar_token(token, _SECRET)
-=======
         provider.validar_token(token)
->>>>>>> feature/front
 
 
 def test_validar_token_administrador_ausente_default_false() -> None:
     """Claim administrador é opcional — default False."""
-<<<<<<< HEAD
-    payload = _payload_valido()
-    del payload["administrador"]
-    token = _make_token(payload)
-    usuario = validar_token(token, _SECRET)
-=======
     provider = RealAuthProvider(auth_url="http://dummy", jwt_secret=_SECRET)
     payload = _payload_valido()
     del payload["administrador"]
     token = _make_token(payload)
     usuario = provider.validar_token(token)
->>>>>>> feature/front
     assert usuario.administrador is False
 
 
 # ---------------------------------------------------------------------------
-<<<<<<< HEAD
-# autenticar (pipeline completo)
-# ---------------------------------------------------------------------------
-
-
-def test_autenticar_com_bearer() -> None:
-    token = _make_token(_payload_valido())
-    usuario = autenticar(f"Bearer {token}", _SECRET)
-    assert usuario.usuario_id == 42
-
-
-def test_autenticar_sem_bearer() -> None:
-    token = _make_token(_payload_valido())
-    usuario = autenticar(token, _SECRET)
-    assert usuario.usuario_id == 42
-
-
-def test_autenticar_sem_header() -> None:
-    with pytest.raises(TokenInvalido):
-        autenticar(None, _SECRET)
-=======
 # RealAuthProvider com prefixo Bearer
 # ---------------------------------------------------------------------------
 
@@ -331,4 +228,3 @@ def test_usuario_autenticado_eh_admin_true() -> None:
 def test_usuario_autenticado_eh_admin_false() -> None:
     usuario = UsuarioAutenticado(usuario_id=1, usuario_uuid="abc", administrador=False)
     assert usuario.eh_admin is False
->>>>>>> feature/front

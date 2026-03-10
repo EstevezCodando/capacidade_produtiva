@@ -12,13 +12,8 @@ Cobre os criterios de aceite do sprint:
 
 Estrategia de isolamento:
   Criamos uma app FastAPI de teste sem lifespan, montando os mesmos
-<<<<<<< HEAD
-  routers da app de producao. Isso evita que Settings.from_env() seja
-  chamado e que o banco seja acessado durante os testes de API.
-=======
   routers da app de producao. Injetamos MockAuthProvider para que
   a autenticacao funcione sem servico_autenticacao externo.
->>>>>>> feature/front
 """
 
 from __future__ import annotations
@@ -33,10 +28,7 @@ from fastapi.testclient import TestClient
 
 from cp.api.rotas import health, usuarios
 from cp.config.settings import Settings
-<<<<<<< HEAD
-=======
 from cp.infrastructure.auth_provider import MockAuthProvider
->>>>>>> feature/front
 
 _SECRET = "segredo-de-integracao"
 _ALGORITMO = "HS256"
@@ -53,39 +45,19 @@ def _token(extra: dict | None = None) -> str:
         payload.update(extra)
     return jwt.encode(payload, _SECRET, algorithm=_ALGORITMO)
 
-<<<<<<< HEAD
-
-=======
->>>>>>> feature/front
 @pytest.fixture()
 def client() -> TestClient:
     """App de teste isolada — sem lifespan, sem banco, sem config.env.
 
     Cria uma FastAPI limpa com os mesmos routers da app de producao
-<<<<<<< HEAD
-    e injeta settings mockadas diretamente no app.state.
-    Isso garante que _jwt_secret() encontre o segredo correto
-    independente de variaveis de ambiente do ambiente de CI/dev.
-=======
     e injeta MockAuthProvider e settings mockadas diretamente no app.state.
     Isso garante que a autenticacao funcione independente de variaveis
     de ambiente ou servicos externos.
->>>>>>> feature/front
     """
     test_app = FastAPI()
     test_app.include_router(health.router)
     test_app.include_router(usuarios.router)
 
-<<<<<<< HEAD
-    mock_settings = MagicMock(spec=Settings)
-    mock_settings.jwt_secret = _SECRET
-    test_app.state.settings = mock_settings
-
-    with TestClient(test_app, raise_server_exceptions=True) as c:
-        yield c
-
-
-=======
     # Mock settings com jwt_secret
     mock_settings = MagicMock(spec=Settings)
     mock_settings.jwt_secret = _SECRET
@@ -119,7 +91,6 @@ def client() -> TestClient:
     with TestClient(test_app, raise_server_exceptions=True) as c:
         yield c
 
->>>>>>> feature/front
 # ---------------------------------------------------------------------------
 # /health — publico
 # ---------------------------------------------------------------------------
@@ -192,8 +163,4 @@ def test_usuarios_admin_retorna_200(client: TestClient) -> None:
     """Admin recebe 200."""
     token = _token({"administrador": True})
     r = client.get("/usuarios", headers={"Authorization": f"Bearer {token}"})
-<<<<<<< HEAD
     assert r.status_code == 200
-=======
-    assert r.status_code == 200
->>>>>>> feature/front

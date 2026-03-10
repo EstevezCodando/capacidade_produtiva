@@ -1,11 +1,7 @@
 """Dependências FastAPI reutilizáveis.
 
 Expõe as dependências de autenticação e autorização como callables
-<<<<<<< HEAD
-compatíveis com `Depends()`. A lógica de validação fica em infra.auth —
-=======
 compatíveis com `Depends()`. A lógica de validação fica em auth_provider —
->>>>>>> feature/front
 aqui apenas traduzimos erros de domínio para respostas HTTP.
 
 Uso:
@@ -26,15 +22,6 @@ from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, Request, status
 
-<<<<<<< HEAD
-from cp.domain.usuario import UsuarioAutenticado
-from cp.infrastructure.auth import TokenInvalido, autenticar
-
-
-def _jwt_secret(request: Request) -> str:
-    """Extrai jwt_secret das settings injetadas no estado da app."""
-    return request.app.state.settings.jwt_secret  # type: ignore[no-any-return]
-=======
 from cp.infrastructure.auth_provider import (
     AuthProvider,
     TokenInvalido,
@@ -58,16 +45,11 @@ def _get_auth_provider(request: Request) -> AuthProvider:
     provider = criar_auth_provider(settings)
     request.app.state.auth_provider = provider
     return provider
->>>>>>> feature/front
 
 
 def verify_login(
     authorization: Annotated[str | None, Header()] = None,
-<<<<<<< HEAD
-    jwt_secret: str = Depends(_jwt_secret),
-=======
     auth_provider: AuthProvider = Depends(_get_auth_provider),
->>>>>>> feature/front
 ) -> UsuarioAutenticado:
     """Valida o JWT e injeta o contexto do usuário.
 
@@ -78,11 +60,7 @@ def verify_login(
     Raises 401 se o token estiver ausente ou inválido.
     """
     try:
-<<<<<<< HEAD
-        return autenticar(authorization, jwt_secret)
-=======
         return auth_provider.validar_token(authorization or "")
->>>>>>> feature/front
     except TokenInvalido as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
