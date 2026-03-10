@@ -6,7 +6,6 @@ de forma centralizada e consistente.
 
 from __future__ import annotations
 
-from dataclasses import asdict
 from datetime import date, datetime
 from typing import Any
 

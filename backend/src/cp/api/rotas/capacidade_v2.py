@@ -15,7 +15,6 @@ Política de autorização:
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
@@ -38,7 +37,6 @@ from cp.domain.capacidade.schemas import (
     ParametroCapacidadeInput,
     ParametroCapacidadeResponse,
     PendenciaResponse,
-    ResumoCapacidadePeriodo,
     StatusDiasResponse,
 )
 from cp.services.capacidade import AgendaService, CapacidadeService, ConsolidacaoService

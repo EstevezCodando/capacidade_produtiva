@@ -24,15 +24,19 @@ from fastapi.staticfiles import StaticFiles
 
 from cp.api.rotas import (
     agenda_v2 as agenda,
+)
+from cp.api.rotas import (
     atividades,
     auth,
-    capacidade_v2 as capacidade,
     health,
     kpi,
     log,
     relatorios,
     sync,
     usuarios,
+)
+from cp.api.rotas import (
+    capacidade_v2 as capacidade,
 )
 from cp.config.settings import Settings
 from cp.infrastructure.db import criar_engine_cp, criar_engine_sap

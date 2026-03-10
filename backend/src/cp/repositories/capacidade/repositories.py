@@ -16,7 +16,6 @@ from cp.domain.capacidade.enums import (
     AcaoAuditoria,
     CodigoAtividade,
     FaixaMinuto,
-    GrupoAtividade,
     StatusDia,
     TipoIndisponibilidade,
 )
@@ -30,7 +29,6 @@ from cp.domain.capacidade.models import (
     ParametroCapacidade,
     TipoAtividade,
 )
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Tipo de Atividade Repository

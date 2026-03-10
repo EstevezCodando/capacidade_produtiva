@@ -24,10 +24,8 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
-from pydantic import BaseModel
 
 from cp.api.deps import SomenteAdmin, UsuarioLogado
-from cp.domain.capacidade.enums import CodigoAtividade, FaixaMinuto, TipoIndisponibilidade
 from cp.domain.capacidade.exceptions import (
     AcessoNegadoError,
     CapacidadeError,
@@ -44,14 +42,10 @@ from cp.domain.capacidade.exceptions import (
 )
 from cp.domain.capacidade.schemas import (
     AgendaCompletaResponse,
-    CriadoResponse,
-    DiaDaAgendaCompleto,
     FeriadoInput,
     FeriadoResponse,
-    FeriadosListResponse,
     IndisponibilidadeInput,
     IndisponibilidadeResponse,
-    IndisponibilidadesListResponse,
     LancamentoAdminInput,
     LancamentoInput,
     LancamentoResponse,

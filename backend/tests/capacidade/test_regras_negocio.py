@@ -11,8 +11,7 @@ Cobre os casos críticos especificados no documento:
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
-from unittest.mock import MagicMock, patch
+from datetime import date, datetime
 
 import pytest
 
@@ -37,13 +36,11 @@ from cp.domain.capacidade.exceptions import (
     ResultadoConsolidacao,
 )
 from cp.domain.capacidade.models import (
-    AgendaLancamento,
     CapacidadeDia,
     ParametroCapacidade,
     TipoAtividade,
 )
 from cp.domain.capacidade.schemas import ResumoCapacidadePeriodo
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Fixtures
@@ -401,8 +398,8 @@ class TestPermissoes:
 
     def test_admin_pode_acessar_qualquer_usuario(self) -> None:
         """Admin pode acessar dados de qualquer usuário."""
-        eh_admin = True
-        usuario_alvo = 3
+        eh_admin = True,
+        3
 
         # Admin não precisa validar acesso
         assert eh_admin is True
@@ -423,7 +420,7 @@ class TestPermissoes:
         self, capacidade_consolidada: CapacidadeDia
     ) -> None:
         """Dia consolidado permite hora extra para operador."""
-        eh_admin = False
+        False,
         faixa = FaixaMinuto.EXTRA
 
         # Não deve lançar exceção

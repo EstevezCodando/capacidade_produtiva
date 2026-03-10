@@ -7,7 +7,6 @@ lançamentos, parâmetros e auditoria.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     CheckConstraint,

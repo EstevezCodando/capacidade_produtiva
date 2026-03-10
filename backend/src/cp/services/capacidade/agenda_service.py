@@ -6,7 +6,6 @@ aplicando regras de negócio e validações.
 
 from __future__ import annotations
 
-from copy import deepcopy
 from datetime import date
 from typing import Sequence
 
@@ -15,7 +14,6 @@ from sqlalchemy.engine import Engine
 from cp.domain.capacidade.enums import (
     CodigoAtividade,
     FaixaMinuto,
-    GrupoAtividade,
     StatusDia,
     TipoIndisponibilidade,
 )
@@ -39,7 +37,6 @@ from cp.domain.capacidade.models import (
 from cp.domain.capacidade.schemas import (
     ApontamentoResumo,
     DiaDaAgendaCompleto,
-    LancamentoResponse,
     PlanejamentoResponse,
 )
 from cp.repositories.capacidade import (

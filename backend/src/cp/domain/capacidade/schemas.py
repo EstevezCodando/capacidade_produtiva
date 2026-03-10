@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from cp.domain.capacidade.enums import (
     CodigoAtividade,
@@ -18,7 +18,6 @@ from cp.domain.capacidade.enums import (
     TipoIndisponibilidade,
     TipoPendencia,
 )
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Schemas Base

@@ -6,17 +6,15 @@ Responsável pela consolidação de períodos e verificação de pendências.
 from __future__ import annotations
 
 from datetime import date, timedelta
-from typing import Sequence
 
 from sqlalchemy.engine import Engine
 
-from cp.domain.capacidade.enums import CodigoAtividade, FaixaMinuto, StatusDia, TipoPendencia
+from cp.domain.capacidade.enums import FaixaMinuto, StatusDia, TipoPendencia
 from cp.domain.capacidade.exceptions import (
     IntervaloInvalidoError,
     PendenciaConsolidacao,
     ResultadoConsolidacao,
 )
-from cp.domain.capacidade.models import CapacidadeDia
 from cp.repositories.capacidade import (
     AgendaLancamentoRepository,
     CapacidadeDiaRepository,
