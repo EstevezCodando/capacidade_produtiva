@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CapacidadeProdutiva — API Reference</title>
+  <meta name="description" content="Documentação de referência da API REST do CapacidadeProdutiva">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Stylesheet — separado do HTML conforme boas práticas -->
+  <link rel="stylesheet" href="/api-docs/api.css">
+</head>
+<body>
+
+  <!-- ── TOP BAR ───────────────────────────────────────────────── -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <span class="topbar-name">CapacidadeProdutiva</span>
+      <span class="topbar-tag">v0.1.0</span>
+    </div>
+    <div class="topbar-divider"></div>
+    <code class="topbar-baseurl">http://localhost:3050</code>
+    <div class="topbar-divider"></div>
+    <a class="topbar-swaggerlink" href="/api/docs" target="_blank">Swagger UI ↗</a>
+    <div class="topbar-divider"></div>
+    <span class="topbar-count" id="total-count">— rotas</span>
+  </header>
+
+  <!-- ── LAYOUT ────────────────────────────────────────────────── -->
+  <div class="layout">
+
+    <!-- Sidebar de navegação por grupo -->
+    <nav class="sidebar" id="sidebar" aria-label="Grupos de endpoints"></nav>
+
+    <!-- Área principal -->
+    <div class="main">
+
+      <!-- Barra de filtros e busca -->
+      <div class="toolbar" role="search">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input
+            id="search"
+            class="search-input"
+            type="search"
+            placeholder="buscar rota ou descrição..."
+            aria-label="Buscar endpoints"
+            autocomplete="off"
+          >
+        </div>
+        <div class="filter-group" role="group" aria-label="Filtrar por autenticação">
+          <button class="filter-btn active" data-auth="todos">todos</button>
+          <button class="filter-btn" data-auth="público">público</button>
+          <button class="filter-btn" data-auth="autenticado">autenticado</button>
+          <button class="filter-btn" data-auth="admin">admin</button>
+        </div>
+        <span class="toolbar-result" id="toolbar-result" aria-live="polite"></span>
+      </div>
+
+      <!-- Legenda de autenticação -->
+      <div class="auth-legend" aria-label="Legenda de autenticação">
+        <div class="legend-item">
+          <span class="legend-dot" style="background:var(--c-pub)"></span>
+          <span style="color:var(--c-pub)">público — sem token</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot" style="background:var(--c-tok)"></span>
+          <span style="color:var(--c-tok)">autenticado — JWT válido no header Authorization</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot" style="background:var(--c-adm)"></span>
+          <span style="color:var(--c-adm)">admin — JWT com administrador=true</span>
+        </div>
+      </div>
+
+      <!-- Grupos de rotas — populados via api.js -->
+      <main class="content" id="content" aria-label="Endpoints da API"></main>
+
+      <!-- Estado vazio (sem resultados na busca) -->
+      <div class="empty-state" id="empty-state" role="status">
+        nenhuma rota encontrada
+      </div>
+
+    </div><!-- /.main -->
+  </div><!-- /.layout -->
+
+  <!-- Script — separado do HTML conforme boas práticas -->
+  <script src="/api-docs/api.js"></script>
+</body>
+</html>

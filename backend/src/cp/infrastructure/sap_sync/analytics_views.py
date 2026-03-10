@@ -234,6 +234,17 @@ WITH atividades_por_ut_subfase AS (
             NULL
         )                                                             AS situacoes_pendentes,
 
+                -- Diagnóstico: concatena todas as observações lançadas (ordem estável)
+        STRING_AGG(
+            CASE
+                WHEN atv.observacao IS NOT NULL AND BTRIM(atv.observacao) <> ''
+                THEN te.nome || ': ' || ts.nome || ' -> ' ||
+                     REGEXP_REPLACE(BTRIM(atv.observacao), '\\s+', ' ', 'g')
+            END,
+            ' | '
+            ORDER BY te.nome, atv.id
+        )                                                             AS observacoes_concatenadas,
+
         -- Conclusão real: nenhuma atividade pendente
         BOOL_AND(atv.tipo_situacao_id IN (4, 5))                     AS concluida
 
@@ -264,6 +275,8 @@ SELECT
     agg.total_atividades,
     agg.total_concluidas,
     agg.total_pendentes,
+    -- Diagnostico das notas:
+        agg.observacoes_concatenadas,
 
     -- Diagnóstico completo: todas as etapas com sua situação
     agg.etapas_situacao,

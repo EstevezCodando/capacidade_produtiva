@@ -13,16 +13,16 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "sqlalchemy>=2.0.0",
     "uvicorn[standard]>=0.32.0",
+    "PyJWT>=2.8.0",
+    "aiofiles>=23.0.0",
 ]
 
 
 [project.scripts]
-inicializar = "cp.cli.bootstrap:main"
-inicializar-db = "cp.cli.bootstrap_db:main"
-inicializar-config = "cp.cli.bootstrap_config:main"
-gerar-config = "cp.cli.create_config:main"
+configurar = "cp.cli.configurar:main"
+inicializar = "cp.cli.inicializar:main"
 sincronizar-sap = "cp.cli.sync_sap:main"
-check = "cp.scripts.check:main"
+check = "cp.cli.check:main"
 
 [dependency-groups]
 dev = [
@@ -81,4 +81,5 @@ exclude_lines = [
 branch = true
 source = ["src/cp"]
 omit = ["src/cp/cli/*"]
+
 

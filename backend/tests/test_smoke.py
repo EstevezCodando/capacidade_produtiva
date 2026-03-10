@@ -30,8 +30,8 @@ def test_app_is_fastapi_instance() -> None:
 
 
 def test_health_endpoint_returns_ok() -> None:
-    """GET /health deve retornar 200 com status ok."""
+    """GET /api/health deve retornar 200 com status ok."""
     client = TestClient(app)
-    response = client.get("/health")
+    response = client.get("/api/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}

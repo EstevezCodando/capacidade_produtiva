@@ -19,6 +19,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 
 from cp.infrastructure.sap_sync.analytics_manager import atualizar_views_analytics
+from cp.infrastructure.sap_sync.kpi_manager import garantir_tabelas_kpi, materializar_kpi
 
 _SCHEMA = "sap_snapshot"
 _BATCH = 5_000
@@ -135,13 +136,15 @@ def _sync_dominio_tipo_fase(s: Connection, c: Connection) -> ResultadoTabela:
 
 
 def _sync_dgeo_usuario(s: Connection, c: Connection) -> ResultadoTabela:
+    # uuid é o identificador usado no JWT emitido pelo serviço de autenticação.
+    # administrador é necessário para o middleware verifyAdmin.
     return _sync(
         s,
         c,
         "dgeo_usuario",
-        "SELECT id, login, nome, nome_guerra, tipo_posto_grad_id, ativo FROM dgeo.usuario",
+        "SELECT id, login, nome, nome_guerra, tipo_turno_id, tipo_posto_grad_id, administrador, ativo, uuid FROM dgeo.usuario",
         "id",
-        ["id", "login", "nome", "nome_guerra", "tipo_posto_grad_id", "ativo"],
+        ["id", "login", "nome", "nome_guerra", "tipo_turno_id", "tipo_posto_grad_id", "administrador", "ativo", "uuid"],
     )
 
 
@@ -350,10 +353,14 @@ def sincronizar_sap_para_snapshot(
     são re-aplicadas na mesma transação para garantir consistência.
     """
     resultados: list[ResultadoTabela] = []
+    # Garante que as tabelas kpi.* existem com o DDL atual antes de materializar.
+    # Idempotente: DROP + CREATE fora da transação principal para suportar DDL.
+    garantir_tabelas_kpi(engine_cp)
     with engine_cp.begin() as conn_cp, engine_sap.connect() as conn_sap:
         for fn in _PIPELINE:
             resultados.append(fn(conn_sap, conn_cp))
         atualizar_views_analytics(conn_cp)
+        materializar_kpi(conn_cp)
     return resultados
 
 

@@ -1,11 +1,26 @@
-# Não enviar para o contexto do Docker build:
+# Ambientes e cache Python
 __pycache__/
 *.pyc
-tests/
-.git/
+*.pyo
 .venv/
+*.egg-info/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
 .coverage
-*.egg-info/
+htmlcov/
+
+# Testes — nao vao para a imagem de producao
+tests/
+
+# Config local — secrets nunca vao para a imagem
+config.env
+.env
+
+# Controle de versao
+.git/
+.gitignore
+
+# IDEs
+.vscode/
+.idea/
