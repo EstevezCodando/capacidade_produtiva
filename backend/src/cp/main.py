@@ -22,7 +22,18 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from cp.api.rotas import agenda, atividades, auth, capacidade, health, kpi, log, relatorios, sync, usuarios
+from cp.api.rotas import (
+    agenda_v2 as agenda,
+    atividades,
+    auth,
+    capacidade_v2 as capacidade,
+    health,
+    kpi,
+    log,
+    relatorios,
+    sync,
+    usuarios,
+)
 from cp.config.settings import Settings
 from cp.infrastructure.db import criar_engine_cp, criar_engine_sap
 

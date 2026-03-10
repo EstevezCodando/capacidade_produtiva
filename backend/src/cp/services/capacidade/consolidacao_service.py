@@ -1,0 +1,292 @@
+"""Serviço de Consolidação.
+
+Responsável pela consolidação de períodos e verificação de pendências.
+"""
+
+from __future__ import annotations
+
+from datetime import date, timedelta
+from typing import Sequence
+
+from sqlalchemy.engine import Engine
+
+from cp.domain.capacidade.enums import CodigoAtividade, FaixaMinuto, StatusDia, TipoPendencia
+from cp.domain.capacidade.exceptions import (
+    IntervaloInvalidoError,
+    PendenciaConsolidacao,
+    ResultadoConsolidacao,
+)
+from cp.domain.capacidade.models import CapacidadeDia
+from cp.repositories.capacidade import (
+    AgendaLancamentoRepository,
+    CapacidadeDiaRepository,
+    FeriadoRepository,
+    IndisponibilidadeRepository,
+    TipoAtividadeRepository,
+)
+from cp.services.capacidade.audit_service import AuditService
+
+
+class ConsolidacaoService:
+    """Serviço de consolidação de períodos.
+
+    Responsabilidades:
+    - Verificar pendências impeditivas
+    - Consolidar dias (mudar status para CONSOLIDADO)
+    - Gerar relatório de pendências
+    """
+
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
+        self._capacidade_repo = CapacidadeDiaRepository(engine)
+        self._lancamento_repo = AgendaLancamentoRepository(engine)
+        self._feriado_repo = FeriadoRepository(engine)
+        self._indisponibilidade_repo = IndisponibilidadeRepository(engine)
+        self._tipo_atividade_repo = TipoAtividadeRepository(engine)
+        self._audit = AuditService(engine)
+
+    def verificar_pendencias(
+        self,
+        usuario_id: int,
+        data_inicio: date,
+        data_fim: date,
+    ) -> list[PendenciaConsolidacao]:
+        """Verifica pendências para consolidação de um usuário.
+
+        Pendências verificadas:
+        - Dia útil sem nenhum lançamento
+        - Soma de minutos abaixo do esperado
+        - Indisponibilidade sem registro adequado
+        """
+        if data_fim < data_inicio:
+            raise IntervaloInvalidoError(data_inicio, data_fim)
+
+        pendencias: list[PendenciaConsolidacao] = []
+        data_atual = data_inicio
+
+        while data_atual <= data_fim:
+            capacidade = self._capacidade_repo.buscar(usuario_id, data_atual)
+
+            # Se não há capacidade materializada, considerar dia como não tratado
+            if not capacidade:
+                # Verificar se deveria ter capacidade
+                eh_dia_util = data_atual.weekday() < 5
+                eh_feriado = self._feriado_repo.eh_feriado(data_atual)
+                indisponibilidade = self._indisponibilidade_repo.buscar_para_data(
+                    usuario_id, data_atual
+                )
+
+                if eh_dia_util and not eh_feriado and not indisponibilidade:
+                    pendencias.append(
+                        PendenciaConsolidacao(
+                            usuario_id=usuario_id,
+                            data=data_atual,
+                            tipo=TipoPendencia.SEM_LANCAMENTO.value,
+                            motivo="Dia útil sem capacidade materializada nem lançamentos",
+                        )
+                    )
+                data_atual += timedelta(days=1)
+                continue
+
+            # Pular dias já consolidados
+            if capacidade.status_dia == StatusDia.CONSOLIDADO:
+                data_atual += timedelta(days=1)
+                continue
+
+            # Verificar dias indisponíveis
+            if capacidade.eh_indisponivel:
+                # Verificar se há indisponibilidade cadastrada
+                indisponibilidade = self._indisponibilidade_repo.buscar_para_data(
+                    usuario_id, data_atual
+                )
+                if not indisponibilidade:
+                    pendencias.append(
+                        PendenciaConsolidacao(
+                            usuario_id=usuario_id,
+                            data=data_atual,
+                            tipo=TipoPendencia.INDISPONIBILIDADE_NAO_TRATADA.value,
+                            motivo="Dia marcado como indisponível mas sem cadastro de indisponibilidade",
+                        )
+                    )
+                data_atual += timedelta(days=1)
+                continue
+
+            # Verificar dias úteis sem feriado
+            if capacidade.eh_dia_util and not capacidade.eh_feriado:
+                # Verificar se há lançamentos
+                lancamentos = self._lancamento_repo.listar_por_dia(usuario_id, data_atual)
+
+                if not lancamentos:
+                    pendencias.append(
+                        PendenciaConsolidacao(
+                            usuario_id=usuario_id,
+                            data=data_atual,
+                            tipo=TipoPendencia.SEM_LANCAMENTO.value,
+                            motivo="Dia útil sem nenhum lançamento",
+                        )
+                    )
+                else:
+                    # Verificar soma de minutos normais
+                    soma_normal = sum(
+                        l.minutos
+                        for l in lancamentos
+                        if l.faixa_minuto == FaixaMinuto.NORMAL
+                    )
+
+                    # Se a soma é muito baixa (menos de 50% do esperado), alertar
+                    limite_minimo = capacidade.minutos_capacidade_normal_prevista * 0.5
+                    if soma_normal < limite_minimo:
+                        pendencias.append(
+                            PendenciaConsolidacao(
+                                usuario_id=usuario_id,
+                                data=data_atual,
+                                tipo=TipoPendencia.LANCAMENTO_INCOMPLETO.value,
+                                motivo=(
+                                    f"Soma de minutos normais ({soma_normal}) abaixo de 50% "
+                                    f"do esperado ({capacidade.minutos_capacidade_normal_prevista})"
+                                ),
+                            )
+                        )
+
+            data_atual += timedelta(days=1)
+
+        return pendencias
+
+    def verificar_pendencias_todos_usuarios(
+        self,
+        usuarios_ids: list[int],
+        data_inicio: date,
+        data_fim: date,
+    ) -> list[PendenciaConsolidacao]:
+        """Verifica pendências para múltiplos usuários."""
+        todas_pendencias: list[PendenciaConsolidacao] = []
+
+        for usuario_id in usuarios_ids:
+            pendencias = self.verificar_pendencias(usuario_id, data_inicio, data_fim)
+            todas_pendencias.extend(pendencias)
+
+        return todas_pendencias
+
+    def consolidar_periodo(
+        self,
+        usuario_id: int,
+        data_inicio: date,
+        data_fim: date,
+        executor_id: int,
+        ignorar_pendencias: bool = False,
+    ) -> ResultadoConsolidacao:
+        """Consolida período para o usuário.
+
+        Se ignorar_pendencias=False e houver pendências, não consolida.
+        Se ignorar_pendencias=True, consolida mesmo com pendências (apenas admin).
+
+        Returns:
+            ResultadoConsolidacao com status e lista de pendências
+        """
+        if data_fim < data_inicio:
+            raise IntervaloInvalidoError(data_inicio, data_fim)
+
+        # Verificar pendências
+        pendencias = self.verificar_pendencias(usuario_id, data_inicio, data_fim)
+
+        if pendencias and not ignorar_pendencias:
+            return ResultadoConsolidacao(
+                consolidado=False,
+                pendencias=pendencias,
+                mensagem=f"Encontradas {len(pendencias)} pendências. Resolva antes de consolidar.",
+            )
+
+        # Consolidar dias
+        dias_consolidados = self._capacidade_repo.consolidar_periodo(
+            usuario_id, data_inicio, data_fim
+        )
+
+        # Auditar
+        self._audit.registrar_consolidacao(
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            usuarios_afetados=[usuario_id],
+            usuario_executor=executor_id,
+        )
+
+        mensagem = f"Consolidados {dias_consolidados} dias."
+        if pendencias:
+            mensagem += f" (Ignoradas {len(pendencias)} pendências)"
+
+        return ResultadoConsolidacao(
+            consolidado=True,
+            pendencias=pendencias,
+            mensagem=mensagem,
+        )
+
+    def consolidar_periodo_todos_usuarios(
+        self,
+        usuarios_ids: list[int],
+        data_inicio: date,
+        data_fim: date,
+        executor_id: int,
+        ignorar_pendencias: bool = False,
+    ) -> ResultadoConsolidacao:
+        """Consolida período para múltiplos usuários.
+
+        Se qualquer usuário tiver pendência e ignorar_pendencias=False,
+        nenhum usuário é consolidado.
+        """
+        if data_fim < data_inicio:
+            raise IntervaloInvalidoError(data_inicio, data_fim)
+
+        # Verificar todas as pendências primeiro
+        todas_pendencias = self.verificar_pendencias_todos_usuarios(
+            usuarios_ids, data_inicio, data_fim
+        )
+
+        if todas_pendencias and not ignorar_pendencias:
+            return ResultadoConsolidacao(
+                consolidado=False,
+                pendencias=todas_pendencias,
+                mensagem=f"Encontradas {len(todas_pendencias)} pendências em {len(set(p.usuario_id for p in todas_pendencias))} usuários.",
+            )
+
+        # Consolidar todos
+        total_dias = 0
+        for usuario_id in usuarios_ids:
+            dias = self._capacidade_repo.consolidar_periodo(
+                usuario_id, data_inicio, data_fim
+            )
+            total_dias += dias
+
+        # Auditar
+        self._audit.registrar_consolidacao(
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            usuarios_afetados=usuarios_ids,
+            usuario_executor=executor_id,
+        )
+
+        mensagem = f"Consolidados {total_dias} dias para {len(usuarios_ids)} usuários."
+        if todas_pendencias:
+            mensagem += f" (Ignoradas {len(todas_pendencias)} pendências)"
+
+        return ResultadoConsolidacao(
+            consolidado=True,
+            pendencias=todas_pendencias,
+            mensagem=mensagem,
+        )
+
+    def obter_status_dias(
+        self, data_inicio: date, data_fim: date
+    ) -> list[dict[str, date | str]]:
+        """Obtém status de todos os dias no período."""
+        capacidades = self._capacidade_repo.listar_por_status(data_inicio, data_fim)
+
+        resultado = []
+        for cap in capacidades:
+            resultado.append(
+                {
+                    "data": cap.data,
+                    "status": cap.status_dia.value,
+                    "usuario_id": cap.usuario_id,
+                }
+            )
+
+        return resultado
