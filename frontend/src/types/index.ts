@@ -1,0 +1,85 @@
+// ============================================================
+// CapacidadeProdutiva — Shared Types
+// Mirrors backend Pydantic schemas exactly
+// ============================================================
+
+// ── Auth / Usuário ───────────────────────────────────────────
+export interface UsuarioMe {
+  usuario_id:    number
+  usuario_uuid:  string
+  nome:          string
+  nome_guerra:   string | null
+  administrador: boolean
+}
+
+export interface LoginCredentials {
+  username: string
+  password: string
+}
+
+export interface AuthToken {
+  token: string
+}
+
+// ── Sessão local ─────────────────────────────────────────────
+export interface SessaoLocal {
+  token:        string
+  usuario:      UsuarioMe
+  login_em:     string   // ISO string
+}
+
+// ── Sync ─────────────────────────────────────────────────────
+export interface SyncStatus {
+  sap_snapshot_atualizado_em: string | null
+  kpi_calculado_em:           string | null
+  ultima_execucao_status:     string | null
+}
+
+// ── KPI ──────────────────────────────────────────────────────
+export interface KpiProjeto {
+  projeto_id:        number
+  nome:              string
+  progresso:         number | null
+  pontos_total:      number
+  pontos_concluidos: number
+}
+
+export interface KpiProjetosResponse {
+  sap_snapshot_atualizado_em: string | null
+  kpi_calculado_em:           string | null
+  projetos:                   KpiProjeto[]
+}
+
+export interface Inconsistencia {
+  ut_id:         number
+  ocorrencia:    string
+  ciclo_modelo:  string
+  projeto_nome:  string | null
+  subfase_nome:  string | null
+  nome_executor: string | null
+}
+
+export interface InconsistenciasResponse {
+  total:                      number
+  sap_snapshot_atualizado_em: string | null
+  itens:                      Inconsistencia[]
+}
+
+// ── Alertas (inbox) ─────────────────────────────────────────
+export type AlertaSeveridade = 'info' | 'warn' | 'error'
+
+export interface Alerta {
+  id:         string
+  severidade: AlertaSeveridade
+  titulo:     string
+  mensagem:   string
+  criado_em:  string   // ISO string
+  lido:       boolean
+}
+
+// ── Log de acesso ─────────────────────────────────────────── 
+export interface LogAcesso {
+  login_em:      string
+  ip?:           string
+  user_agent?:   string
+}

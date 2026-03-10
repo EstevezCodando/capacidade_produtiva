@@ -22,7 +22,11 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+<<<<<<< HEAD
 from cp.api.rotas import agenda, atividades, capacidade, health, kpi, log, relatorios, sync, usuarios
+=======
+from cp.api.rotas import agenda, atividades, auth, capacidade, health, kpi, log, relatorios, sync, usuarios
+>>>>>>> feature/front
 from cp.config.settings import Settings
 from cp.infrastructure.db import criar_engine_cp, criar_engine_sap
 
@@ -108,6 +112,10 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 
 app.include_router(health.router, prefix="/api")
+<<<<<<< HEAD
+=======
+app.include_router(auth.router, prefix="/api")
+>>>>>>> feature/front
 app.include_router(sync.router, prefix="/api")
 app.include_router(usuarios.router, prefix="/api")
 app.include_router(kpi.router, prefix="/api")

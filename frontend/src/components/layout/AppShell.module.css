@@ -1,0 +1,12 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main {
+  margin-top: var(--nav-h);
+  flex: 1;
+  min-height: calc(100vh - var(--nav-h));
+  background: var(--bg-void);
+}

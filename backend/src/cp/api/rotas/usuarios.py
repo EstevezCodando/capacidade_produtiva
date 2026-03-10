@@ -7,8 +7,17 @@ Política de autorização:
 
 from __future__ import annotations
 
+<<<<<<< HEAD
 from fastapi import APIRouter
 from pydantic import BaseModel
+=======
+from typing import Any
+
+from fastapi import APIRouter, Request
+from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.engine import Engine
+>>>>>>> feature/front
 
 from cp.api.deps import SomenteAdmin, UsuarioLogado
 
@@ -16,6 +25,7 @@ router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
 
 class UsuarioMe(BaseModel):
+<<<<<<< HEAD
     usuario_id: int
     usuario_uuid: str
     administrador: bool
@@ -28,6 +38,70 @@ def me(usuario: UsuarioLogado) -> UsuarioMe:
         usuario_id=usuario.usuario_id,
         usuario_uuid=usuario.usuario_uuid,
         administrador=usuario.administrador,
+=======
+    """Dados do usuário autenticado."""
+
+    uuid: str
+    login: str
+    nome: str
+    nome_guerra: str | None
+    administrador: bool
+    # Campos legados para compatibilidade
+    usuario_id: int
+    usuario_uuid: str
+
+
+def _buscar_usuario_snapshot(engine_cp: Engine, usuario_id: int) -> dict[str, Any] | None:
+    """Busca dados do usuário no sap_snapshot."""
+    sql = text("""
+        SELECT id, login, nome, nome_guerra, administrador, uuid
+        FROM sap_snapshot.dgeo_usuario
+        WHERE id = :id
+    """)
+    with engine_cp.connect() as conn:
+        result = conn.execute(sql, {"id": usuario_id})
+        row = result.fetchone()
+        if row:
+            return {
+                "id": row.id,
+                "login": row.login,
+                "nome": row.nome,
+                "nome_guerra": row.nome_guerra,
+                "administrador": bool(row.administrador),
+                "uuid": str(row.uuid),
+            }
+        return None
+
+
+@router.get("/me", summary="Dados do usuário autenticado")
+def me(usuario: UsuarioLogado, request: Request) -> UsuarioMe:
+    """Retorna o contexto do usuário extraído do JWT e enriquecido com dados do banco."""
+    engine_cp = request.app.state.engine_cp
+
+    # Tenta buscar dados completos do snapshot
+    dados = _buscar_usuario_snapshot(engine_cp, usuario.usuario_id)
+
+    if dados:
+        return UsuarioMe(
+            uuid=dados["uuid"],
+            login=dados["login"],
+            nome=dados["nome"],
+            nome_guerra=dados["nome_guerra"],
+            administrador=dados["administrador"],
+            usuario_id=dados["id"],
+            usuario_uuid=dados["uuid"],
+        )
+
+    # Fallback: usa apenas os dados do JWT
+    return UsuarioMe(
+        uuid=usuario.usuario_uuid,
+        login=f"user_{usuario.usuario_id}",
+        nome=f"Usuário {usuario.usuario_id}",
+        nome_guerra=None,
+        administrador=usuario.administrador,
+        usuario_id=usuario.usuario_id,
+        usuario_uuid=usuario.usuario_uuid,
+>>>>>>> feature/front
     )
 
 

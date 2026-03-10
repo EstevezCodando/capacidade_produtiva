@@ -1,0 +1,220 @@
+.root {
+  padding: 32px 40px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* ── Header ────────────────────────────────────────────────── */
+.pageHeader {
+  margin-bottom: 28px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.pageTitle {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--tx-primary);
+  letter-spacing: 0.3px;
+}
+
+.pageSubtitle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-secondary);
+  margin-top: 4px;
+}
+
+.staleness {
+  color: var(--tx-muted);
+}
+
+/* ── Stats ─────────────────────────────────────────────────── */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.statCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--bd-subtle);
+  border-radius: var(--r-lg);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.statLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--tx-muted);
+}
+
+.statValue {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--tx-primary);
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+.statSub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--tx-secondary);
+}
+
+/* ── Section ────────────────────────────────────────────────── */
+.section {
+  margin-bottom: 32px;
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--tx-muted);
+  margin-bottom: 12px;
+}
+
+/* ── Projeto rows ───────────────────────────────────────────── */
+.projetoRow {
+  background: var(--bg-surface);
+  border: 1px solid var(--bd-subtle);
+  border-radius: var(--r-md);
+  padding: 14px 18px;
+  margin-bottom: 6px;
+  transition: border-color 0.12s;
+}
+
+.projetoRow:hover {
+  border-color: var(--bd-default);
+}
+
+.projetoInfo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.projetoNome {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tx-primary);
+}
+
+.projetoPts {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-secondary);
+}
+
+/* ── Progress ───────────────────────────────────────────────── */
+.progressWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 5px;
+  background: var(--bg-raised);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.progressPct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ── Loading skeleton ───────────────────────────────────────── */
+.loadingRows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skeletonRow {
+  height: 72px;
+  background: var(--bg-surface);
+  border: 1px solid var(--bd-subtle);
+  border-radius: var(--r-md);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ── States ─────────────────────────────────────────────────── */
+.errorBox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--error-bg);
+  border: 1px solid rgba(224, 82, 82, 0.3);
+  border-radius: var(--r-md);
+  padding: 14px 18px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--error);
+}
+
+.emptyState {
+  background: var(--bg-surface);
+  border: 1px solid var(--bd-subtle);
+  border-radius: var(--r-md);
+  padding: 32px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--tx-muted);
+}
+
+/* ── Placeholder ────────────────────────────────────────────── */
+.placeholderBox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-surface);
+  border: 1px dashed var(--bd-subtle);
+  border-radius: var(--r-md);
+  padding: 28px 24px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--tx-muted);
+}
+
+.placeholderIcon {
+  font-size: 20px;
+  opacity: 0.5;
+}

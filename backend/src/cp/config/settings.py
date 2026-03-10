@@ -15,6 +15,10 @@ class Settings(BaseSettings):
 
     environment: str = Field(default="production", alias="ENVIRONMENT")
 
+    # Modo de teste: quando True, usa MockAuthProvider ao invés de RealAuthProvider
+    # Isso permite rodar testes no CI sem depender do servico_autenticacao
+    testing_mode: bool = Field(default=False, alias="TESTING_MODE")
+
     # CP banco
     cp_db_host: str = Field(alias="CP_DB_HOST")
     cp_db_port: int = Field(alias="CP_DB_PORT")

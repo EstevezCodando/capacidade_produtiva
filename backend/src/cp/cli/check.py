@@ -1,4 +1,11 @@
-# caminho: backend/scripts/check.py
+"""Verificação de qualidade de código.
+
+Executa pytest, ruff (lint e format) e mypy em sequência.
+Falha na primeira etapa que retornar erro.
+
+Uso:
+    uv run check
+"""
 
 from __future__ import annotations
 
