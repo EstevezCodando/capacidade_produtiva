@@ -340,6 +340,7 @@ class AgendaPrevistaRepository:
                             AgendaPrevistaAdmin.usuario_id == usuario_id,
                             AgendaPrevistaAdmin.data >= data_inicio,
                             AgendaPrevistaAdmin.data <= data_fim,
+                            AgendaPrevistaAdmin.em_uso.is_(True),
                         )
                     )
                     .order_by(AgendaPrevistaAdmin.data)
@@ -360,6 +361,7 @@ class AgendaPrevistaRepository:
                         and_(
                             AgendaPrevistaAdmin.data >= data_inicio,
                             AgendaPrevistaAdmin.data <= data_fim,
+                            AgendaPrevistaAdmin.em_uso.is_(True),
                         )
                     )
                     .order_by(AgendaPrevistaAdmin.usuario_id, AgendaPrevistaAdmin.data)
@@ -387,6 +389,7 @@ class AgendaPrevistaRepository:
                 minutos_planejados_normais=minutos_normais,
                 minutos_planejados_extras=minutos_extras,
                 descricao=descricao,
+                em_uso=True,
                 criado_por=criado_por,
             )
             session.add(planejamento)
@@ -401,28 +404,39 @@ class AgendaPrevistaRepository:
         minutos_extras: int | None = None,
         descricao: str | None = None,
     ) -> AgendaPrevistaAdmin | None:
-        """Atualiza planejamento existente."""
+        """Versiona planejamento existente, marcando o anterior como inativo."""
         with Session(self._engine) as session:
             planejamento = session.get(AgendaPrevistaAdmin, id)
-            if not planejamento:
+            if not planejamento or not planejamento.em_uso:
                 return None
-            if minutos_normais is not None:
-                planejamento.minutos_planejados_normais = minutos_normais
-            if minutos_extras is not None:
-                planejamento.minutos_planejados_extras = minutos_extras
-            if descricao is not None:
-                planejamento.descricao = descricao
+
+            planejamento.em_uso = False
+            novo = AgendaPrevistaAdmin(
+                usuario_id=planejamento.usuario_id,
+                data=planejamento.data,
+                bloco_id=planejamento.bloco_id,
+                minutos_planejados_normais=(
+                    minutos_normais if minutos_normais is not None else planejamento.minutos_planejados_normais
+                ),
+                minutos_planejados_extras=(
+                    minutos_extras if minutos_extras is not None else planejamento.minutos_planejados_extras
+                ),
+                descricao=descricao if descricao is not None else planejamento.descricao,
+                em_uso=True,
+                criado_por=planejamento.criado_por,
+            )
+            session.add(novo)
             session.commit()
-            session.refresh(planejamento)
-            return planejamento
+            session.refresh(novo)
+            return novo
 
     def remover(self, id: int) -> bool:
-        """Remove planejamento. Retorna True se removido."""
+        """Inativa planejamento sem apagar histórico."""
         with Session(self._engine) as session:
             planejamento = session.get(AgendaPrevistaAdmin, id)
-            if not planejamento:
+            if not planejamento or not planejamento.em_uso:
                 return False
-            session.delete(planejamento)
+            planejamento.em_uso = False
             session.commit()
             return True
 
@@ -435,6 +449,7 @@ class AgendaPrevistaRepository:
                 and_(
                     AgendaPrevistaAdmin.usuario_id == usuario_id,
                     AgendaPrevistaAdmin.data == data,
+                    AgendaPrevistaAdmin.em_uso.is_(True),
                 )
             )
             if bloco_id is not None:
@@ -442,6 +457,39 @@ class AgendaPrevistaRepository:
             else:
                 query = query.where(AgendaPrevistaAdmin.bloco_id.is_(None))
             return session.execute(query).scalar_one_or_none()
+
+    def soma_minutos_planejados_dia(self, usuario_id: int, data: date) -> int:
+        """Soma minutos normais planejados ativos no dia."""
+        with Session(self._engine) as session:
+            result = session.execute(
+                select(func.coalesce(func.sum(AgendaPrevistaAdmin.minutos_planejados_normais), 0)).where(
+                    and_(
+                        AgendaPrevistaAdmin.usuario_id == usuario_id,
+                        AgendaPrevistaAdmin.data == data,
+                        AgendaPrevistaAdmin.em_uso.is_(True),
+                    )
+                )
+            ).scalar()
+            return int(result or 0)
+
+    def remover_em_lote(self, usuario_ids: Sequence[int], datas: Sequence[date]) -> int:
+        """Inativa todos os planejamentos ativos para usuários e datas informados."""
+        if not usuario_ids or not datas:
+            return 0
+        with Session(self._engine) as session:
+            planejamentos = session.execute(
+                select(AgendaPrevistaAdmin).where(
+                    and_(
+                        AgendaPrevistaAdmin.usuario_id.in_(list(usuario_ids)),
+                        AgendaPrevistaAdmin.data.in_(list(datas)),
+                        AgendaPrevistaAdmin.em_uso.is_(True),
+                    )
+                )
+            ).scalars().all()
+            for item in planejamentos:
+                item.em_uso = False
+            session.commit()
+            return len(planejamentos)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -474,6 +522,7 @@ class AgendaLancamentoRepository:
                     AgendaLancamento.usuario_id == usuario_id,
                     AgendaLancamento.data_lancamento >= data_inicio,
                     AgendaLancamento.data_lancamento <= data_fim,
+                    AgendaLancamento.em_uso.is_(True),
                 )
             )
             if faixa:
@@ -495,6 +544,7 @@ class AgendaLancamentoRepository:
                         AgendaLancamento.usuario_id == usuario_id,
                         AgendaLancamento.data_lancamento == data,
                         AgendaLancamento.faixa_minuto == faixa,
+                        AgendaLancamento.em_uso.is_(True),
                     )
                 )
             ).scalar()
@@ -517,6 +567,7 @@ class AgendaLancamentoRepository:
                         AgendaLancamento.usuario_id == usuario_id,
                         AgendaLancamento.data_lancamento == data,
                         AgendaLancamento.faixa_minuto == faixa,
+                        AgendaLancamento.em_uso.is_(True),
                         TipoAtividade.codigo == tipo_codigo,
                     )
                 )
@@ -544,6 +595,7 @@ class AgendaLancamentoRepository:
                 faixa_minuto=faixa,
                 minutos=minutos,
                 descricao=descricao,
+                em_uso=True,
                 criado_por=criado_por,
             )
             session.add(lancamento)
@@ -558,28 +610,37 @@ class AgendaLancamentoRepository:
         descricao: str | None = None,
         atualizado_por: int | None = None,
     ) -> AgendaLancamento | None:
-        """Atualiza lançamento existente."""
+        """Versiona lançamento existente, preservando histórico."""
         with Session(self._engine) as session:
             lancamento = session.get(AgendaLancamento, id)
-            if not lancamento:
+            if not lancamento or not lancamento.em_uso:
                 return None
-            if minutos is not None:
-                lancamento.minutos = minutos
-            if descricao is not None:
-                lancamento.descricao = descricao
-            if atualizado_por is not None:
-                lancamento.atualizado_por = atualizado_por
+
+            lancamento.em_uso = False
+            novo = AgendaLancamento(
+                usuario_id=lancamento.usuario_id,
+                data_lancamento=lancamento.data_lancamento,
+                bloco_id=lancamento.bloco_id,
+                tipo_atividade_id=lancamento.tipo_atividade_id,
+                faixa_minuto=lancamento.faixa_minuto,
+                minutos=minutos if minutos is not None else lancamento.minutos,
+                descricao=descricao if descricao is not None else lancamento.descricao,
+                em_uso=True,
+                criado_por=lancamento.criado_por,
+                atualizado_por=atualizado_por,
+            )
+            session.add(novo)
             session.commit()
-            session.refresh(lancamento)
-            return lancamento
+            session.refresh(novo)
+            return novo
 
     def remover(self, id: int) -> bool:
-        """Remove lançamento. Retorna True se removido."""
+        """Inativa lançamento sem apagar histórico."""
         with Session(self._engine) as session:
             lancamento = session.get(AgendaLancamento, id)
-            if not lancamento:
+            if not lancamento or not lancamento.em_uso:
                 return False
-            session.delete(lancamento)
+            lancamento.em_uso = False
             session.commit()
             return True
 
@@ -594,6 +655,7 @@ class AgendaLancamentoRepository:
                         and_(
                             AgendaLancamento.usuario_id == usuario_id,
                             AgendaLancamento.data_lancamento == data,
+                            AgendaLancamento.em_uso.is_(True),
                         )
                     )
                 )

@@ -132,6 +132,26 @@ class PlanejamentoUpdateInput(BaseModel):
     descricao: str | None = Field(None, max_length=500, description="Descrição do planejamento")
 
 
+
+
+class PlanejamentoLoteInput(BaseModel):
+    """Entrada para criação em lote de planejamentos."""
+
+    usuario_ids: list[int] = Field(..., min_length=1, description="IDs dos usuários")
+    datas: list[date] = Field(..., min_length=1, description="Datas selecionadas")
+    bloco_id: int | None = Field(None, description="ID do bloco quando aplicável")
+    minutos_planejados_normais: int = Field(0, ge=0, description="Minutos normais planejados")
+    minutos_planejados_extras: int = Field(0, ge=0, description="Minutos extras planejados")
+    descricao: str | None = Field(None, max_length=500, description="Descrição do planejamento")
+
+
+class PlanejamentoRemocaoLoteInput(BaseModel):
+    """Entrada para remoção em lote de planejamentos ativos."""
+
+    usuario_ids: list[int] = Field(..., min_length=1, description="IDs dos usuários")
+    datas: list[date] = Field(..., min_length=1, description="Datas selecionadas")
+
+
 class PlanejamentoResponse(BaseSchema):
     """Resposta com dados de planejamento."""
 

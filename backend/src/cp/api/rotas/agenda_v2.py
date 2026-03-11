@@ -51,6 +51,8 @@ from cp.domain.capacidade.schemas import (
     LancamentoResponse,
     LancamentoUpdateInput,
     PlanejamentoInput,
+    PlanejamentoLoteInput,
+    PlanejamentoRemocaoLoteInput,
     PlanejamentoResponse,
     PlanejamentoUpdateInput,
     RemovidoResponse,
@@ -390,6 +392,64 @@ def criar_planejamento(
             criado_em=planejamento.criado_em,
             atualizado_em=planejamento.atualizado_em,
         )
+    except Exception as exc:
+        _handle_exception(exc)
+
+
+@router.post("/planejamento/lote", summary="Criar planejamento em lote (admin)", status_code=201)
+def criar_planejamento_lote(
+    request: Request,
+    body: PlanejamentoLoteInput,
+    admin: SomenteAdmin,
+) -> list[PlanejamentoResponse]:
+    """Admin cria o mesmo planejamento para múltiplos usuários e datas."""
+    service = _get_agenda_service(request)
+
+    try:
+        planejamentos = service.criar_planejamento_em_lote(
+            usuario_ids=body.usuario_ids,
+            datas=body.datas,
+            bloco_id=body.bloco_id,
+            minutos_normais=body.minutos_planejados_normais,
+            minutos_extras=body.minutos_planejados_extras,
+            descricao=body.descricao,
+            criado_por=admin.usuario_id,
+        )
+        return [
+            PlanejamentoResponse(
+                id=planejamento.id,
+                usuario_id=planejamento.usuario_id,
+                data=planejamento.data,
+                bloco_id=planejamento.bloco_id,
+                minutos_planejados_normais=planejamento.minutos_planejados_normais,
+                minutos_planejados_extras=planejamento.minutos_planejados_extras,
+                descricao=planejamento.descricao,
+                criado_por=planejamento.criado_por,
+                criado_em=planejamento.criado_em,
+                atualizado_em=planejamento.atualizado_em,
+            )
+            for planejamento in planejamentos
+        ]
+    except Exception as exc:
+        _handle_exception(exc)
+
+
+@router.post("/planejamento/remover-lote", summary="Remover planejamentos em lote (admin)")
+def remover_planejamento_lote(
+    request: Request,
+    body: PlanejamentoRemocaoLoteInput,
+    admin: SomenteAdmin,
+) -> RemovidoResponse:
+    """Admin inativa todos os planejamentos ativos para os usuários e datas selecionados."""
+    service = _get_agenda_service(request)
+
+    try:
+        quantidade = service.remover_planejamento_em_lote(
+            usuario_ids=body.usuario_ids,
+            datas=body.datas,
+            removido_por=admin.usuario_id,
+        )
+        return RemovidoResponse(removido=quantidade > 0, mensagem=f"{quantidade} planejamento(s) removido(s).")
     except Exception as exc:
         _handle_exception(exc)
 

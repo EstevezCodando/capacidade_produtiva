@@ -34,6 +34,8 @@ export interface TipoAtividade {
   codigo: CodigoAtividade
   nome: string
   grupo: GrupoAtividade
+  origem?: 'TIPO_ATIVIDADE' | 'BLOCO'
+  bloco_id?: number | null
 }
 
 // ── Parâmetros de Capacidade ─────────────────────────────────
@@ -80,6 +82,20 @@ export interface PlanejamentoUpdateInput {
   minutos_planejados_normais?: number
   minutos_planejados_extras?: number
   descricao?: string | null
+}
+
+export interface PlanejamentoLoteInput {
+  usuario_ids: number[]
+  datas: string[]
+  bloco_id: number | null
+  minutos_planejados_normais: number
+  minutos_planejados_extras?: number
+  descricao?: string | null
+}
+
+export interface PlanejamentoRemocaoLoteInput {
+  usuario_ids: number[]
+  datas: string[]
 }
 
 // ── Lançamento ───────────────────────────────────────────────

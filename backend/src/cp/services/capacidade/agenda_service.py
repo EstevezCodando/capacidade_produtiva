@@ -167,6 +167,33 @@ class AgendaService:
     # Planejamento (Admin)
     # ─────────────────────────────────────────────────────────────────────────
 
+    def _validar_planejamento_normal(
+        self,
+        usuario_id: int,
+        data: date,
+        minutos_normais: int,
+        excluir_planejamento_id: int | None = None,
+    ) -> None:
+        """Valida o teto de 6h para planejamento em horário normal."""
+        if minutos_normais <= 0:
+            return
+
+        capacidade = self._capacidade_repo.buscar(usuario_id, data)
+        teto_normal = capacidade.minutos_capacidade_normal_prevista if capacidade else 360
+        ja_planejado = self._planejamento_repo.soma_minutos_planejados_dia(usuario_id, data)
+
+        if excluir_planejamento_id:
+            atual = self._planejamento_repo.buscar_por_id(excluir_planejamento_id)
+            if atual and atual.em_uso:
+                ja_planejado -= atual.minutos_planejados_normais
+
+        if ja_planejado + minutos_normais > teto_normal:
+            raise LimiteCapacidadeExcedidoError(
+                capacidade_disponivel=max(0, teto_normal - ja_planejado),
+                minutos_solicitados=minutos_normais,
+                minutos_ja_alocados=ja_planejado,
+            )
+
     def criar_planejamento(
         self,
         usuario_id: int,
@@ -177,14 +204,8 @@ class AgendaService:
         descricao: str | None,
         criado_por: int,
     ) -> AgendaPrevistaAdmin:
-        """Cria novo planejamento de agenda."""
-        # Verificar se já existe planejamento para usuario/data/bloco
-        existente = self._planejamento_repo.buscar_existente(usuario_id, data, bloco_id)
-        if existente:
-            # Atualizar ao invés de criar
-            return self.atualizar_planejamento(
-                existente.id, minutos_normais, minutos_extras, descricao, criado_por
-            )
+        """Cria novo planejamento de agenda sem sobrescrever lançamentos existentes."""
+        self._validar_planejamento_normal(usuario_id, data, minutos_normais)
 
         planejamento = self._planejamento_repo.criar(
             usuario_id=usuario_id,
@@ -209,8 +230,15 @@ class AgendaService:
     ) -> AgendaPrevistaAdmin:
         """Atualiza planejamento existente."""
         antes = self._planejamento_repo.buscar_por_id(id)
-        if not antes:
+        if not antes or not antes.em_uso:
             raise RegistroNaoEncontradoError("Planejamento", id)
+
+        self._validar_planejamento_normal(
+            antes.usuario_id,
+            antes.data,
+            minutos_normais if minutos_normais is not None else antes.minutos_planejados_normais,
+            excluir_planejamento_id=id,
+        )
 
         depois = self._planejamento_repo.atualizar(
             id=id,
@@ -225,7 +253,7 @@ class AgendaService:
     def remover_planejamento(self, id: int, removido_por: int) -> bool:
         """Remove planejamento."""
         planejamento = self._planejamento_repo.buscar_por_id(id)
-        if not planejamento:
+        if not planejamento or not planejamento.em_uso:
             raise RegistroNaoEncontradoError("Planejamento", id)
 
         self._audit.auditar_planejamento_removido(planejamento, removido_por)
@@ -239,11 +267,45 @@ class AgendaService:
             usuario_id, data_inicio, data_fim
         )
 
-    def listar_planejamento_geral(
-        self, data_inicio: date, data_fim: date
-    ) -> Sequence[AgendaPrevistaAdmin]:
-        """Lista todos os planejamentos no período."""
-        return self._planejamento_repo.listar_todos_periodo(data_inicio, data_fim)
+    def criar_planejamento_em_lote(
+        self,
+        usuario_ids: Sequence[int],
+        datas: Sequence[date],
+        bloco_id: int | None,
+        minutos_normais: int,
+        minutos_extras: int,
+        descricao: str | None,
+        criado_por: int,
+    ) -> list[AgendaPrevistaAdmin]:
+        """Cria o mesmo planejamento para múltiplos usuários e datas."""
+        criados: list[AgendaPrevistaAdmin] = []
+        for usuario_id in usuario_ids:
+            for data_item in datas:
+                criados.append(
+                    self.criar_planejamento(
+                        usuario_id=usuario_id,
+                        data=data_item,
+                        bloco_id=bloco_id,
+                        minutos_normais=minutos_normais,
+                        minutos_extras=minutos_extras,
+                        descricao=descricao,
+                        criado_por=criado_por,
+                    )
+                )
+        return criados
+
+    def remover_planejamento_em_lote(
+        self,
+        usuario_ids: Sequence[int],
+        datas: Sequence[date],
+        removido_por: int,
+    ) -> int:
+        """Inativa todos os planejamentos ativos das combinações informadas."""
+        planejamentos = self._planejamento_repo.listar_todos_periodo(min(datas), max(datas))
+        afetados = [p for p in planejamentos if p.usuario_id in usuario_ids and p.data in datas]
+        for item in afetados:
+            self._audit.auditar_planejamento_removido(item, removido_por)
+        return self._planejamento_repo.remover_em_lote(usuario_ids, datas)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Lançamentos

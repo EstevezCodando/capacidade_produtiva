@@ -256,11 +256,15 @@ export function useAgendaData(options: UseAgendaDataOptions) {
   // Query de capacidade/resumo do período
   const capacidadeQuery = useQuery({
     queryKey: ['capacidade', usuarioId, dataInicio, dataFim, blocoId],
-    queryFn: () => {
-      if (isAdmin && usuarioId) {
-        return getCapacidadeUsuario(usuarioId, dataInicio, dataFim, blocoId)
+    queryFn: async () => {
+      try {
+        if (isAdmin && usuarioId) {
+          return await getCapacidadeUsuario(usuarioId, dataInicio, dataFim, blocoId)
+        }
+        return await getMeuPeriodo(dataInicio, dataFim, blocoId)
+      } catch {
+        return null
       }
-      return getMeuPeriodo(dataInicio, dataFim, blocoId)
     },
     enabled: enabled && !!dataInicio && !!dataFim,
     staleTime: 30_000,
@@ -303,8 +307,9 @@ export function useAgendaData(options: UseAgendaDataOptions) {
     diasMap,
     getDiaData,
     isLoading: agendaQuery.isLoading || capacidadeQuery.isLoading,
-    isError: agendaQuery.isError || capacidadeQuery.isError,
-    error: agendaQuery.error || capacidadeQuery.error,
+    isError: agendaQuery.isError,
+    error: agendaQuery.error,
+    capacidadeError: capacidadeQuery.error,
     invalidate,
   }
 }

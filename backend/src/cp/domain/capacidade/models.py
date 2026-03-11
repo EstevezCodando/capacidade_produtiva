@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -20,6 +21,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -173,14 +175,11 @@ class AgendaPrevistaAdmin(Base):
 
     __tablename__ = "agenda_prevista_admin"
     __table_args__ = (
-        UniqueConstraint(
-            "usuario_id", "data", "bloco_id",
-            name="uq_agenda_prevista_usuario_data_bloco"
-        ),
         CheckConstraint("minutos_planejados_normais >= 0", name="ck_minutos_planejados_normais_nao_negativo"),
         CheckConstraint("minutos_planejados_extras >= 0", name="ck_minutos_planejados_extras_nao_negativo"),
         Index("ix_agenda_prevista_usuario_data", "usuario_id", "data"),
         Index("ix_agenda_prevista_data", "data"),
+        Index("ix_agenda_prevista_em_uso", "em_uso"),
         {"schema": "capacidade"},
     )
 
@@ -191,6 +190,7 @@ class AgendaPrevistaAdmin(Base):
     minutos_planejados_normais: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     minutos_planejados_extras: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    em_uso: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
     criado_por: Mapped[int] = mapped_column(Integer, nullable=False)
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -219,6 +219,7 @@ class AgendaLancamento(Base):
         Index("ix_agenda_lancamento_usuario_data", "usuario_id", "data_lancamento"),
         Index("ix_agenda_lancamento_data", "data_lancamento"),
         Index("ix_agenda_lancamento_bloco", "bloco_id"),
+        Index("ix_agenda_lancamento_em_uso", "em_uso"),
         {"schema": "capacidade"},
     )
 
@@ -235,6 +236,7 @@ class AgendaLancamento(Base):
     )
     minutos: Mapped[int] = mapped_column(Integer, nullable=False)
     descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    em_uso: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
     criado_por: Mapped[int] = mapped_column(Integer, nullable=False)
     atualizado_por: Mapped[int | None] = mapped_column(Integer, nullable=True)
     criado_em: Mapped[datetime] = mapped_column(

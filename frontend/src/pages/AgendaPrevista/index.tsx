@@ -5,20 +5,21 @@ import { useAuth } from '@/context/AuthContext'
 import { useCalendarNavigation, useAgendaData } from '@/hooks/useCalendar'
 import {
   consolidarPeriodo,
-  criarPlanejamento,
+  criarPlanejamentoLote,
   editarPlanejamento,
   getAgendaUsuario,
   getConfigTeto,
   getTiposAtividade,
   getUsuarios,
   removerPlanejamento,
+  removerPlanejamentoLote,
 } from '@/api/agenda'
 import CalendarHeader from '@/components/calendar/CalendarHeader'
 import CalendarGrid from '@/components/calendar/CalendarGrid'
 import ConsolidacaoModal from '@/components/agenda/ConsolidacaoModal'
 import Modal from '@/components/ui/Modal'
 import { Button, Card, Input, Select, Skeleton, StatCard, Textarea } from '@/components/ui/Common'
-import type { AgendaCompleta, PlanejamentoInput, TipoAtividade, UsuarioResumo } from '@/types/agenda'
+import type { AgendaCompleta, TipoAtividade, UsuarioResumo } from '@/types/agenda'
 import styles from './AgendaPage.module.css'
 
 interface FormularioPlanejamento {
@@ -189,13 +190,16 @@ export default function AgendaPrevista() {
     queryFn: async (): Promise<AgendaCompleta[]> => {
       if (!idsUsuariosPainel.length) return []
       if (!ehAdmin) return agenda ? [agenda] : []
-      return Promise.all(
+      const resultados = await Promise.allSettled(
         idsUsuariosPainel.map((usuarioId) => getAgendaUsuario(
           usuarioId,
           calendar.formatForApi(calendar.dateRange.start),
           calendar.formatForApi(calendar.dateRange.end),
         )),
       )
+      return resultados
+        .filter((resultado): resultado is PromiseFulfilledResult<AgendaCompleta> => resultado.status === 'fulfilled')
+        .map((resultado) => resultado.value)
     },
     enabled: idsUsuariosPainel.length > 0 && (!!agenda || ehAdmin),
     staleTime: 30_000,
@@ -378,25 +382,19 @@ export default function AgendaPrevista() {
 
       const dias = calendar.selectedDates.map((data) => format(data, 'yyyy-MM-dd'))
       const tipoSelecionado = tiposAtividade.find((item) => item.id === Number(form.tipoAtividadeId))
-      const descricaoComTipo = [tipoSelecionado?.nome ? `[${tipoSelecionado.nome}]` : '', form.descricao.trim()]
-        .filter(Boolean)
-        .join(' ')
+      const blocoSelecionadoId = tipoSelecionado?.origem === 'BLOCO' ? (tipoSelecionado.bloco_id ?? null) : null
+      const descricaoComTipo = tipoSelecionado?.origem === 'BLOCO'
+        ? form.descricao.trim()
+        : [tipoSelecionado?.nome ? `[${tipoSelecionado.nome}]` : '', form.descricao.trim()].filter(Boolean).join(' ')
 
-      const lancamentos: PlanejamentoInput[] = []
-      for (const usuarioId of selectedUsuarioIds) {
-        for (const data of dias) {
-          lancamentos.push({
-            usuario_id: usuarioId,
-            data,
-            bloco_id: null,
-            minutos_planejados_normais: form.tipoHorario === 'NORMAL' ? minutosCalculados : 0,
-            minutos_planejados_extras: form.tipoHorario === 'EXTRA' ? minutosCalculados : 0,
-            descricao: descricaoComTipo || undefined,
-          })
-        }
-      }
-
-      await Promise.all(lancamentos.map((item) => criarPlanejamento(item)))
+      await criarPlanejamentoLote({
+        usuario_ids: selectedUsuarioIds,
+        datas: dias,
+        bloco_id: blocoSelecionadoId,
+        minutos_planejados_normais: form.tipoHorario === 'NORMAL' ? minutosCalculados : 0,
+        minutos_planejados_extras: form.tipoHorario === 'EXTRA' ? minutosCalculados : 0,
+        descricao: descricaoComTipo || undefined,
+      })
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['agenda'] })
@@ -545,6 +543,29 @@ export default function AgendaPrevista() {
     },
   })
 
+  const removerPlanejamentoLoteMutation = useMutation({
+    mutationFn: async () => {
+      if (selectedUsuarioIds.length === 0) throw new Error('Selecione ao menos um usuário.')
+      if (calendar.selectedDates.length === 0) throw new Error('Selecione ao menos uma data.')
+      return removerPlanejamentoLote({
+        usuario_ids: selectedUsuarioIds,
+        datas: calendar.selectedDates.map((data) => format(data, 'yyyy-MM-dd')),
+      })
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['agenda'] })
+      await queryClient.invalidateQueries({ queryKey: ['capacidade'] })
+      await queryClient.invalidateQueries({ queryKey: ['agenda-prevista-multiusuario'] })
+      invalidate()
+    },
+    onError: (error) => {
+      setErrors((atual) => ({
+        ...atual,
+        submit: error instanceof Error ? error.message : 'Não foi possível remover os planejamentos selecionados.',
+      }))
+    },
+  })
+
   return (
     <div className={styles.page}>
       <aside className={styles.sidebar}>
@@ -681,6 +702,14 @@ export default function AgendaPrevista() {
               >
                 Consolidar período
               </Button>
+              <Button
+                variant="danger"
+                onClick={() => { void removerPlanejamentoLoteMutation.mutateAsync().catch(() => undefined) }}
+                disabled={!(ehAdmin && selectedUsuarioIds.length > 0 && calendar.selectedDates.length > 0)}
+                loading={removerPlanejamentoLoteMutation.isPending}
+              >
+                Remover selecionados
+              </Button>
               <Button variant="primary" onClick={abrirPlanejamento} disabled={!podeCriarPlanejamento}>
                 Criar planejamento
               </Button>
@@ -778,14 +807,13 @@ export default function AgendaPrevista() {
                             <div>
                               <div className={styles.dayActivityTitle}>{atividade.descricao}</div>
                               <div className={styles.dayActivityMeta}>
-                                Faixa {atividade.faixa === 'NORMAL' ? 'normal' : 'extra'}
-                                {ehAdmin && <span className={styles.dayActivityMetaHint}> Clique para editar ou remover</span>}
+                                {atividade.faixa === 'NORMAL' ? 'Normal' : 'Hora extra'} · {formatarHorasMinutos(atividade.minutos)}
                               </div>
                             </div>
-                            <span className={styles.dayActivityDuration}>{formatarHorasMinutos(atividade.minutos)}</span>
+                            {ehAdmin && <span className={styles.dayActivityAction}>Editar</span>}
                           </article>
                         )) : (
-                          <div className={styles.dayActivityEmpty}>Nenhuma atividade planejada para este usuário neste dia.</div>
+                          <div className={styles.dayEmptyState}>Nenhuma atividade planejada.</div>
                         )}
                       </div>
                     </section>

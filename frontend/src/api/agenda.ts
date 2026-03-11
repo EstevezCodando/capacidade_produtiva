@@ -17,6 +17,8 @@ import type {
   LancamentoUpdateInput,
   Planejamento,
   PlanejamentoInput,
+  PlanejamentoLoteInput,
+  PlanejamentoRemocaoLoteInput,
   PlanejamentoUpdateInput,
   RemovidoResponse,
   TipoAtividade,
@@ -69,6 +71,16 @@ export async function editarPlanejamento(id: number, input: PlanejamentoUpdateIn
   return res.data
 }
 
+export async function criarPlanejamentoLote(input: PlanejamentoLoteInput): Promise<Planejamento[]> {
+  const res = await apiClient.post<Planejamento[]>('/agenda/planejamento/lote', input)
+  return res.data
+}
+
+export async function removerPlanejamentoLote(input: PlanejamentoRemocaoLoteInput): Promise<RemovidoResponse> {
+  const res = await apiClient.post<RemovidoResponse>('/agenda/planejamento/remover-lote', input)
+  return res.data
+}
+
 export async function removerPlanejamento(id: number): Promise<RemovidoResponse> {
   const res = await apiClient.delete<RemovidoResponse>(`/agenda/planejamento/${id}`)
   return res.data
@@ -90,8 +102,12 @@ export async function removerLancamentoAdmin(id: number): Promise<RemovidoRespon
 }
 
 export async function getFeriados(): Promise<{ feriados: Feriado[] }> {
-  const res = await apiClient.get<{ feriados: Feriado[] }>('/capacidade/feriados')
-  return res.data
+  try {
+    const res = await apiClient.get<{ feriados: Feriado[] }>('/capacidade/feriados')
+    return res.data
+  } catch {
+    return { feriados: [] }
+  }
 }
 
 export async function criarFeriado(input: FeriadoInput): Promise<Feriado> {
@@ -115,8 +131,19 @@ export async function removerIndisponibilidade(id: number): Promise<RemovidoResp
 }
 
 export async function getConfigTeto(): Promise<ConfigTeto> {
-  const res = await apiClient.get<ConfigTeto>('/capacidade/config')
-  return res.data
+  try {
+    const res = await apiClient.get<ConfigTeto>('/capacidade/config')
+    return res.data
+  } catch {
+    return {
+      teto_normal_min: 360,
+      teto_extra_min: 240,
+      vigencia_inicio: '',
+      vigencia_fim: null,
+      configurado_em: null,
+      configurado_por: null,
+    }
+  }
 }
 
 export async function atualizarConfigTeto(input: ConfigTetoInput): Promise<ConfigTeto> {
@@ -164,11 +191,19 @@ export async function getBlocos(): Promise<Bloco[]> {
 }
 
 export async function getUsuarios(): Promise<UsuarioResumo[]> {
-  const res = await apiClient.get<UsuarioResumo[] | { itens?: UsuarioResumo[] }>('/usuarios')
-  return Array.isArray(res.data) ? res.data : (res.data.itens ?? [])
+  try {
+    const res = await apiClient.get<UsuarioResumo[] | { itens?: UsuarioResumo[] }>('/usuarios')
+    return Array.isArray(res.data) ? res.data : (res.data.itens ?? [])
+  } catch {
+    return []
+  }
 }
 
 export async function getTiposAtividade(): Promise<TipoAtividade[]> {
-  const res = await apiClient.get<TipoAtividade[] | { itens?: TipoAtividade[] }>('/atividades/tipos')
-  return Array.isArray(res.data) ? res.data : (res.data.itens ?? [])
+  try {
+    const res = await apiClient.get<TipoAtividade[] | { itens?: TipoAtividade[] }>('/atividades/tipos')
+    return Array.isArray(res.data) ? res.data : (res.data.itens ?? [])
+  } catch {
+    return []
+  }
 }
