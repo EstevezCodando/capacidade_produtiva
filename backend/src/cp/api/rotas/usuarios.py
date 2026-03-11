@@ -20,20 +20,38 @@ router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
 
 class UsuarioMe(BaseModel):
-    """Dados do usuário autenticado."""
-
     uuid: str
     login: str
     nome: str
     nome_guerra: str | None
     administrador: bool
-    # Campos legados para compatibilidade
     usuario_id: int
     usuario_uuid: str
 
 
+class UsuarioResumo(BaseModel):
+    id: int
+    nome: str
+    nome_guerra: str | None
+
+
+class UsuariosListResponse(BaseModel):
+    itens: list[UsuarioResumo]
+
+
+class UsuarioDetalhe(BaseModel):
+    id: int
+    nome: str
+    nome_guerra: str | None
+    ativo: bool
+    administrador: bool
+    pontos_executor: float
+    pontos_revisor: float
+    pontos_corretor: float
+    pendencias_agenda: list[str]
+
+
 def _buscar_usuario_snapshot(engine_cp: Engine, usuario_id: int) -> dict[str, Any] | None:
-    """Busca dados do usuário no sap_snapshot."""
     sql = text("""
         SELECT id, login, nome, nome_guerra, administrador, uuid
         FROM sap_snapshot.dgeo_usuario
@@ -56,10 +74,7 @@ def _buscar_usuario_snapshot(engine_cp: Engine, usuario_id: int) -> dict[str, An
 
 @router.get("/me", summary="Dados do usuário autenticado")
 def me(usuario: UsuarioLogado, request: Request) -> UsuarioMe:
-    """Retorna o contexto do usuário extraído do JWT e enriquecido com dados do banco."""
     engine_cp = request.app.state.engine_cp
-
-    # Tenta buscar dados completos do snapshot
     dados = _buscar_usuario_snapshot(engine_cp, usuario.usuario_id)
 
     if dados:
@@ -73,7 +88,6 @@ def me(usuario: UsuarioLogado, request: Request) -> UsuarioMe:
             usuario_uuid=dados["uuid"],
         )
 
-    # Fallback: usa apenas os dados do JWT
     return UsuarioMe(
         uuid=usuario.usuario_uuid,
         login=f"user_{usuario.usuario_id}",
@@ -85,42 +99,50 @@ def me(usuario: UsuarioLogado, request: Request) -> UsuarioMe:
     )
 
 
-@router.get(
-    "",
-    summary="Lista todos os usuários (admin)",
-    description="Endpoint reservado para administradores. Operadores recebem 403.",
-)
-def listar_usuarios(usuario: SomenteAdmin) -> dict[str, str]:
-    # Stub — implementação real virá com o repositório de usuários.
-    # A autorização já foi verificada pela dependência SomenteAdmin.
-    return {"detail": "endpoint reservado para implementação futura", "solicitado_por": usuario.usuario_uuid}
+@router.get("", summary="Lista todos os usuários (admin)")
+def listar_usuarios(_: SomenteAdmin, request: Request) -> list[UsuarioResumo]:
+    engine_cp = request.app.state.engine_cp
+    sql = text("""
+        SELECT id, nome, nome_guerra
+        FROM sap_snapshot.dgeo_usuario
+        ORDER BY nome
+    """)
+    with engine_cp.connect() as conn:
+        rows = conn.execute(sql).fetchall()
+    return [
+        UsuarioResumo(id=row.id, nome=row.nome, nome_guerra=row.nome_guerra)
+        for row in rows
+    ]
 
 
-class UsuarioDetalhe(BaseModel):
-    id: int
-    nome: str
-    nome_guerra: str | None
-    ativo: bool
-    administrador: bool
-    pontos_executor: float
-    pontos_revisor: float
-    pontos_corretor: float
-    pendencias_agenda: list[str]
-
-
-@router.get(
-    "/{usuario_id}",
-    summary="Detalhe de um usuário",
-    description="Dados completos do usuário: perfil, pontos acumulados por papel e pendências de agenda.",
-)
-def detalhe_usuario(usuario_id: int, _: SomenteAdmin) -> UsuarioDetalhe:
-    # Stub — implementação real virá com repositório de usuários e kpi.pontos_usuario
+@router.get("/{usuario_id}", summary="Detalhe de um usuário")
+def detalhe_usuario(usuario_id: int, request: Request, _: SomenteAdmin) -> UsuarioDetalhe:
+    engine_cp = request.app.state.engine_cp
+    sql = text("""
+        SELECT id, nome, nome_guerra, TRUE AS ativo, administrador
+        FROM sap_snapshot.dgeo_usuario
+        WHERE id = :id
+    """)
+    with engine_cp.connect() as conn:
+        row = conn.execute(sql, {"id": usuario_id}).fetchone()
+    if row is None:
+        return UsuarioDetalhe(
+            id=usuario_id,
+            nome="",
+            nome_guerra=None,
+            ativo=False,
+            administrador=False,
+            pontos_executor=0.0,
+            pontos_revisor=0.0,
+            pontos_corretor=0.0,
+            pendencias_agenda=[],
+        )
     return UsuarioDetalhe(
-        id=usuario_id,
-        nome="",
-        nome_guerra=None,
-        ativo=True,
-        administrador=False,
+        id=row.id,
+        nome=row.nome,
+        nome_guerra=row.nome_guerra,
+        ativo=bool(row.ativo),
+        administrador=bool(row.administrador),
         pontos_executor=0.0,
         pontos_revisor=0.0,
         pontos_corretor=0.0,

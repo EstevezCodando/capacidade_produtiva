@@ -7,11 +7,19 @@ import type { CalendarDay, DiaDaAgenda, CalendarView } from '@/types/agenda'
 import DayCell from './DayCell'
 import styles from './Calendar.module.css'
 
+interface HoverUsuarioResumo {
+  usuarioId: number
+  nome: string
+  minutosPlanejados: number
+  capacidadeMaxima: number
+}
+
 interface CalendarGridProps {
   days: CalendarDay[]
   weekDays: { short: string; full: string }[]
   view: CalendarView
   getDiaData: (date: Date) => DiaDaAgenda | undefined
+  getHoverUsuarios?: (date: Date) => HoverUsuarioResumo[]
   selectedDates: Date[]
   onSelectDate: (date: Date, addToSelection?: boolean) => void
   onSelectRange: (start: Date, end: Date) => void
@@ -25,6 +33,7 @@ export default function CalendarGrid({
   weekDays,
   view,
   getDiaData,
+  getHoverUsuarios,
   selectedDates,
   onSelectDate,
   onSelectRange,
@@ -36,29 +45,25 @@ export default function CalendarGrid({
   const [dragEnd, setDragEnd] = useState<Date | null>(null)
   const isDragging = useRef(false)
 
-  // Dias filtrados por view
   const visibleDays = useMemo(() => {
     if (view === 'month') return days
-    if (view === 'week') return days.slice(0, 7) // Primeira semana apenas como exemplo
-    return days.slice(0, 1) // Dia único
+    if (view === 'week') return days.slice(0, 7)
+    return days.slice(0, 1)
   }, [days, view])
 
-  // Handler de início de drag
   const handleMouseDown = useCallback((date: Date, e: React.MouseEvent) => {
-    if (e.button !== 0) return // Apenas botão esquerdo
+    if (e.button !== 0) return
     isDragging.current = true
     setDragStart(date)
     setDragEnd(date)
   }, [])
 
-  // Handler de movimento durante drag
   const handleMouseEnter = useCallback((date: Date) => {
     if (isDragging.current && dragStart) {
       setDragEnd(date)
     }
   }, [dragStart])
 
-  // Handler de fim de drag
   const handleMouseUp = useCallback(() => {
     if (isDragging.current && dragStart && dragEnd) {
       if (isSameDay(dragStart, dragEnd)) {
@@ -72,7 +77,6 @@ export default function CalendarGrid({
     setDragEnd(null)
   }, [dragStart, dragEnd, onSelectDate, onSelectRange])
 
-  // Verificar se dia está no range de drag
   const isInDragRange = useCallback((date: Date) => {
     if (!dragStart || !dragEnd) return false
     const start = dragStart < dragEnd ? dragStart : dragEnd
@@ -80,18 +84,16 @@ export default function CalendarGrid({
     return date >= start && date <= end
   }, [dragStart, dragEnd])
 
-  // Verificar se dia está selecionado
   const isSelected = useCallback((date: Date) => {
     return selectedDates.some((d) => isSameDay(d, date))
   }, [selectedDates])
 
   return (
-    <div 
+    <div
       className={`${styles.grid} ${styles[`grid-${view}`]}`}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* Header com dias da semana */}
       <div className={styles.weekHeader}>
         {weekDays.map((day, i) => (
           <div key={i} className={styles.weekDay}>
@@ -101,7 +103,6 @@ export default function CalendarGrid({
         ))}
       </div>
 
-      {/* Grid de dias */}
       <div className={styles.daysGrid}>
         {visibleDays.map((calDay) => {
           const diaData = getDiaData(calDay.date)
@@ -113,6 +114,7 @@ export default function CalendarGrid({
               key={format(calDay.date, 'yyyy-MM-dd')}
               calendarDay={calDay}
               diaData={diaData}
+              hoverUsuarios={getHoverUsuarios?.(calDay.date) ?? []}
               isSelected={selected}
               isInDragRange={inDragRange}
               isAdmin={isAdmin}

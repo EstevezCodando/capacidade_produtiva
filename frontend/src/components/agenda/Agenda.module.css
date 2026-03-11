@@ -534,3 +534,98 @@
   color: var(--error);
   margin: 0;
 }
+
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.modalSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modalSectionTitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--tx-primary);
+}
+
+.modalSectionSubtitle {
+  margin: 0;
+  color: var(--tx-secondary);
+  font-size: 13px;
+}
+
+.chipsWrap {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  color: var(--tx-secondary);
+  font-weight: 600;
+}
+
+.fieldControl {
+  width: 100%;
+  border: 1px solid var(--bd-subtle);
+  background: var(--bg-raised);
+  color: var(--tx-primary);
+  border-radius: var(--r-md);
+  padding: 11px 12px;
+  font: inherit;
+}
+
+.textareaControl {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.planejamentoPreview {
+  padding: 14px;
+  border-radius: var(--r-md);
+  background: rgba(90, 157, 255, 0.08);
+  border: 1px solid rgba(90, 157, 255, 0.18);
+  color: var(--tx-secondary);
+  line-height: 1.5;
+}
+
+.planejamentoPreviewTitle {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--tx-muted);
+  margin-bottom: 6px;
+}
+
+.planejamentoPreviewNote {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+.formError {
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: rgba(224, 82, 82, 0.1);
+  border: 1px solid rgba(224, 82, 82, 0.25);
+  color: #ffb4b4;
+  font-size: 13px;
+}

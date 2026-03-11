@@ -10,20 +10,20 @@
   /* ── Backgrounds ──────────────────────────────────────── */
   --bg-void:    #080a0e;   /* fundo raiz */
   --bg-base:    #0c0f16;   /* superfície principal */
-  --bg-surface: #141e31;   /* cards, painéis */
-  --bg-raised:  #1b2944;   /* elementos elevados */
-  --bg-overlay: #273856;   /* hover, selecionado */
+  --bg-surface: #12192a;   /* cards, painéis */
+  --bg-raised:  #18233a;   /* elementos elevados */
+  --bg-overlay: #22304c;   /* hover, selecionado */
 
   /* ── Bordas ───────────────────────────────────────────── */
-  --bd-faint:   #2a3857;
-  --bd-subtle:  #3c4f74;
-  --bd-default: #53698f;
+  --bd-faint:   #24304a;
+  --bd-subtle:  #31405f;
+  --bd-default: #42537a;
   --bd-strong:  #374570;
 
   /* ── Texto ────────────────────────────────────────────── */
   --tx-primary:   #eef4ff;
-  --tx-secondary: #c0cee8;
-  --tx-muted:     #9aadd1;
+  --tx-secondary: #aebee0;
+  --tx-muted:     #8396be;
   --tx-disabled:  #4b5876;
 
   /* ── Acento principal — verde-menta operacional ────────── */

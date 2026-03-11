@@ -28,8 +28,8 @@
 
 /* Sizes */
 .btn-sm { padding: 6px 12px; font-size: 12px; }
-.btn-md { padding: 8px 16px; font-size: 13px; }
-.btn-lg { padding: 10px 20px; font-size: 14px; }
+.btn-md { padding: 10px 18px; font-size: 14px; }
+.btn-lg { padding: 12px 22px; font-size: 15px; }
 
 /* Variants */
 .btn-primary {
@@ -149,7 +149,7 @@
 }
 
 .cardTitle {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--tx-primary);
   margin: 0;
@@ -157,7 +157,7 @@
 }
 
 .cardSubtitle {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--tx-secondary);
   margin: 4px 0 0;
   font-family: var(--font-mono);
@@ -260,7 +260,7 @@
 .stat-lg .statValue { font-size: 36px; }
 
 .statLabel {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--tx-muted);
   text-transform: uppercase;
@@ -429,8 +429,8 @@
   padding-right: 32px;
 }
 
-.select-sm { padding: 6px 32px 6px 10px; font-size: 12px; }
-.select-md { padding: 8px 32px 8px 12px; font-size: 13px; }
+.select-sm { padding: 8px 36px 8px 12px; font-size: 13px; min-height: 42px; }
+.select-md { padding: 12px 40px 12px 14px; font-size: 15px; min-height: 48px; }
 
 .select:hover:not(:disabled) {
   border-color: var(--bd-default);
@@ -458,9 +458,9 @@
 }
 
 .inputLabel {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--tx-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  color: #c7d4ef;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -468,10 +468,11 @@
 .input {
   background: var(--bg-raised);
   border: 1px solid var(--bd-subtle);
-  border-radius: var(--r-md);
-  padding: 10px 12px;
+  border-radius: 10px;
+  min-height: 48px;
+  padding: 12px 14px;
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: 15px;
   color: var(--tx-primary);
   transition: all 0.15s;
 }
@@ -487,7 +488,11 @@
 }
 
 .input::placeholder {
-  color: var(--tx-muted);
+  color: #8fa3cc;
+}
+
+.input[type='number'] {
+  appearance: textfield;
 }
 
 .inputError {
@@ -495,25 +500,25 @@
 }
 
 .inputErrorMsg {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--error);
 }
 
 .inputHint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--tx-muted);
 }
 
 .textarea {
   background: var(--bg-raised);
   border: 1px solid var(--bd-subtle);
-  border-radius: var(--r-md);
-  padding: 10px 12px;
+  border-radius: 10px;
+  padding: 14px 16px;
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: 15px;
   color: var(--tx-primary);
   resize: vertical;
-  min-height: 80px;
+  min-height: 140px;
   transition: all 0.15s;
 }
 

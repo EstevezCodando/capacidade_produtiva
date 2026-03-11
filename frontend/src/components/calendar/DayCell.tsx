@@ -7,9 +7,17 @@ import { format } from 'date-fns'
 import type { CalendarDay, DiaDaAgenda } from '@/types/agenda'
 import styles from './Calendar.module.css'
 
+interface HoverUsuarioResumo {
+  usuarioId: number
+  nome: string
+  minutosPlanejados: number
+  capacidadeMaxima: number
+}
+
 interface DayCellProps {
   calendarDay: CalendarDay
   diaData?: DiaDaAgenda
+  hoverUsuarios?: HoverUsuarioResumo[]
   isSelected: boolean
   isInDragRange: boolean
   isAdmin?: boolean
@@ -19,9 +27,18 @@ interface DayCellProps {
   onClick: () => void
 }
 
+function formatarHorasMinutos(minutos: number): string {
+  const horas = Math.floor(minutos / 60)
+  const resto = minutos % 60
+  if (horas > 0 && resto > 0) return `${horas}h ${resto}min`
+  if (horas > 0) return `${horas}h`
+  return `${resto}min`
+}
+
 export default function DayCell({
   calendarDay,
   diaData,
+  hoverUsuarios = [],
   isSelected,
   isInDragRange,
   isAdmin = false,
@@ -32,17 +49,16 @@ export default function DayCell({
 }: DayCellProps) {
   const { date, isCurrentMonth, isToday, isWeekend } = calendarDay
 
-  // Computar classes baseado no estado
   const cellClasses = useMemo(() => {
     const classes = [styles.dayCell]
-    
+
     if (!isCurrentMonth) classes.push(styles.dayCellOtherMonth)
     if (isToday) classes.push(styles.dayCellToday)
     if (isWeekend) classes.push(styles.dayCellWeekend)
     if (isSelected) classes.push(styles.dayCellSelected)
     if (isInDragRange && !isSelected) classes.push(styles.dayCellDragRange)
     if (loading) classes.push(styles.dayCellLoading)
-    
+
     if (diaData) {
       if (diaData.eh_feriado) classes.push(styles.dayCellHoliday)
       if (diaData.eh_indisponivel) classes.push(styles.dayCellUnavailable)
@@ -52,7 +68,6 @@ export default function DayCell({
     return classes.join(' ')
   }, [isCurrentMonth, isToday, isWeekend, isSelected, isInDragRange, loading, diaData])
 
-  // Calcular indicadores de capacidade
   const capacityInfo = useMemo(() => {
     if (!diaData) return null
 
@@ -61,8 +76,8 @@ export default function DayCell({
     const extraUsed = diaData.apontado_extra_min
     const extraMax = diaData.teto_extra_min
     const planejadoTotal = diaData.planejamento.reduce(
-      (sum, p) => sum + p.minutos_planejados_normais + p.minutos_planejados_extras, 
-      0
+      (sum, p) => sum + p.minutos_planejados_normais + p.minutos_planejados_extras,
+      0,
     )
 
     const normalPct = normalMax > 0 ? Math.min(100, (normalUsed / normalMax) * 100) : 0
@@ -86,10 +101,9 @@ export default function DayCell({
     }
   }, [diaData])
 
-  // Badges/indicadores
   const badges = useMemo(() => {
     const items: { key: string; label: string; variant: string }[] = []
-    
+
     if (diaData?.eh_feriado) {
       items.push({ key: 'holiday', label: 'Feriado', variant: 'holiday' })
     }
@@ -119,16 +133,13 @@ export default function DayCell({
       tabIndex={0}
       aria-label={`${format(date, 'EEEE, d MMMM')}`}
     >
-      {/* Número do dia */}
       <div className={styles.dayNumber}>
         <span className={styles.dayNumberText}>{format(date, 'd')}</span>
         {isToday && <span className={styles.todayIndicator} />}
       </div>
 
-      {/* Conteúdo do dia */}
       {diaData && !loading && (
         <div className={styles.dayContent}>
-          {/* Badges de status */}
           {badges.length > 0 && (
             <div className={styles.dayBadges}>
               {badges.map((badge) => (
@@ -142,16 +153,15 @@ export default function DayCell({
             </div>
           )}
 
-          {/* Mini barra de capacidade */}
           {capacityInfo && !diaData.eh_feriado && !diaData.eh_indisponivel && (
             <div className={styles.dayCapacity}>
               <div className={styles.miniCapacityBar}>
-                <div 
+                <div
                   className={`${styles.miniCapacityFill} ${styles[`miniCapacity-${capacityInfo.status}`]}`}
                   style={{ width: `${capacityInfo.normalPct}%` }}
                 />
                 {capacityInfo.extraUsed > 0 && (
-                  <div 
+                  <div
                     className={styles.miniCapacityExtra}
                     style={{ width: `${capacityInfo.extraPct}%` }}
                   />
@@ -168,7 +178,6 @@ export default function DayCell({
             </div>
           )}
 
-          {/* Indicador de planejamento (Agenda Prevista) */}
           {diaData.planejamento.length > 0 && (
             <div className={styles.dayPlanejamento}>
               <span className={styles.planejamentoIcon}>◈</span>
@@ -178,7 +187,6 @@ export default function DayCell({
             </div>
           )}
 
-          {/* Indicador de lançamentos (Agenda Realizada) */}
           {diaData.lancamentos.length > 0 && (
             <div className={styles.dayLancamentos}>
               <span className={styles.lancamentosCount}>
@@ -189,7 +197,31 @@ export default function DayCell({
         </div>
       )}
 
-      {/* Loading skeleton */}
+      {hoverUsuarios.length > 0 && (
+        <div className={styles.dayHoverCard}>
+          <div className={styles.dayHoverTitle}>Carga planejada por usuário</div>
+          <div className={styles.dayHoverList}>
+            {hoverUsuarios.map((item) => {
+              const percentual = item.capacidadeMaxima > 0
+                ? Math.min(100, (item.minutosPlanejados / item.capacidadeMaxima) * 100)
+                : 0
+              return (
+                <div key={`${item.usuarioId}-${format(date, 'yyyy-MM-dd')}`} className={styles.dayHoverItem}>
+                  <div className={styles.dayHoverHeader}>
+                    <span className={styles.dayHoverUser}>{item.nome}</span>
+                    <span className={styles.dayHoverValue}>{formatarHorasMinutos(item.minutosPlanejados)} / {formatarHorasMinutos(item.capacidadeMaxima)}</span>
+                  </div>
+                  <div className={styles.dayHoverTrack}>
+                    <div className={styles.dayHoverFill} style={{ width: `${percentual}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          {isAdmin && <div className={styles.dayHoverHint}>Clique para abrir o detalhamento do dia.</div>}
+        </div>
+      )}
+
       {loading && (
         <div className={styles.daySkeleton}>
           <div className={styles.skeletonBar} />
@@ -197,7 +229,6 @@ export default function DayCell({
         </div>
       )}
 
-      {/* Indicador de ocioso */}
       {capacityInfo?.hasOcioso && diaData?.status === 'ABERTO' && (
         <div className={styles.ociosoIndicator} title={`${diaData.minutos_ociosos}min ociosos`}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

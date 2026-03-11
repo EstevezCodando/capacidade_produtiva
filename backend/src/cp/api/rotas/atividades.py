@@ -1,19 +1,37 @@
-"""Rotas de atividades e distribuicao de pontos.
-
-Politica de autorizacao:
-    GET /atividades                — autenticado
-    GET /atividades/{id}          — autenticado
-    GET /distribuicao-pontos      — autenticado
-"""
+"""Rotas de atividades e distribuicao de pontos."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
+from sqlalchemy import text
 
 from cp.api.deps import UsuarioLogado
 
 router = APIRouter(tags=["atividades"])
+
+
+class TipoAtividadeResponse(BaseModel):
+    id: int
+    codigo: str
+    nome: str
+    grupo: str
+
+
+@router.get("/atividades/tipos", summary="Tipos de atividade")
+def listar_tipos_atividade(_: UsuarioLogado, request: Request) -> list[TipoAtividadeResponse]:
+    engine_cp = request.app.state.engine_cp
+    sql = text("""
+        SELECT id, codigo, nome, grupo
+        FROM capacidade.tipo_atividade
+        ORDER BY nome
+    """)
+    with engine_cp.connect() as conn:
+        rows = conn.execute(sql).fetchall()
+    return [
+        TipoAtividadeResponse(id=row.id, codigo=row.codigo, nome=row.nome, grupo=row.grupo)
+        for row in rows
+    ]
 
 
 class AtividadeResumo(BaseModel):
@@ -49,7 +67,6 @@ def listar_atividades(
     pagina: int = Query(1, ge=1),
     por_pagina: int = Query(50, ge=1, le=500),
 ) -> AtividadesResponse:
-    """Atividades do snapshot com filtros combinaveis. Paginada."""
     return AtividadesResponse(total=0, pagina=pagina, por_pagina=por_pagina, itens=[])
 
 
@@ -71,7 +88,6 @@ class AtividadeDetalhe(BaseModel):
 
 @router.get("/atividades/{atividade_id}", summary="Detalhe de uma atividade")
 def detalhe_atividade(atividade_id: int, _: UsuarioLogado) -> AtividadeDetalhe:
-    """Atividade completa com nota parseada e texto de observacao."""
     return AtividadeDetalhe(
         id=atividade_id,
         ut_id=0,
@@ -118,9 +134,4 @@ def distribuicao_pontos(
     subfase_id: int | None = Query(None),
     usuario_id: int | None = Query(None),
 ) -> DistribuicaoPontosResponse:
-    """Visao wide por UT concluida: executor/revisor/corretor com nome e pontos."""
-    return DistribuicaoPontosResponse(
-        total=0,
-        sap_snapshot_atualizado_em=None,
-        itens=[],
-    )
+    return DistribuicaoPontosResponse(total=0, sap_snapshot_atualizado_em=None, itens=[])

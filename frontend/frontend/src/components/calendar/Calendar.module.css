@@ -12,7 +12,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 24px;
-  background: #16213a;
+  background: #121b30;
   border-bottom: 1px solid var(--bd-faint);
   gap: 24px;
 }
@@ -134,8 +134,8 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #0f1630;
-  overflow: visible;
+  background: #0b1020;
+  overflow: hidden;
 }
 
 .weekHeader {
@@ -148,7 +148,7 @@
 .weekDay {
   padding: 10px 8px;
   text-align: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #b8c7e6;
   text-transform: uppercase;
@@ -193,23 +193,22 @@
   position: relative;
   min-height: 118px;
   padding: 10px;
-  background: #17233b;
+  background: #131c2e;
   cursor: pointer;
   transition: all 0.12s ease;
   display: flex;
   flex-direction: column;
   user-select: none;
-  overflow: visible;
 }
 
 .dayCell:hover {
-  background: #223252;
+  background: #1a2742;
 }
 
 /* Estados do dia */
 .dayCellOtherMonth {
-  background: #101726;
-  opacity: 0.72;
+  background: var(--bg-base);
+  opacity: 0.5;
 }
 
 .dayCellOtherMonth:hover {
@@ -221,16 +220,16 @@
 }
 
 .dayCellWeekend {
-  background: #14203a;
+  background: #0f1729;
 }
 
 .dayCellSelected {
-  background: rgba(45, 212, 160, 0.24) !important;
+  background: rgba(45, 212, 160, 0.18) !important;
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
 .dayCellDragRange {
-  background: rgba(91, 141, 238, 0.2);
+  background: rgba(91, 141, 238, 0.14);
   box-shadow: inset 0 0 0 1px rgba(91, 141, 238, 0.35);
 }
 
@@ -303,7 +302,7 @@
   flex-direction: column;
   gap: 4px;
   min-height: 0;
-  overflow: visible;
+  overflow: hidden;
 }
 
 /* Badges de status */
@@ -509,7 +508,7 @@
   }
   
   .dayNumberText {
-    font-size: 12px;
+    font-size: 11px;
   }
   
   .dayContent {
@@ -533,98 +532,6 @@
   
   .dayPlanejamento,
   .dayLancamentos {
-    display: none;
-  }
-}
-
-
-.dayHoverCard {
-  position: absolute;
-  left: 10px;
-  top: calc(100% + 10px);
-  z-index: 35;
-  width: min(320px, calc(100vw - 48px));
-  padding: 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(92, 118, 183, 0.42);
-  background: linear-gradient(180deg, rgba(18, 27, 46, 0.98) 0%, rgba(11, 17, 31, 0.98) 100%);
-  box-shadow: 0 22px 44px rgba(0, 0, 0, 0.38);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(8px);
-  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0.45s;
-  pointer-events: none;
-}
-
-.dayCell:hover .dayHoverCard,
-.dayCell:focus-within .dayHoverCard {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-  transition-delay: 0.45s;
-}
-
-.dayHoverTitle {
-  color: #f7faff;
-  font-size: 13px;
-  font-weight: 700;
-  margin-bottom: 10px;
-}
-
-.dayHoverList {
-  display: grid;
-  gap: 10px;
-}
-
-.dayHoverItem {
-  display: grid;
-  gap: 6px;
-}
-
-.dayHoverHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.dayHoverUser {
-  color: #eaf1ff;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.35;
-}
-
-.dayHoverValue {
-  color: #b8c7e6;
-  font-size: 11px;
-  line-height: 1.3;
-  white-space: nowrap;
-}
-
-.dayHoverTrack {
-  position: relative;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(125, 149, 204, 0.18);
-  overflow: hidden;
-}
-
-.dayHoverFill {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #34d399 0%, #4fded0 100%);
-}
-
-.dayHoverHint {
-  margin-top: 10px;
-  color: #8fa4d6;
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-@media (max-width: 768px) {
-  .dayHoverCard {
     display: none;
   }
 }
