@@ -1,5 +1,5 @@
 import { useState, useEffect }              from 'react'
-import { useSearchParams }                   from 'react-router-dom'
+import { useSearchParams, Navigate }         from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth }                           from '@/context/AuthContext'
 import { getSyncStatus, executarSync }       from '@/api/endpoints'
@@ -92,7 +92,12 @@ function TabPerfil() {
 
 // ── Tab: Configurações (admin only) ─────────────────────────
 function TabConfiguracoes() {
+  const { ehAdmin } = useAuth()
   const queryClient = useQueryClient()
+
+  if (!ehAdmin) {
+    return <Navigate to="/perfil" replace />
+  }
 
   const { data: sync, isLoading: syncLoading } = useQuery({
     queryKey: ['syncStatus'],
@@ -169,7 +174,7 @@ function TabConfiguracoes() {
 
       <div className={styles.sectionCard}>
         <h3 className={styles.sectionCardTitle}>Cores das atividades</h3>
-        <p className={styles.sectionCardDesc}>Somente administradores podem alterar as cores. O valor persiste no banco e é reutilizado em toda a agenda.</p>
+        <p className={styles.sectionCardDesc}>As cores definidas aqui persistem no banco e são reutilizadas em toda a agenda.</p>
 
         <div className={styles.profileFields}>
           {tiposAtividade.map((tipo) => (
@@ -214,8 +219,19 @@ export default function Perfil() {
   )
 
   useEffect(() => {
-    if (tabParam === 'configuracoes' && ehAdmin) setActiveTab('configuracoes')
-  }, [tabParam, ehAdmin])
+    if (tabParam === 'configuracoes' && ehAdmin) {
+      setActiveTab('configuracoes')
+      return
+    }
+
+    if (tabParam === 'configuracoes' && !ehAdmin) {
+      setActiveTab('perfil')
+      setSearchParams({})
+      return
+    }
+
+    setActiveTab('perfil')
+  }, [tabParam, ehAdmin, setSearchParams])
 
   function handleTab(id: string) {
     setActiveTab(id)

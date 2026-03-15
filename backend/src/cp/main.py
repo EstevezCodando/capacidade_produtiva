@@ -36,7 +36,7 @@ from cp.api.rotas import (
     usuarios,
 )
 from cp.api.rotas import (
-    capacidade_v2 as capacidade,
+    capacidade,
 )
 from cp.config.settings import Settings
 from cp.infrastructure.db import criar_engine_cp, criar_engine_sap

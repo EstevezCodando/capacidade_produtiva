@@ -70,6 +70,37 @@ class TipoAtividadeRepository:
         with Session(self._engine) as session:
             return session.get(TipoAtividade, id)
 
+    def listar_configuraveis(self) -> Sequence[TipoAtividade]:
+        """Lista tipos de atividade configuráveis para a agenda.
+
+        Inclui tanto os tipos padrão quanto os vinculados a blocos, ordenando
+        primeiro pelos vinculados a bloco e depois pelo nome.
+        """
+        with Session(self._engine) as session:
+            return (
+                session.execute(
+                    select(TipoAtividade)
+                    .order_by(
+                        TipoAtividade.bloco_id.is_(None),
+                        TipoAtividade.nome,
+                        TipoAtividade.id,
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+    def atualizar_cor(self, id: int, cor: str) -> TipoAtividade | None:
+        """Atualiza a cor de um tipo de atividade."""
+        with Session(self._engine) as session:
+            tipo = session.get(TipoAtividade, id)
+            if not tipo:
+                return None
+            tipo.cor = cor
+            session.commit()
+            session.refresh(tipo)
+            return tipo
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Parâmetro de Capacidade Repository
