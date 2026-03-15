@@ -207,3 +207,14 @@ export async function getTiposAtividade(): Promise<TipoAtividade[]> {
     return []
   }
 }
+
+
+export async function getTiposAtividadeConfiguracao(): Promise<TipoAtividade[]> {
+  const res = await apiClient.get<TipoAtividade[]>('/capacidade/tipos-atividade')
+  return res.data
+}
+
+export async function atualizarCorTipoAtividade(tipoAtividadeId: number, cor: string): Promise<TipoAtividade> {
+  const res = await apiClient.put<TipoAtividade>(`/capacidade/tipos-atividade/${tipoAtividadeId}/cor`, { cor })
+  return res.data
+}

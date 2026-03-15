@@ -628,3 +628,16 @@
     display: none;
   }
 }
+
+.dayActivityDots {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.dayActivityDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.2);
+}

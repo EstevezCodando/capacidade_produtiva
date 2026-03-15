@@ -20,9 +20,11 @@ class TipoAtividadeResponse(BaseModel):
     grupo: str
     origem: str
     bloco_id: int | None = None
+    cor: str
 
 
-def _listar_tipos_fixos(request: Request) -> list[TipoAtividadeResponse]:
+@router.get("/atividades/tipos", summary="Tipos de atividade configurados")
+def listar_tipos_atividade(_: UsuarioLogado, request: Request) -> list[TipoAtividadeResponse]:
     engine_cp = request.app.state.engine_cp
     sql = text(
         """
@@ -31,10 +33,14 @@ def _listar_tipos_fixos(request: Request) -> list[TipoAtividadeResponse]:
             ta.codigo::text AS codigo,
             ta.nome AS nome,
             ta.grupo::text AS grupo,
-            'TIPO_ATIVIDADE' AS origem,
-            NULL::integer AS bloco_id
+            CASE WHEN ta.bloco_id IS NULL THEN 'TIPO_ATIVIDADE' ELSE 'BLOCO' END AS origem,
+            ta.bloco_id AS bloco_id,
+            ta.cor AS cor
         FROM capacidade.tipo_atividade ta
-        ORDER BY ta.nome
+        ORDER BY
+            CASE WHEN ta.bloco_id IS NULL THEN 0 ELSE 1 END,
+            ta.grupo,
+            ta.nome
         """
     )
     with engine_cp.connect() as conn:
@@ -47,57 +53,10 @@ def _listar_tipos_fixos(request: Request) -> list[TipoAtividadeResponse]:
             grupo=row.grupo,
             origem=row.origem,
             bloco_id=row.bloco_id,
+            cor=row.cor,
         )
         for row in rows
     ]
-
-
-def _listar_blocos_sincronizados(request: Request) -> list[TipoAtividadeResponse]:
-    engine_cp = request.app.state.engine_cp
-    with engine_cp.connect() as conn:
-        tabela_existe = conn.execute(
-            text("SELECT to_regclass('sap_snapshot.macrocontrole_bloco')")
-        ).scalar_one_or_none()
-        if not tabela_existe:
-            return []
-
-        rows = conn.execute(
-            text(
-                """
-                SELECT
-                    (1000000 + b.id) AS id,
-                    'BLOCO' AS codigo,
-                    b.nome AS nome,
-                    'PRODUCAO' AS grupo,
-                    'BLOCO' AS origem,
-                    b.id AS bloco_id
-                FROM sap_snapshot.macrocontrole_bloco b
-                ORDER BY b.nome
-                """
-            )
-        ).fetchall()
-
-    return [
-        TipoAtividadeResponse(
-            id=row.id,
-            codigo=row.codigo,
-            nome=row.nome,
-            grupo=row.grupo,
-            origem=row.origem,
-            bloco_id=row.bloco_id,
-        )
-        for row in rows
-    ]
-
-
-@router.get("/atividades/tipos", summary="Tipos de atividade e blocos sincronizados")
-def listar_tipos_atividade(_: UsuarioLogado, request: Request) -> list[TipoAtividadeResponse]:
-    tipos = _listar_tipos_fixos(request)
-    try:
-        blocos = _listar_blocos_sincronizados(request)
-    except Exception:
-        blocos = []
-    return [*tipos, *blocos]
 
 
 class AtividadeResumo(BaseModel):

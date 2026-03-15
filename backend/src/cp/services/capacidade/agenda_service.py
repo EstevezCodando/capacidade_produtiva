@@ -342,9 +342,16 @@ class AgendaService:
             self._validar_capacidade_normal(usuario_id, data, minutos)
 
         # Obter tipo de atividade
-        tipo = self._tipo_atividade_repo.buscar_por_codigo(tipo_atividade)
-        if not tipo:
-            raise RegistroNaoEncontradoError("TipoAtividade", tipo_atividade.value)
+        if tipo_atividade == CodigoAtividade.BLOCO:
+            if bloco_id is None:
+                raise ValidacaoError("bloco_id é obrigatório para atividade do tipo BLOCO")
+            tipo = self._tipo_atividade_repo.buscar_por_bloco_id(bloco_id)
+            if not tipo:
+                raise RegistroNaoEncontradoError("TipoAtividadeBloco", bloco_id)
+        else:
+            tipo = self._tipo_atividade_repo.buscar_por_codigo(tipo_atividade)
+            if not tipo:
+                raise RegistroNaoEncontradoError("TipoAtividade", tipo_atividade.value)
 
         # Verificar se é dia consolidado e alertar
         capacidade = self._capacidade_repo.buscar(usuario_id, data)

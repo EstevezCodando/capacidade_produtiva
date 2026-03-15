@@ -753,6 +753,7 @@ export default function AgendaPrevista() {
                 }}
                 isAdmin={ehAdmin}
                 loading={isLoading || agendasMultiplosUsuariosQuery.isLoading}
+                exibirIndicadorOcioso={!ehAdmin || selectedUsuarioIds.length > 0}
               />
             )}
           </div>

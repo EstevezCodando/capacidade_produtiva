@@ -26,6 +26,7 @@ interface CalendarGridProps {
   onDayClick: (date: Date, data?: DiaDaAgenda) => void
   isAdmin?: boolean
   loading?: boolean
+  exibirIndicadorOcioso?: boolean
 }
 
 export default function CalendarGrid({
@@ -40,6 +41,7 @@ export default function CalendarGrid({
   onDayClick,
   isAdmin = false,
   loading = false,
+  exibirIndicadorOcioso = true,
 }: CalendarGridProps) {
   const [dragStart, setDragStart] = useState<Date | null>(null)
   const [dragEnd, setDragEnd] = useState<Date | null>(null)
@@ -119,6 +121,7 @@ export default function CalendarGrid({
               isInDragRange={inDragRange}
               isAdmin={isAdmin}
               loading={loading && !diaData}
+              exibirIndicadorOcioso={exibirIndicadorOcioso}
               onMouseDown={(e) => handleMouseDown(calDay.date, e)}
               onMouseEnter={() => handleMouseEnter(calDay.date)}
               onClick={() => onDayClick(calDay.date, diaData)}

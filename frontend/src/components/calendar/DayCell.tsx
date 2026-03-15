@@ -22,6 +22,7 @@ interface DayCellProps {
   isInDragRange: boolean
   isAdmin?: boolean
   loading?: boolean
+  exibirIndicadorOcioso?: boolean
   onMouseDown: (e: React.MouseEvent) => void
   onMouseEnter: () => void
   onClick: () => void
@@ -43,6 +44,7 @@ export default function DayCell({
   isInDragRange,
   isAdmin = false,
   loading = false,
+  exibirIndicadorOcioso = true,
   onMouseDown,
   onMouseEnter,
   onClick,
@@ -229,7 +231,7 @@ export default function DayCell({
         </div>
       )}
 
-      {capacityInfo?.hasOcioso && diaData?.status === 'ABERTO' && (
+      {exibirIndicadorOcioso && capacityInfo?.hasOcioso && diaData?.status === 'ABERTO' && (
         <div className={styles.ociosoIndicator} title={`${diaData.minutos_ociosos}min ociosos`}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10" />

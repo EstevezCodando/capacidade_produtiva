@@ -59,7 +59,18 @@ class TipoAtividade(Base):
 
     __tablename__ = "tipo_atividade"
     __table_args__ = (
-        UniqueConstraint("codigo", name="uq_tipo_atividade_codigo"),
+        Index(
+            "ux_tipo_atividade_codigo_padrao",
+            "codigo",
+            unique=True,
+            postgresql_where=text("bloco_id IS NULL"),
+        ),
+        Index(
+            "ux_tipo_atividade_bloco_id",
+            "bloco_id",
+            unique=True,
+            postgresql_where=text("bloco_id IS NOT NULL"),
+        ),
         {"schema": "capacidade"},
     )
 
@@ -69,6 +80,13 @@ class TipoAtividade(Base):
         nullable=False,
     )
     nome: Mapped[str] = mapped_column(String(100), nullable=False)
+    bloco_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cor: Mapped[str] = mapped_column(
+        String(7),
+        nullable=False,
+        default="#5B8DEE",
+        server_default="#5B8DEE",
+    )
     grupo: Mapped[str] = mapped_column(
         Enum(GrupoAtividade, name="grupo_atividade", schema="capacidade"),
         nullable=False,

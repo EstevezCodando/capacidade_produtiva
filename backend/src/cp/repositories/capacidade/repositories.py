@@ -42,10 +42,22 @@ class TipoAtividadeRepository:
         self._engine = engine
 
     def buscar_por_codigo(self, codigo: CodigoAtividade) -> TipoAtividade | None:
-        """Busca tipo de atividade pelo código."""
+        """Busca tipo de atividade padrão pelo código."""
         with Session(self._engine) as session:
             return session.execute(
-                select(TipoAtividade).where(TipoAtividade.codigo == codigo)
+                select(TipoAtividade).where(
+                    and_(
+                        TipoAtividade.codigo == codigo,
+                        TipoAtividade.bloco_id.is_(None),
+                    )
+                )
+            ).scalar_one_or_none()
+
+    def buscar_por_bloco_id(self, bloco_id: int) -> TipoAtividade | None:
+        """Busca o tipo de atividade vinculado a um bloco sincronizado."""
+        with Session(self._engine) as session:
+            return session.execute(
+                select(TipoAtividade).where(TipoAtividade.bloco_id == bloco_id)
             ).scalar_one_or_none()
 
     def listar_todos(self) -> Sequence[TipoAtividade]:

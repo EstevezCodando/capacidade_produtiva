@@ -98,6 +98,35 @@ def _sync(
 # ---------------------------------------------------------------------------
 
 
+def _sync_tipo_atividade_blocos(conn_cp: Connection) -> None:
+    """Espelha macrocontrole_bloco em capacidade.tipo_atividade sem duplicar registros."""
+    conn_cp.execute(
+        text(
+            """
+            INSERT INTO capacidade.tipo_atividade (codigo, nome, bloco_id, cor, grupo)
+            SELECT 'BLOCO', b.nome, b.id, '#5B8DEE', 'PRODUCAO'
+            FROM sap_snapshot.macrocontrole_bloco b
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM capacidade.tipo_atividade ta
+                WHERE ta.bloco_id = b.id
+            )
+            """
+        )
+    )
+    conn_cp.execute(
+        text(
+            """
+            UPDATE capacidade.tipo_atividade ta
+            SET nome = b.nome
+            FROM sap_snapshot.macrocontrole_bloco b
+            WHERE ta.bloco_id = b.id
+              AND ta.nome IS DISTINCT FROM b.nome
+            """
+        )
+    )
+
+
 def _sync_dominio_status(s: Connection, c: Connection) -> ResultadoTabela:
     return _sync(s, c, "dominio_status", "SELECT code, nome FROM dominio.status", "code", ["code", "nome"])
 
@@ -359,6 +388,7 @@ def sincronizar_sap_para_snapshot(
     with engine_cp.begin() as conn_cp, engine_sap.connect() as conn_sap:
         for fn in _PIPELINE:
             resultados.append(fn(conn_sap, conn_cp))
+        _sync_tipo_atividade_blocos(conn_cp)
         atualizar_views_analytics(conn_cp)
         materializar_kpi(conn_cp)
     return resultados

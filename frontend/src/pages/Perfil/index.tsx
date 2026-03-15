@@ -3,25 +3,20 @@ import { useSearchParams }                   from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth }                           from '@/context/AuthContext'
 import { getSyncStatus, executarSync }       from '@/api/endpoints'
+import { getTiposAtividadeConfiguracao, atualizarCorTipoAtividade } from '@/api/agenda'
+import ConfiguracoesAdmin from '@/components/admin/ConfiguracoesAdmin'
 import { formatDistanceToNow, parseISO, format } from 'date-fns'
 import { ptBR }                              from 'date-fns/locale'
 import styles                               from './Perfil.module.css'
 
 // ── Tipos locais ─────────────────────────────────────────────
-interface ConfigSistema {
-  intervalo_sync_min:  number
-  teto_normal_min:     number
-  teto_extra_min:      number
-}
-
-// Lê config do localStorage (sem backend ainda)
-function lerConfig(): ConfigSistema {
-  try {
-    const raw = localStorage.getItem('cp_config_sistema')
-    return raw ? JSON.parse(raw) : { intervalo_sync_min: 30, teto_normal_min: 360, teto_extra_min: 600 }
-  } catch {
-    return { intervalo_sync_min: 30, teto_normal_min: 360, teto_extra_min: 600 }
-  }
+interface TipoAtividadeConfiguravel {
+  id: number
+  codigo: string
+  nome: string
+  grupo: string
+  bloco_id?: number | null
+  cor: string
 }
 
 // ── Tab: Meu Perfil ──────────────────────────────────────────
@@ -98,27 +93,37 @@ function TabPerfil() {
 // ── Tab: Configurações (admin only) ─────────────────────────
 function TabConfiguracoes() {
   const queryClient = useQueryClient()
-  const [config, setConfig] = useState<ConfigSistema>(lerConfig)
-  const [saved,  setSaved]  = useState(false)
 
   const { data: sync, isLoading: syncLoading } = useQuery({
     queryKey: ['syncStatus'],
-    queryFn:  getSyncStatus,
+    queryFn: getSyncStatus,
     refetchInterval: 30_000,
+  })
+
+  const { data: tiposAtividade = [] } = useQuery<TipoAtividadeConfiguravel[]>({
+    queryKey: ['tipos-atividade-configuracao'],
+    queryFn: getTiposAtividadeConfiguracao,
+    staleTime: 60_000,
+  })
+
+  const atualizarCorMutation = useMutation({
+    mutationFn: ({ id, cor }: { id: number; cor: string }) => atualizarCorTipoAtividade(id, cor),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['tipos-atividade-configuracao'] })
+      void queryClient.invalidateQueries({ queryKey: ['tipos-atividade'] })
+      void queryClient.invalidateQueries({ queryKey: ['agenda'] })
+      void queryClient.invalidateQueries({ queryKey: ['agenda-prevista-multiusuario'] })
+    },
   })
 
   const syncMut = useMutation({
     mutationFn: executarSync,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['syncStatus'] })
+      void queryClient.invalidateQueries({ queryKey: ['tipos-atividade-configuracao'] })
+      void queryClient.invalidateQueries({ queryKey: ['tipos-atividade'] })
     },
   })
-
-  function salvarConfig() {
-    localStorage.setItem('cp_config_sistema', JSON.stringify(config))
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
-  }
 
   const syncTs = sync?.sap_snapshot_atualizado_em
     ? format(parseISO(sync.sap_snapshot_atualizado_em), "dd/MM/yyyy HH:mm", { locale: ptBR })
@@ -129,38 +134,10 @@ function TabConfiguracoes() {
 
   return (
     <div className={styles.tabContent}>
-
-      {/* ── Bloco: Sincronização SAP ───────────────────────── */}
       <div className={styles.sectionCard}>
         <h3 className={styles.sectionCardTitle}>Sincronização SAP</h3>
-        <p className={styles.sectionCardDesc}>
-          O pipeline lê o banco SAP, atualiza o sap_snapshot e recalcula todos os KPIs.
-          Roda automaticamente conforme o intervalo abaixo e pode ser disparado manualmente.
-        </p>
+        <p className={styles.sectionCardDesc}>O pipeline atualiza o snapshot, sincroniza os blocos como atividades configuráveis e recalcula os indicadores.</p>
 
-        <div className={styles.configGrid}>
-          <div className={styles.configField}>
-            <label className={styles.configLabel}>
-              Intervalo automático (minutos)
-            </label>
-            <div className={styles.configInputRow}>
-              <input
-                type="number"
-                min={5}
-                max={240}
-                step={5}
-                className={styles.configInput}
-                value={config.intervalo_sync_min}
-                onChange={(e) => setConfig({ ...config, intervalo_sync_min: Number(e.target.value) })}
-              />
-              <span className={styles.configHint}>
-                min 5 min · max 240 min
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Status da última sync */}
         <div className={styles.syncStatus}>
           <div className={styles.syncStatusRow}>
             <span className={styles.syncStatusLabel}>Última execução</span>
@@ -181,91 +158,41 @@ function TabConfiguracoes() {
               {syncLoading ? '…' : sync?.ultima_execucao_status ?? 'desconhecido'}
             </span>
           </div>
-          <div className={styles.syncStatusRow}>
-            <span className={styles.syncStatusLabel}>KPI calculado em</span>
-            <span className={styles.syncStatusVal}>
-              {sync?.kpi_calculado_em
-                ? format(parseISO(sync.kpi_calculado_em), "dd/MM/yyyy HH:mm", { locale: ptBR })
-                : '—'}
-            </span>
-          </div>
         </div>
 
-        <button
-          className={styles.syncBtn}
-          onClick={() => syncMut.mutate()}
-          disabled={syncMut.isPending}
-        >
-          {syncMut.isPending ? (
-            <><span className={styles.spinner} /> Sincronizando…</>
-          ) : (
-            <><span>↺</span> Sincronizar SAP agora</>
-          )}
+        <button className={styles.syncBtn} onClick={() => syncMut.mutate()} disabled={syncMut.isPending}>
+          {syncMut.isPending ? <><span className={styles.spinner} /> Sincronizando…</> : <><span>↺</span> Sincronizar SAP agora</>}
         </button>
-
-        {syncMut.isSuccess && (
-          <p className={styles.successMsg}>✓ Sincronização enfileirada com sucesso.</p>
-        )}
-        {syncMut.isError && (
-          <p className={styles.errorMsg}>⚠ Falha ao disparar sincronização. Verifique o backend.</p>
-        )}
       </div>
 
-      {/* ── Bloco: Capacidade ────────────────────────────────── */}
+      <ConfiguracoesAdmin />
+
       <div className={styles.sectionCard}>
-        <h3 className={styles.sectionCardTitle}>Tetos de Capacidade</h3>
-        <p className={styles.sectionCardDesc}>
-          Define o máximo de minutos permitidos por dia para lançamentos normais e extras.
-          Alterações aqui afetam todos os operadores a partir do próximo dia.
-        </p>
+        <h3 className={styles.sectionCardTitle}>Cores das atividades</h3>
+        <p className={styles.sectionCardDesc}>Somente administradores podem alterar as cores. O valor persiste no banco e é reutilizado em toda a agenda.</p>
 
-        <div className={styles.configGrid}>
-          <div className={styles.configField}>
-            <label className={styles.configLabel}>Teto normal (minutos/dia)</label>
-            <div className={styles.configInputRow}>
-              <input
-                type="number"
-                min={60}
-                max={600}
-                step={30}
-                className={styles.configInput}
-                value={config.teto_normal_min}
-                onChange={(e) => setConfig({ ...config, teto_normal_min: Number(e.target.value) })}
-              />
-              <span className={styles.configHint}>
-                = {(config.teto_normal_min / 60).toFixed(1)}h
-              </span>
+        <div className={styles.profileFields}>
+          {tiposAtividade.map((tipo) => (
+            <div key={tipo.id} className={styles.fieldRow}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ width: 14, height: 14, borderRadius: 999, background: tipo.cor, border: '1px solid rgba(255,255,255,0.16)' }} />
+                <div>
+                  <span className={styles.fieldValue}>{tipo.nome}</span>
+                  <div className={styles.fieldSub}>{tipo.bloco_id ? `Bloco ${tipo.bloco_id}` : tipo.codigo}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <code className={styles.fieldCode}>{tipo.cor}</code>
+                <input
+                  type="color"
+                  value={tipo.cor}
+                  onChange={(e) => atualizarCorMutation.mutate({ id: tipo.id, cor: e.target.value.toUpperCase() })}
+                  style={{ width: 42, height: 32, background: 'transparent', border: 'none', cursor: 'pointer' }}
+                />
+              </div>
             </div>
-          </div>
-
-          <div className={styles.configField}>
-            <label className={styles.configLabel}>Teto extra (minutos/dia)</label>
-            <div className={styles.configInputRow}>
-              <input
-                type="number"
-                min={60}
-                max={720}
-                step={30}
-                className={styles.configInput}
-                value={config.teto_extra_min}
-                onChange={(e) => setConfig({ ...config, teto_extra_min: Number(e.target.value) })}
-              />
-              <span className={styles.configHint}>
-                = {(config.teto_extra_min / 60).toFixed(1)}h
-              </span>
-            </div>
-          </div>
+          ))}
         </div>
-      </div>
-
-      {/* ── Salvar ───────────────────────────────────────────── */}
-      <div className={styles.saveRow}>
-        <button className={styles.saveBtn} onClick={salvarConfig}>
-          {saved ? '✓ Configurações salvas' : 'Salvar configurações'}
-        </button>
-        <span className={styles.saveNote}>
-          * Intervalo de sync e tetos serão aplicados pelo backend via endpoint /api/capacidade/config
-        </span>
       </div>
     </div>
   )

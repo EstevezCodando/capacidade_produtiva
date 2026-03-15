@@ -42,6 +42,8 @@ class TipoAtividadeResponse(BaseSchema):
     codigo: CodigoAtividade
     nome: str
     grupo: GrupoAtividade
+    bloco_id: int | None = None
+    cor: str
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -212,6 +214,7 @@ class LancamentoResponse(BaseSchema):
     tipo_atividade_id: int
     tipo_atividade_codigo: CodigoAtividade
     tipo_atividade_nome: str
+    tipo_atividade_cor: str
     faixa_minuto: FaixaMinuto
     minutos: int
     descricao: str | None
@@ -234,7 +237,10 @@ class ApontamentoResumo(BaseModel):
     data: date
     bloco_id: int | None
     bloco_nome: str | None = None
+    tipo_atividade_id: int
     tipo_atividade: CodigoAtividade
+    tipo_atividade_nome: str
+    tipo_atividade_cor: str
     minutos: int
     faixa: FaixaMinuto
 

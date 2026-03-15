@@ -159,7 +159,10 @@ export default function DayDetailPanel({
             {agregado.lancamentos.slice(0, 8).map((l) => (
               <div key={l.id} className={`${styles.itemCard} ${styles.itemCardClickable}`} onClick={() => onEditLancamento?.(l.id)}>
                 <div className={styles.itemHeader}>
-                  <span className={styles.itemTipo}><span className={`${styles.tipoIcon} ${styles[`tipo-${l.tipo_atividade}`]}`}>{l.tipo_atividade === 'BLOCO' ? '◈' : '◇'}</span>{l.tipo_atividade}</span>
+                  <span className={styles.itemTipo}>
+                    <span className={styles.tipoIcon} style={{ color: l.tipo_atividade_cor }}>●</span>
+                    {l.tipo_atividade_nome}
+                  </span>
                   <span className={`${styles.itemMinutos} ${l.faixa === 'EXTRA' ? styles.itemExtra : ''}`}>{l.minutos}min{l.faixa === 'EXTRA' && <Badge variant="warning" size="sm">HE</Badge>}</span>
                 </div>
               </div>

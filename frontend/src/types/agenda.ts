@@ -36,6 +36,7 @@ export interface TipoAtividade {
   grupo: GrupoAtividade
   origem?: 'TIPO_ATIVIDADE' | 'BLOCO'
   bloco_id?: number | null
+  cor: string
 }
 
 // ── Parâmetros de Capacidade ─────────────────────────────────

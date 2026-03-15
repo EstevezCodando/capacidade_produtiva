@@ -44,6 +44,57 @@ from cp.services.capacidade import AgendaService, CapacidadeService, Consolidaca
 router = APIRouter(prefix="/capacidade", tags=["capacidade"])
 
 
+class TipoAtividadeConfigResponse(BaseModel):
+    id: int
+    codigo: str
+    nome: str
+    grupo: str
+    bloco_id: int | None
+    cor: str
+
+
+class TipoAtividadeCorInput(BaseModel):
+    cor: str = Field(..., pattern=r"^#[0-9A-Fa-f]{6}$")
+
+
+@router.get("/tipos-atividade", summary="Lista atividades configuráveis")
+def listar_tipos_atividade_config(request: Request, _: SomenteAdmin) -> list[TipoAtividadeConfigResponse]:
+    service = _get_agenda_service(request)
+    tipos = service._tipo_atividade_repo.listar_configuraveis()
+    return [
+        TipoAtividadeConfigResponse(
+            id=tipo.id,
+            codigo=tipo.codigo.value if hasattr(tipo.codigo, "value") else str(tipo.codigo),
+            nome=tipo.nome,
+            grupo=tipo.grupo.value if hasattr(tipo.grupo, "value") else str(tipo.grupo),
+            bloco_id=tipo.bloco_id,
+            cor=tipo.cor,
+        )
+        for tipo in tipos
+    ]
+
+
+@router.put("/tipos-atividade/{tipo_atividade_id}/cor", summary="Atualiza a cor de uma atividade")
+def atualizar_cor_tipo_atividade(
+    request: Request,
+    tipo_atividade_id: int,
+    body: TipoAtividadeCorInput,
+    _: SomenteAdmin,
+) -> TipoAtividadeConfigResponse:
+    service = _get_agenda_service(request)
+    tipo = service._tipo_atividade_repo.atualizar_cor(tipo_atividade_id, body.cor.upper())
+    if not tipo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tipo de atividade não encontrado.")
+    return TipoAtividadeConfigResponse(
+        id=tipo.id,
+        codigo=tipo.codigo.value if hasattr(tipo.codigo, "value") else str(tipo.codigo),
+        nome=tipo.nome,
+        grupo=tipo.grupo.value if hasattr(tipo.grupo, "value") else str(tipo.grupo),
+        bloco_id=tipo.bloco_id,
+        cor=tipo.cor,
+    )
+
+
 def _get_capacidade_service(request: Request) -> CapacidadeService:
     """Obtém o serviço de capacidade a partir do estado da app."""
     engine = request.app.state.engine_cp
