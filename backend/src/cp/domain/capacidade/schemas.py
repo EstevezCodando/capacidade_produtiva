@@ -381,7 +381,7 @@ class ConsolidacaoResponse(BaseModel):
 class StatusDiasResponse(BaseModel):
     """Status dos dias em um período."""
 
-    dias: list[dict[str, str | date]]
+    dias: list[dict[str, str | date | int]]
 
 
 # ──────────────────────────────────────────────────────────────────────────────

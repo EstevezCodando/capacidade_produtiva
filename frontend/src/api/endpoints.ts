@@ -10,26 +10,6 @@ import type {
 } from "@/types";
 import { apiClient } from "./client";
 
-// ── Auth ─────────────────────────────────────────────────────
-// O login é feito contra o servico_autenticacao externo.
-// O frontend envia as credenciais para o auth e recebe o JWT,
-// depois usa o JWT para chamar /api/usuarios/me para obter o perfil.
-export async function loginAuth(
-  authUrl: string,
-  username: string,
-  password: string,
-): Promise<string> {
-  // O servico_autenticacao pode variar — aqui assumimos POST /login → { token }
-  const res = await fetch(`${authUrl}/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!res.ok) throw new Error("Credenciais inválidas");
-  const data = (await res.json()) as { token?: string; access_token?: string };
-  return data.token ?? data.access_token ?? "";
-}
-
 export async function getUsuarioMe(): Promise<UsuarioMe> {
   const res = await apiClient.get<UsuarioMe>("/usuarios/me");
   return res.data;
