@@ -2,7 +2,7 @@
 // DayDetailPanel — Painel lateral com detalhes do dia/período
 // ============================================================
 import { useMemo } from 'react'
-import { format, differenceInDays } from 'date-fns'
+import { format, differenceInDays, isAfter } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { DiaDaAgenda, DateRange } from '@/types/agenda'
 import Drawer from '@/components/ui/Drawer'
@@ -16,6 +16,7 @@ interface DayDetailPanelProps {
   selectedRange: DateRange | null
   getDiaData: (date: Date) => DiaDaAgenda | undefined
   isAdmin: boolean
+  maxDate?: Date
   onAddLancamento?: (date: Date) => void
   onAddPlanejamento?: (date: Date) => void
   onEditLancamento?: (id: number) => void
@@ -29,6 +30,7 @@ export default function DayDetailPanel({
   selectedRange,
   getDiaData,
   isAdmin,
+  maxDate,
   onAddLancamento,
   onAddPlanejamento,
   onEditLancamento,
@@ -185,7 +187,9 @@ export default function DayDetailPanel({
       <Drawer.Footer>
         {isSingleDay && singleDayData && singleDayData.status === 'ABERTO' && (
           <>
-            <Button variant="secondary" size="sm" onClick={() => onAddLancamento?.(selectedDates[0])}>+ Lançamento</Button>
+            {(!maxDate || !isAfter(selectedDates[0], maxDate)) && (
+              <Button variant="secondary" size="sm" onClick={() => onAddLancamento?.(selectedDates[0])}>+ Lançamento</Button>
+            )}
             {isAdmin && <Button variant="secondary" size="sm" onClick={() => onAddPlanejamento?.(selectedDates[0])}>+ Planejamento</Button>}
           </>
         )}
