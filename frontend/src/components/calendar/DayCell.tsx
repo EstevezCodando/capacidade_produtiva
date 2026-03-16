@@ -27,11 +27,17 @@ interface CapacityDisplay {
   segmentos: SegmentoBarra[]
 }
 
+interface OciosoDisplay {
+  minutos: number
+  ativo: boolean
+}
+
 interface DayCellProps {
   calendarDay: CalendarDay
   diaData?: DiaDaAgenda
   hoverUsuarios?: HoverUsuarioResumo[]
   capacityDisplay?: CapacityDisplay | null
+  ociosoDisplay?: OciosoDisplay | null
   isSelected: boolean
   isInDragRange: boolean
   isAdmin?: boolean
@@ -55,6 +61,7 @@ export default function DayCell({
   diaData,
   hoverUsuarios = [],
   capacityDisplay = null,
+  ociosoDisplay = null,
   isSelected,
   isInDragRange,
   isAdmin = false,
@@ -263,8 +270,8 @@ export default function DayCell({
         </div>
       )}
 
-      {exibirIndicadorOcioso && capacityInfo?.hasOcioso && diaData?.status === 'ABERTO' && (
-        <div className={styles.ociosoIndicator} title={`${diaData.minutos_ociosos}min ociosos`}>
+      {exibirIndicadorOcioso && (ociosoDisplay?.ativo ?? capacityInfo?.hasOcioso) && diaData?.status === 'ABERTO' && (
+        <div className={styles.ociosoIndicator} title={`${ociosoDisplay?.minutos ?? diaData?.minutos_ociosos ?? 0}min ociosos`}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10" />
             <path d="M12 6v6l4 2" />

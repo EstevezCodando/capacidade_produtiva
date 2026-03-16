@@ -1,95 +1,111 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { format } from 'date-fns'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useAuth } from '@/context/AuthContext'
-import { useCalendarNavigation, useAgendaData } from '@/hooks/useCalendar'
 import {
-  consolidarPeriodo,
-  criarPlanejamentoLote,
-  editarPlanejamento,
-  getAgendaUsuario,
-  getConfigTeto,
-  getTiposAtividade,
-  getUsuarios,
-  removerPlanejamento,
-  removerPlanejamentoLote,
-} from '@/api/agenda'
-import CalendarHeader from '@/components/calendar/CalendarHeader'
-import CalendarGrid from '@/components/calendar/CalendarGrid'
-import ConsolidacaoModal from '@/components/agenda/ConsolidacaoModal'
-import Modal from '@/components/ui/Modal'
-import { Button, Card, Input, Select, Skeleton, StatCard, Textarea } from '@/components/ui/Common'
-import type { AgendaCompleta, TipoAtividade, UsuarioResumo } from '@/types/agenda'
-import styles from './AgendaPage.module.css'
+    consolidarPeriodo,
+    criarPlanejamentoLote,
+    editarPlanejamento,
+    getAgendaUsuario,
+    getConfigTeto,
+    getTiposAtividade,
+    getUsuarios,
+    removerPlanejamento,
+    removerPlanejamentoLote,
+} from "@/api/agenda";
+import ConsolidacaoModal from "@/components/agenda/ConsolidacaoModal";
+import CalendarGrid from "@/components/calendar/CalendarGrid";
+import CalendarHeader from "@/components/calendar/CalendarHeader";
+import {
+    Button,
+    Card,
+    Input,
+    Select,
+    Skeleton,
+    StatCard,
+    Textarea,
+} from "@/components/ui/Common";
+import Modal from "@/components/ui/Modal";
+import { useAuth } from "@/context/AuthContext";
+import { useAgendaData, useCalendarNavigation } from "@/hooks/useCalendar";
+import type {
+    AgendaCompleta,
+    TipoAtividade,
+    UsuarioResumo,
+} from "@/types/agenda";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { useEffect, useMemo, useRef, useState } from "react";
+import styles from "./AgendaPage.module.css";
 
 interface FormularioPlanejamento {
-  tipoAtividadeId: string
-  tipoHorario: 'NORMAL' | 'EXTRA'
-  unidadeTempo: 'HORAS' | 'MINUTOS'
-  quantidade: string
-  descricao: string
+  tipoAtividadeId: string;
+  tipoHorario: "NORMAL" | "EXTRA";
+  unidadeTempo: "HORAS" | "MINUTOS";
+  quantidade: string;
+  descricao: string;
 }
 
 interface SegmentoBarraDia {
-  cor: string
-  minutos: number
-  percentual?: number
+  cor: string;
+  minutos: number;
+  percentual?: number;
 }
 
 interface AtividadeDetalheDia {
-  planejamentoId: number
-  usuarioId: number
-  data: string
-  descricao: string
-  minutos: number
-  faixa: 'NORMAL' | 'EXTRA'
-  cor: string
+  planejamentoId: number;
+  usuarioId: number;
+  data: string;
+  descricao: string;
+  minutos: number;
+  faixa: "NORMAL" | "EXTRA";
+  cor: string;
 }
 
 interface UsuarioResumoDia {
-  usuarioId: number
-  nome: string
-  minutosPlanejados: number
-  minutosNormaisPlanejados: number
-  minutosExtrasPlanejados: number
-  capacidadeMaxima: number
-  atividades: AtividadeDetalheDia[]
-  segmentos: SegmentoBarraDia[]
+  usuarioId: number;
+  nome: string;
+  minutosPlanejados: number;
+  minutosNormaisPlanejados: number;
+  minutosExtrasPlanejados: number;
+  capacidadeMaxima: number;
+  atividades: AtividadeDetalheDia[];
+  segmentos: SegmentoBarraDia[];
 }
 
 interface PlanejamentoEdicaoState {
-  planejamentoId: number
-  usuarioId: number
-  usuarioNome: string
-  data: string
-  faixa: 'NORMAL' | 'EXTRA'
-  minutos: number
-  descricao: string
-  capacidadeMaxima: number
-  totalNormalDia: number
+  planejamentoId: number;
+  usuarioId: number;
+  usuarioNome: string;
+  data: string;
+  faixa: "NORMAL" | "EXTRA";
+  minutos: number;
+  descricao: string;
+  capacidadeMaxima: number;
+  totalNormalDia: number;
 }
 
 const ESTADO_INICIAL_FORM: FormularioPlanejamento = {
-  tipoAtividadeId: '',
-  tipoHorario: 'NORMAL',
-  unidadeTempo: 'HORAS',
-  quantidade: '1',
-  descricao: '',
-}
+  tipoAtividadeId: "",
+  tipoHorario: "NORMAL",
+  unidadeTempo: "HORAS",
+  quantidade: "1",
+  descricao: "",
+};
 
 function obterNomeUsuario(usuario: UsuarioResumo): string {
-  return usuario.nome_guerra?.trim() || usuario.nome
+  return usuario.nome_guerra?.trim() || usuario.nome;
 }
 
 function formatarHorasMinutos(minutos: number): string {
-  const horas = Math.floor(minutos / 60)
-  const resto = minutos % 60
-  if (horas > 0 && resto > 0) return `${horas}h ${resto}min`
-  if (horas > 0) return `${horas}h`
-  return `${resto}min`
+  const horas = Math.floor(minutos / 60);
+  const resto = minutos % 60;
+  if (horas > 0 && resto > 0) return `${horas}h ${resto}min`;
+  if (horas > 0) return `${horas}h`;
+  return `${resto}min`;
 }
 
-function criarResumoUsuarioDia(usuarioId: number, nome: string, capacidadeMaxima: number): UsuarioResumoDia {
+function criarResumoUsuarioDia(
+  usuarioId: number,
+  nome: string,
+  capacidadeMaxima: number,
+): UsuarioResumoDia {
   return {
     usuarioId,
     nome,
@@ -99,20 +115,20 @@ function criarResumoUsuarioDia(usuarioId: number, nome: string, capacidadeMaxima
     capacidadeMaxima,
     atividades: [],
     segmentos: [],
-  }
+  };
 }
 
 function normalizarCorHex(cor?: string | null): string {
-  const valor = (cor ?? '').trim().toUpperCase()
-  if (/^#[0-9A-F]{6}$/.test(valor)) return valor
-  return 'var(--accent)'
+  const valor = (cor ?? "").trim().toUpperCase();
+  if (/^#[0-9A-F]{6}$/.test(valor)) return valor;
+  return "var(--accent)";
 }
 
 function extrairNomeTipoDaDescricao(descricao?: string | null): string | null {
-  const texto = descricao?.trim()
-  if (!texto) return null
-  const match = texto.match(/^\[([^\]]+)]/)
-  return match?.[1]?.trim() || null
+  const texto = descricao?.trim();
+  if (!texto) return null;
+  const match = texto.match(/^\[([^\]]+)]/);
+  return match?.[1]?.trim() || null;
 }
 
 function obterCorPlanejamento(
@@ -120,450 +136,637 @@ function obterCorPlanejamento(
   tiposAtividade: TipoAtividade[],
 ): string {
   if (planejamento.bloco_id) {
-    const tipoBloco = tiposAtividade.find((item) => item.origem === 'BLOCO' && item.bloco_id === planejamento.bloco_id)
-    if (tipoBloco?.cor) return normalizarCorHex(tipoBloco.cor)
+    const tipoBloco = tiposAtividade.find(
+      (item) =>
+        item.origem === "BLOCO" && item.bloco_id === planejamento.bloco_id,
+    );
+    if (tipoBloco?.cor) return normalizarCorHex(tipoBloco.cor);
   }
 
-  const nomeTipo = extrairNomeTipoDaDescricao(planejamento.descricao)
+  const nomeTipo = extrairNomeTipoDaDescricao(planejamento.descricao);
   if (nomeTipo) {
-    const tipoDescricao = tiposAtividade.find((item) => item.nome.trim().toLowerCase() === nomeTipo.toLowerCase())
-    if (tipoDescricao?.cor) return normalizarCorHex(tipoDescricao.cor)
+    const tipoDescricao = tiposAtividade.find(
+      (item) => item.nome.trim().toLowerCase() === nomeTipo.toLowerCase(),
+    );
+    if (tipoDescricao?.cor) return normalizarCorHex(tipoDescricao.cor);
   }
 
-  return 'var(--accent)'
+  return "var(--accent)";
 }
 
-function acumularSegmento(segmentos: SegmentoBarraDia[], cor: string, minutos: number) {
-  if (minutos <= 0) return
-  const corNormalizada = normalizarCorHex(cor)
-  const existente = segmentos.find((item) => item.cor === corNormalizada)
+function acumularSegmento(
+  segmentos: SegmentoBarraDia[],
+  cor: string,
+  minutos: number,
+) {
+  if (minutos <= 0) return;
+  const corNormalizada = normalizarCorHex(cor);
+  const existente = segmentos.find((item) => item.cor === corNormalizada);
   if (existente) {
-    existente.minutos += minutos
-    return
+    existente.minutos += minutos;
+    return;
   }
-  segmentos.push({ cor: corNormalizada, minutos })
+  segmentos.push({ cor: corNormalizada, minutos });
 }
 
-function calcularSegmentosPercentuais(segmentos: SegmentoBarraDia[], capacidadeTotal: number): SegmentoBarraDia[] {
-  if (capacidadeTotal <= 0 || segmentos.length === 0) return []
+function calcularSegmentosPercentuais(
+  segmentos: SegmentoBarraDia[],
+  capacidadeTotal: number,
+): SegmentoBarraDia[] {
+  if (capacidadeTotal <= 0 || segmentos.length === 0) return [];
   return segmentos
     .filter((segmento) => segmento.minutos > 0)
     .map((segmento) => ({
       ...segmento,
       percentual: Math.min(100, (segmento.minutos / capacidadeTotal) * 100),
-    }))
+    }));
 }
 
-function converterQuantidadeParaMinutos(unidadeTempo: 'HORAS' | 'MINUTOS', quantidade: number): number {
-  return unidadeTempo === 'HORAS' ? quantidade * 60 : quantidade
+function converterQuantidadeParaMinutos(
+  unidadeTempo: "HORAS" | "MINUTOS",
+  quantidade: number,
+): number {
+  return unidadeTempo === "HORAS" ? quantidade * 60 : quantidade;
+}
+
+function obterDescricaoOrigemTipo(tipo: TipoAtividade): string {
+  if (tipo.origem === "BLOCO") return "Bloco de produção";
+  if (tipo.grupo === "INDISPONIBILIDADE") return "Indisponibilidade";
+  if (tipo.grupo === "AJUSTE") return "Ajuste administrativo";
+  return "Tipo configurado";
 }
 
 export default function AgendaPrevista() {
-  const queryClient = useQueryClient()
-  const { ehAdmin, usuario } = useAuth()
-  const calendar = useCalendarNavigation({ initialView: 'month' })
+  const queryClient = useQueryClient();
+  const { ehAdmin, usuario } = useAuth();
+  const calendar = useCalendarNavigation({ initialView: "month" });
 
-  const [selectedUsuarioIds, setSelectedUsuarioIds] = useState<number[]>([])
-  const [usuariosOpen, setUsuariosOpen] = useState(false)
-  const [planejamentoOpen, setPlanejamentoOpen] = useState(false)
-  const [consolidacaoOpen, setConsolidacaoOpen] = useState(false)
-  const [filtroUsuarios, setFiltroUsuarios] = useState('')
-  const [diaDetalheSelecionado, setDiaDetalheSelecionado] = useState<Date | null>(null)
-  const [form, setForm] = useState<FormularioPlanejamento>(ESTADO_INICIAL_FORM)
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [planejamentoEmEdicao, setPlanejamentoEmEdicao] = useState<PlanejamentoEdicaoState | null>(null)
-  const [edicaoMinutos, setEdicaoMinutos] = useState('')
-  const [edicaoDescricao, setEdicaoDescricao] = useState('')
-  const [edicaoErrors, setEdicaoErrors] = useState<Record<string, string>>({})
-  const dropdownRef = useRef<HTMLDivElement | null>(null)
+  const [selectedUsuarioIds, setSelectedUsuarioIds] = useState<number[]>([]);
+  const [usuariosOpen, setUsuariosOpen] = useState(false);
+  const [planejamentoOpen, setPlanejamentoOpen] = useState(false);
+  const [consolidacaoOpen, setConsolidacaoOpen] = useState(false);
+  const [filtroUsuarios, setFiltroUsuarios] = useState("");
+  const [diaDetalheSelecionado, setDiaDetalheSelecionado] =
+    useState<Date | null>(null);
+  const [form, setForm] = useState<FormularioPlanejamento>(ESTADO_INICIAL_FORM);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [planejamentoEmEdicao, setPlanejamentoEmEdicao] =
+    useState<PlanejamentoEdicaoState | null>(null);
+  const [edicaoMinutos, setEdicaoMinutos] = useState("");
+  const [edicaoDescricao, setEdicaoDescricao] = useState("");
+  const [edicaoErrors, setEdicaoErrors] = useState<Record<string, string>>({});
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   const { data: usuarios = [], isLoading: loadingUsuarios } = useQuery({
-    queryKey: ['usuarios'],
+    queryKey: ["usuarios"],
     queryFn: getUsuarios,
     enabled: ehAdmin,
     staleTime: 60_000,
-  })
+  });
 
   const { data: tiposAtividadeResposta, isLoading: loadingTipos } = useQuery({
-    queryKey: ['tipos-atividade'],
+    queryKey: ["tipos-atividade"],
     queryFn: getTiposAtividade,
     staleTime: 60_000,
-  })
+  });
 
   const { data: configTeto } = useQuery({
-    queryKey: ['config-teto'],
+    queryKey: ["config-teto"],
     queryFn: getConfigTeto,
     staleTime: 60_000,
-  })
+  });
 
   const tiposAtividade: TipoAtividade[] = useMemo(() => {
-    if (Array.isArray(tiposAtividadeResposta)) return tiposAtividadeResposta as TipoAtividade[]
-    if (tiposAtividadeResposta && Array.isArray((tiposAtividadeResposta as { tipos?: TipoAtividade[] }).tipos)) {
-      return (tiposAtividadeResposta as { tipos: TipoAtividade[] }).tipos
+    if (Array.isArray(tiposAtividadeResposta))
+      return tiposAtividadeResposta as TipoAtividade[];
+    if (
+      tiposAtividadeResposta &&
+      Array.isArray(
+        (tiposAtividadeResposta as { tipos?: TipoAtividade[] }).tipos,
+      )
+    ) {
+      return (tiposAtividadeResposta as { tipos: TipoAtividade[] }).tipos;
     }
-    return []
-  }, [tiposAtividadeResposta])
+    return [];
+  }, [tiposAtividadeResposta]);
 
   const usuariosSelecionados = useMemo(
     () => usuarios.filter((item) => selectedUsuarioIds.includes(item.id)),
     [usuarios, selectedUsuarioIds],
-  )
+  );
 
   const usuariosFiltrados = useMemo(() => {
-    const termo = filtroUsuarios.trim().toLowerCase()
-    if (!termo) return usuarios
+    const termo = filtroUsuarios.trim().toLowerCase();
+    if (!termo) return usuarios;
     return usuarios.filter((item) => {
-      const nomeCurto = obterNomeUsuario(item).toLowerCase()
-      const nomeCompleto = item.nome.toLowerCase()
-      return nomeCurto.includes(termo) || nomeCompleto.includes(termo)
-    })
-  }, [filtroUsuarios, usuarios])
+      const nomeCurto = obterNomeUsuario(item).toLowerCase();
+      const nomeCompleto = item.nome.toLowerCase();
+      return nomeCurto.includes(termo) || nomeCompleto.includes(termo);
+    });
+  }, [filtroUsuarios, usuarios]);
 
   const usuarioIdPrincipal = useMemo(() => {
-    if (!ehAdmin) return usuario?.usuario_id
-    if (selectedUsuarioIds.length > 0) return selectedUsuarioIds[0]
-    return usuario?.usuario_id
-  }, [ehAdmin, selectedUsuarioIds, usuario?.usuario_id])
+    if (!ehAdmin) return usuario?.usuario_id;
+    if (selectedUsuarioIds.length > 0) return selectedUsuarioIds[0];
+    return usuario?.usuario_id;
+  }, [ehAdmin, selectedUsuarioIds, usuario?.usuario_id]);
 
   const usuarioPrincipal = useMemo(
     () => usuarios.find((item) => item.id === usuarioIdPrincipal),
     [usuarios, usuarioIdPrincipal],
-  )
+  );
 
-  const { agenda, capacidade, getDiaData, isLoading, isError, invalidate } = useAgendaData({
-    usuarioId: usuarioIdPrincipal,
-    isAdmin: ehAdmin,
-    dataInicio: calendar.formatForApi(calendar.dateRange.start),
-    dataFim: calendar.formatForApi(calendar.dateRange.end),
-    enabled: !!usuarioIdPrincipal,
-  })
+  const { agenda, capacidade, getDiaData, isLoading, isError, invalidate } =
+    useAgendaData({
+      usuarioId: usuarioIdPrincipal,
+      isAdmin: ehAdmin,
+      dataInicio: calendar.formatForApi(calendar.dateRange.start),
+      dataFim: calendar.formatForApi(calendar.dateRange.end),
+      enabled: !!usuarioIdPrincipal,
+    });
 
   const idsUsuariosPainel = useMemo(() => {
     if (ehAdmin) {
-      if (selectedUsuarioIds.length > 0) return selectedUsuarioIds
-      return usuarioIdPrincipal ? [usuarioIdPrincipal] : []
+      if (selectedUsuarioIds.length > 0) return selectedUsuarioIds;
+      return usuarioIdPrincipal ? [usuarioIdPrincipal] : [];
     }
-    return usuario?.usuario_id ? [usuario.usuario_id] : []
-  }, [ehAdmin, selectedUsuarioIds, usuarioIdPrincipal, usuario?.usuario_id])
+    return usuario?.usuario_id ? [usuario.usuario_id] : [];
+  }, [ehAdmin, selectedUsuarioIds, usuarioIdPrincipal, usuario?.usuario_id]);
 
   const agendasMultiplosUsuariosQuery = useQuery({
-    queryKey: ['agenda-prevista-multiusuario', idsUsuariosPainel, calendar.dateRange.start.toISOString(), calendar.dateRange.end.toISOString(), ehAdmin],
+    queryKey: [
+      "agenda-prevista-multiusuario",
+      idsUsuariosPainel,
+      calendar.dateRange.start.toISOString(),
+      calendar.dateRange.end.toISOString(),
+      ehAdmin,
+    ],
     queryFn: async (): Promise<AgendaCompleta[]> => {
-      if (!idsUsuariosPainel.length) return []
-      if (!ehAdmin) return agenda ? [agenda] : []
+      if (!idsUsuariosPainel.length) return [];
+      if (!ehAdmin) return agenda ? [agenda] : [];
       const resultados = await Promise.allSettled(
-        idsUsuariosPainel.map((usuarioId) => getAgendaUsuario(
-          usuarioId,
-          calendar.formatForApi(calendar.dateRange.start),
-          calendar.formatForApi(calendar.dateRange.end),
-        )),
-      )
+        idsUsuariosPainel.map((usuarioId) =>
+          getAgendaUsuario(
+            usuarioId,
+            calendar.formatForApi(calendar.dateRange.start),
+            calendar.formatForApi(calendar.dateRange.end),
+          ),
+        ),
+      );
       return resultados
-        .filter((resultado): resultado is PromiseFulfilledResult<AgendaCompleta> => resultado.status === 'fulfilled')
-        .map((resultado) => resultado.value)
+        .filter(
+          (resultado): resultado is PromiseFulfilledResult<AgendaCompleta> =>
+            resultado.status === "fulfilled",
+        )
+        .map((resultado) => resultado.value);
     },
     enabled: idsUsuariosPainel.length > 0 && (!!agenda || ehAdmin),
     staleTime: 30_000,
-  })
+  });
 
-  const resumoPeriodo = capacidade?.resumo
-  const capacidadePadraoMinutos = configTeto?.teto_normal_min ?? 360
-  const diasSelecionados = calendar.selectedDates.length
+  const resumoPeriodo = capacidade?.resumo;
+  const capacidadePadraoMinutos = configTeto?.teto_normal_min ?? 360;
+  const diasSelecionados = calendar.selectedDates.length;
 
   const intervaloSelecionado = useMemo(() => {
-    if (calendar.selectedRange) return calendar.selectedRange
+    if (calendar.selectedRange) return calendar.selectedRange;
     if (calendar.selectedDates.length === 1) {
-      return { start: calendar.selectedDates[0], end: calendar.selectedDates[0] }
+      return {
+        start: calendar.selectedDates[0],
+        end: calendar.selectedDates[0],
+      };
     }
-    return null
-  }, [calendar.selectedDates, calendar.selectedRange])
+    return null;
+  }, [calendar.selectedDates, calendar.selectedRange]);
 
   const intervaloSelecionadoLabel = useMemo(() => {
-    if (!intervaloSelecionado) return 'Nenhum dia selecionado'
-    const inicio = format(intervaloSelecionado.start, 'dd/MM/yyyy')
-    const fim = format(intervaloSelecionado.end, 'dd/MM/yyyy')
-    return inicio === fim ? inicio : `${inicio} até ${fim}`
-  }, [intervaloSelecionado])
+    if (!intervaloSelecionado) return "Nenhum dia selecionado";
+    const inicio = format(intervaloSelecionado.start, "dd/MM/yyyy");
+    const fim = format(intervaloSelecionado.end, "dd/MM/yyyy");
+    return inicio === fim ? inicio : `${inicio} até ${fim}`;
+  }, [intervaloSelecionado]);
 
   const quantidadeDiasResumo = useMemo(() => {
-    if (!intervaloSelecionado) return '0 dia'
-    if (diasSelecionados === 1) return '1 dia'
-    return `${diasSelecionados} dias`
-  }, [diasSelecionados, intervaloSelecionado])
+    if (!intervaloSelecionado) return "0 dia";
+    if (diasSelecionados === 1) return "1 dia";
+    return `${diasSelecionados} dias`;
+  }, [diasSelecionados, intervaloSelecionado]);
 
-  const podeCriarPlanejamento = ehAdmin && selectedUsuarioIds.length > 0 && diasSelecionados >= 1
-  const podeConsolidar = ehAdmin && !!intervaloSelecionado && diasSelecionados >= 1
+  const podeCriarPlanejamento =
+    ehAdmin && selectedUsuarioIds.length > 0 && diasSelecionados >= 1;
+  const podeConsolidar =
+    ehAdmin && !!intervaloSelecionado && diasSelecionados >= 1;
 
   useEffect(() => {
-    if (!ehAdmin) return
+    if (!ehAdmin) return;
     function handleClickFora(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setUsuariosOpen(false)
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setUsuariosOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickFora)
-    return () => document.removeEventListener('mousedown', handleClickFora)
-  }, [ehAdmin])
+    document.addEventListener("mousedown", handleClickFora);
+    return () => document.removeEventListener("mousedown", handleClickFora);
+  }, [ehAdmin]);
 
   function alternarUsuario(usuarioId: number) {
     setSelectedUsuarioIds((atual) => {
-      if (atual.includes(usuarioId)) return atual.filter((id) => id !== usuarioId)
-      return [...atual, usuarioId].sort((a, b) => a - b)
-    })
+      if (atual.includes(usuarioId))
+        return atual.filter((id) => id !== usuarioId);
+      return [...atual, usuarioId].sort((a, b) => a - b);
+    });
   }
 
   function limparSelecaoUsuarios() {
-    setSelectedUsuarioIds([])
+    setSelectedUsuarioIds([]);
   }
 
   function abrirPlanejamento() {
-    setErrors({})
-    setPlanejamentoOpen(true)
+    setErrors({});
+    setPlanejamentoOpen(true);
   }
 
   function resumoUsuariosSelecionados(): string {
-    if (!selectedUsuarioIds.length) return 'Selecione um ou mais usuários'
-    if (usuariosSelecionados.length <= 2) return usuariosSelecionados.map(obterNomeUsuario).join(', ')
-    return `${usuariosSelecionados.length} usuários selecionados`
+    if (!selectedUsuarioIds.length) return "Selecione um ou mais usuários";
+    if (usuariosSelecionados.length <= 2)
+      return usuariosSelecionados.map(obterNomeUsuario).join(", ");
+    return `${usuariosSelecionados.length} usuários selecionados`;
   }
 
   const mapaUsuariosPorId = useMemo(() => {
-    const mapa = new Map<number, string>()
+    const mapa = new Map<number, string>();
     for (const item of usuarios) {
-      mapa.set(item.id, obterNomeUsuario(item))
+      mapa.set(item.id, obterNomeUsuario(item));
     }
     if (usuario?.usuario_id) {
-      mapa.set(usuario.usuario_id, usuario.nome_guerra || usuario.nome || 'Usuário atual')
+      mapa.set(
+        usuario.usuario_id,
+        usuario.nome_guerra || usuario.nome || "Usuário atual",
+      );
     }
-    return mapa
-  }, [usuarios, usuario])
+    return mapa;
+  }, [usuarios, usuario]);
 
   const agendaDetalheUsuarios = useMemo(() => {
-    if (ehAdmin) return agendasMultiplosUsuariosQuery.data ?? []
-    return agenda ? [agenda] : []
-  }, [agenda, agendasMultiplosUsuariosQuery.data, ehAdmin])
+    if (ehAdmin) return agendasMultiplosUsuariosQuery.data ?? [];
+    return agenda ? [agenda] : [];
+  }, [agenda, agendasMultiplosUsuariosQuery.data, ehAdmin]);
 
   const detalhesPorDia = useMemo(() => {
-    const mapa = new Map<string, UsuarioResumoDia[]>()
-    const datasVisiveis = calendar.calendarDays.map((item) => format(item.date, 'yyyy-MM-dd'))
+    const mapa = new Map<string, UsuarioResumoDia[]>();
+    const datasVisiveis = calendar.calendarDays.map((item) =>
+      format(item.date, "yyyy-MM-dd"),
+    );
 
     for (const data of datasVisiveis) {
       mapa.set(
         data,
-        idsUsuariosPainel.map((usuarioId) => criarResumoUsuarioDia(
-          usuarioId,
-          mapaUsuariosPorId.get(usuarioId) ?? `Usuário ${usuarioId}`,
-          capacidadePadraoMinutos,
-        )),
-      )
+        idsUsuariosPainel.map((usuarioId) =>
+          criarResumoUsuarioDia(
+            usuarioId,
+            mapaUsuariosPorId.get(usuarioId) ?? `Usuário ${usuarioId}`,
+            capacidadePadraoMinutos,
+          ),
+        ),
+      );
     }
 
     for (const agendaUsuario of agendaDetalheUsuarios) {
-      const nomeUsuario = mapaUsuariosPorId.get(agendaUsuario.usuario_id) ?? `Usuário ${agendaUsuario.usuario_id}`
+      const nomeUsuario =
+        mapaUsuariosPorId.get(agendaUsuario.usuario_id) ??
+        `Usuário ${agendaUsuario.usuario_id}`;
       for (const dia of agendaUsuario.dias) {
-        const listaDia = mapa.get(dia.data) ?? []
-        let resumoUsuario = listaDia.find((item) => item.usuarioId === agendaUsuario.usuario_id)
+        const listaDia = mapa.get(dia.data) ?? [];
+        let resumoUsuario = listaDia.find(
+          (item) => item.usuarioId === agendaUsuario.usuario_id,
+        );
         if (!resumoUsuario) {
-          resumoUsuario = criarResumoUsuarioDia(agendaUsuario.usuario_id, nomeUsuario, dia.teto_normal_min || capacidadePadraoMinutos)
-          listaDia.push(resumoUsuario)
+          resumoUsuario = criarResumoUsuarioDia(
+            agendaUsuario.usuario_id,
+            nomeUsuario,
+            dia.teto_normal_min || capacidadePadraoMinutos,
+          );
+          listaDia.push(resumoUsuario);
         }
 
-        resumoUsuario.capacidadeMaxima = dia.teto_normal_min || capacidadePadraoMinutos
+        resumoUsuario.capacidadeMaxima =
+          dia.teto_normal_min || capacidadePadraoMinutos;
 
         for (const planejamento of dia.planejamento) {
-          const corPlanejamento = obterCorPlanejamento(planejamento, tiposAtividade)
+          const corPlanejamento = obterCorPlanejamento(
+            planejamento,
+            tiposAtividade,
+          );
 
           if (planejamento.minutos_planejados_normais > 0) {
-            resumoUsuario.minutosNormaisPlanejados += planejamento.minutos_planejados_normais
+            resumoUsuario.minutosNormaisPlanejados +=
+              planejamento.minutos_planejados_normais;
             resumoUsuario.atividades.push({
               planejamentoId: planejamento.id,
               usuarioId: agendaUsuario.usuario_id,
               data: dia.data,
-              descricao: planejamento.descricao?.trim() || 'Planejamento administrativo',
+              descricao:
+                planejamento.descricao?.trim() || "Planejamento administrativo",
               minutos: planejamento.minutos_planejados_normais,
-              faixa: 'NORMAL',
+              faixa: "NORMAL",
               cor: corPlanejamento,
-            })
-            acumularSegmento(resumoUsuario.segmentos, corPlanejamento, planejamento.minutos_planejados_normais)
+            });
+            acumularSegmento(
+              resumoUsuario.segmentos,
+              corPlanejamento,
+              planejamento.minutos_planejados_normais,
+            );
           }
           if (planejamento.minutos_planejados_extras > 0) {
-            resumoUsuario.minutosExtrasPlanejados += planejamento.minutos_planejados_extras
+            resumoUsuario.minutosExtrasPlanejados +=
+              planejamento.minutos_planejados_extras;
             resumoUsuario.atividades.push({
               planejamentoId: planejamento.id,
               usuarioId: agendaUsuario.usuario_id,
               data: dia.data,
-              descricao: planejamento.descricao?.trim() || 'Planejamento administrativo',
+              descricao:
+                planejamento.descricao?.trim() || "Planejamento administrativo",
               minutos: planejamento.minutos_planejados_extras,
-              faixa: 'EXTRA',
+              faixa: "EXTRA",
               cor: corPlanejamento,
-            })
-            acumularSegmento(resumoUsuario.segmentos, corPlanejamento, planejamento.minutos_planejados_extras)
+            });
+            acumularSegmento(
+              resumoUsuario.segmentos,
+              corPlanejamento,
+              planejamento.minutos_planejados_extras,
+            );
           }
         }
 
-        resumoUsuario.minutosPlanejados = resumoUsuario.minutosNormaisPlanejados + resumoUsuario.minutosExtrasPlanejados
-        mapa.set(dia.data, [...listaDia].sort((a, b) => a.nome.localeCompare(b.nome)))
+        resumoUsuario.minutosPlanejados =
+          resumoUsuario.minutosNormaisPlanejados +
+          resumoUsuario.minutosExtrasPlanejados;
+        mapa.set(
+          dia.data,
+          [...listaDia].sort((a, b) => a.nome.localeCompare(b.nome)),
+        );
       }
     }
 
-    return mapa
-  }, [agendaDetalheUsuarios, calendar.calendarDays, capacidadePadraoMinutos, idsUsuariosPainel, mapaUsuariosPorId, tiposAtividade])
+    return mapa;
+  }, [
+    agendaDetalheUsuarios,
+    calendar.calendarDays,
+    capacidadePadraoMinutos,
+    idsUsuariosPainel,
+    mapaUsuariosPorId,
+    tiposAtividade,
+  ]);
 
-  function obterResumoDiaUsuario(usuarioId: number, data: string): UsuarioResumoDia | undefined {
-    return (detalhesPorDia.get(data) ?? []).find((item) => item.usuarioId === usuarioId)
+  function obterResumoDiaUsuario(
+    usuarioId: number,
+    data: string,
+  ): UsuarioResumoDia | undefined {
+    return (detalhesPorDia.get(data) ?? []).find(
+      (item) => item.usuarioId === usuarioId,
+    );
   }
 
   const criarPlanejamentoMutation = useMutation({
     mutationFn: async () => {
-      const novosErros: Record<string, string> = {}
-      const quantidade = Number(form.quantidade)
-      const minutosCalculados = converterQuantidadeParaMinutos(form.unidadeTempo, quantidade)
+      const novosErros: Record<string, string> = {};
+      const quantidade = Number(form.quantidade);
+      const minutosCalculados = converterQuantidadeParaMinutos(
+        form.unidadeTempo,
+        quantidade,
+      );
 
-      if (!form.tipoAtividadeId) novosErros.tipoAtividadeId = 'Selecione um tipo de atividade.'
-      if (!form.tipoHorario) novosErros.tipoHorario = 'Selecione o tipo de horário.'
-      if (!Number.isFinite(quantidade) || quantidade <= 0) novosErros.quantidade = 'Informe uma quantidade válida.'
-      if (calendar.selectedDates.length === 0) novosErros.periodo = 'Selecione pelo menos um dia.'
-      if (selectedUsuarioIds.length === 0) novosErros.usuarios = 'Selecione ao menos um usuário.'
+      if (!form.tipoAtividadeId)
+        novosErros.tipoAtividadeId = "Selecione um tipo de atividade.";
+      if (!form.tipoHorario)
+        novosErros.tipoHorario = "Selecione o tipo de horário.";
+      if (!Number.isFinite(quantidade) || quantidade <= 0)
+        novosErros.quantidade = "Informe uma quantidade válida.";
+      if (calendar.selectedDates.length === 0)
+        novosErros.periodo = "Selecione pelo menos um dia.";
+      if (selectedUsuarioIds.length === 0)
+        novosErros.usuarios = "Selecione ao menos um usuário.";
 
-      if (form.tipoHorario === 'NORMAL' && Number.isFinite(minutosCalculados) && minutosCalculados > 0) {
+      if (
+        form.tipoHorario === "NORMAL" &&
+        Number.isFinite(minutosCalculados) &&
+        minutosCalculados > 0
+      ) {
         for (const usuarioId of selectedUsuarioIds) {
-          const nomeUsuario = mapaUsuariosPorId.get(usuarioId) ?? `Usuário ${usuarioId}`
+          const nomeUsuario =
+            mapaUsuariosPorId.get(usuarioId) ?? `Usuário ${usuarioId}`;
           for (const dataSelecionada of calendar.selectedDates) {
-            const dataChave = format(dataSelecionada, 'yyyy-MM-dd')
-            const resumoDia = obterResumoDiaUsuario(usuarioId, dataChave)
-            const capacidadeDia = resumoDia?.capacidadeMaxima ?? capacidadePadraoMinutos
-            const normalJaPlanejado = resumoDia?.minutosNormaisPlanejados ?? 0
+            const dataChave = format(dataSelecionada, "yyyy-MM-dd");
+            const resumoDia = obterResumoDiaUsuario(usuarioId, dataChave);
+            const capacidadeDia =
+              resumoDia?.capacidadeMaxima ?? capacidadePadraoMinutos;
+            const normalJaPlanejado = resumoDia?.minutosNormaisPlanejados ?? 0;
             if (normalJaPlanejado + minutosCalculados > capacidadeDia) {
-              novosErros.quantidade = `O usuário ${nomeUsuario} ultrapassa ${formatarHorasMinutos(capacidadeDia)} em ${format(dataSelecionada, 'dd/MM/yyyy')}. O sistema só permite até 6h em horário normal.`
-              break
+              novosErros.quantidade = `O usuário ${nomeUsuario} ultrapassa ${formatarHorasMinutos(capacidadeDia)} em ${format(dataSelecionada, "dd/MM/yyyy")}. O sistema só permite até 6h em horário normal.`;
+              break;
             }
           }
-          if (novosErros.quantidade) break
+          if (novosErros.quantidade) break;
         }
       }
 
-      setErrors(novosErros)
+      setErrors(novosErros);
       if (Object.keys(novosErros).length > 0) {
-        throw new Error('Existem campos obrigatórios ou limites inválidos.')
+        throw new Error("Existem campos obrigatórios ou limites inválidos.");
       }
 
-      const dias = calendar.selectedDates.map((data) => format(data, 'yyyy-MM-dd'))
-      const tipoSelecionado = tiposAtividade.find((item) => item.id === Number(form.tipoAtividadeId))
-      const blocoSelecionadoId = tipoSelecionado?.origem === 'BLOCO' ? (tipoSelecionado.bloco_id ?? null) : null
-      const descricaoComTipo = tipoSelecionado?.origem === 'BLOCO'
-        ? form.descricao.trim()
-        : [tipoSelecionado?.nome ? `[${tipoSelecionado.nome}]` : '', form.descricao.trim()].filter(Boolean).join(' ')
+      const dias = calendar.selectedDates.map((data) =>
+        format(data, "yyyy-MM-dd"),
+      );
+      const tipoSelecionado = tiposAtividade.find(
+        (item) => item.id === Number(form.tipoAtividadeId),
+      );
+      const blocoSelecionadoId =
+        tipoSelecionado?.origem === "BLOCO"
+          ? (tipoSelecionado.bloco_id ?? null)
+          : null;
+      const descricaoComTipo =
+        tipoSelecionado?.origem === "BLOCO"
+          ? form.descricao.trim()
+          : [
+              tipoSelecionado?.nome ? `[${tipoSelecionado.nome}]` : "",
+              form.descricao.trim(),
+            ]
+              .filter(Boolean)
+              .join(" ");
 
       await criarPlanejamentoLote({
         usuario_ids: selectedUsuarioIds,
         datas: dias,
         bloco_id: blocoSelecionadoId,
-        minutos_planejados_normais: form.tipoHorario === 'NORMAL' ? minutosCalculados : 0,
-        minutos_planejados_extras: form.tipoHorario === 'EXTRA' ? minutosCalculados : 0,
+        minutos_planejados_normais:
+          form.tipoHorario === "NORMAL" ? minutosCalculados : 0,
+        minutos_planejados_extras:
+          form.tipoHorario === "EXTRA" ? minutosCalculados : 0,
         descricao: descricaoComTipo || undefined,
-      })
+      });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['agenda'] })
-      await queryClient.invalidateQueries({ queryKey: ['capacidade'] })
-      await queryClient.invalidateQueries({ queryKey: ['agenda-prevista-multiusuario'] })
-      invalidate()
-      setPlanejamentoOpen(false)
-      setForm(ESTADO_INICIAL_FORM)
-      setErrors({})
+      await queryClient.invalidateQueries({ queryKey: ["agenda"] });
+      await queryClient.invalidateQueries({ queryKey: ["capacidade"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["agenda-prevista-multiusuario"],
+      });
+      invalidate();
+      setPlanejamentoOpen(false);
+      setForm(ESTADO_INICIAL_FORM);
+      setErrors({});
     },
     onError: (error) => {
       setErrors((atual) => ({
         ...atual,
-        submit: error instanceof Error ? error.message : 'Não foi possível criar o planejamento.',
-      }))
+        submit:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível criar o planejamento.",
+      }));
     },
-  })
+  });
 
   const consolidacaoCsvMutation = useMutation({
     mutationFn: async () => {
-      if (!intervaloSelecionado) throw new Error('Selecione um período para consolidar.')
+      if (!intervaloSelecionado)
+        throw new Error("Selecione um período para consolidar.");
       return consolidarPeriodo({
-        data_inicio: format(intervaloSelecionado.start, 'yyyy-MM-dd'),
-        data_fim: format(intervaloSelecionado.end, 'yyyy-MM-dd'),
-        usuarios_ids: selectedUsuarioIds.length > 0 ? selectedUsuarioIds : undefined,
+        data_inicio: format(intervaloSelecionado.start, "yyyy-MM-dd"),
+        data_fim: format(intervaloSelecionado.end, "yyyy-MM-dd"),
+        usuarios_ids:
+          selectedUsuarioIds.length > 0 ? selectedUsuarioIds : undefined,
         ignorar_pendencias: false,
-      })
+      });
     },
     onSuccess: (resultado) => {
       if (!resultado.pendencias.length) {
-        setConsolidacaoOpen(true)
-        return
+        setConsolidacaoOpen(true);
+        return;
       }
 
       const linhas = [
-        ['usuario', 'dia', 'horas_faltantes'].join(','),
-        ...resultado.pendencias.map((pendencia) => [
-          JSON.stringify(pendencia.usuario_nome ?? `Usuário ${pendencia.usuario_id}`),
-          pendencia.data,
-          JSON.stringify(pendencia.motivo),
-        ].join(',')),
-      ]
+        ["usuario", "dia", "horas_faltantes"].join(","),
+        ...resultado.pendencias.map((pendencia) =>
+          [
+            JSON.stringify(
+              pendencia.usuario_nome ?? `Usuário ${pendencia.usuario_id}`,
+            ),
+            pendencia.data,
+            JSON.stringify(pendencia.motivo),
+          ].join(","),
+        ),
+      ];
 
-      const blob = new Blob([linhas.join('\n')], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `pendencias-consolidacao-${format(new Date(), 'yyyyMMdd-HHmmss')}.csv`
-      link.click()
-      URL.revokeObjectURL(url)
-      setConsolidacaoOpen(true)
+      const blob = new Blob([linhas.join("\n")], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `pendencias-consolidacao-${format(new Date(), "yyyyMMdd-HHmmss")}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setConsolidacaoOpen(true);
     },
-  })
+  });
 
-  const quantidadeMinutos = Number(form.quantidade || 0)
+  const quantidadeMinutos = Number(form.quantidade || 0);
   const cargaPlanejadaLabel = useMemo(() => {
-    if (!quantidadeMinutos || quantidadeMinutos < 1) return 'Não definida'
-    return formatarHorasMinutos(converterQuantidadeParaMinutos(form.unidadeTempo, quantidadeMinutos))
-  }, [form.unidadeTempo, quantidadeMinutos])
+    if (!quantidadeMinutos || quantidadeMinutos < 1) return "Não definida";
+    return formatarHorasMinutos(
+      converterQuantidadeParaMinutos(form.unidadeTempo, quantidadeMinutos),
+    );
+  }, [form.unidadeTempo, quantidadeMinutos]);
 
-  const dataDetalheSelecionadoChave = diaDetalheSelecionado ? format(diaDetalheSelecionado, 'yyyy-MM-dd') : null
-  const detalhesDiaSelecionado = dataDetalheSelecionadoChave ? detalhesPorDia.get(dataDetalheSelecionadoChave) ?? [] : []
-
-
+  const dataDetalheSelecionadoChave = diaDetalheSelecionado
+    ? format(diaDetalheSelecionado, "yyyy-MM-dd")
+    : null;
+  const detalhesDiaSelecionado = dataDetalheSelecionadoChave
+    ? (detalhesPorDia.get(dataDetalheSelecionadoChave) ?? [])
+    : [];
 
   const capacidadeVisualPorDia = useMemo(() => {
-    const mapa = new Map<string, { totalMinutos: number; totalExtraMinutos: number; segmentos: SegmentoBarraDia[] }>()
+    const mapa = new Map<
+      string,
+      {
+        totalMinutos: number;
+        totalExtraMinutos: number;
+        segmentos: SegmentoBarraDia[];
+      }
+    >();
 
     for (const [data, usuariosDia] of detalhesPorDia.entries()) {
-      const capacidadeTotal = usuariosDia.reduce((soma, item) => soma + item.capacidadeMaxima, 0)
-      const minutosTotais = usuariosDia.reduce((soma, item) => soma + item.minutosPlanejados, 0)
-      const minutosExtrasTotais = usuariosDia.reduce((soma, item) => soma + item.minutosExtrasPlanejados, 0)
-      const segmentosAgrupados: SegmentoBarraDia[] = []
+      const capacidadeTotal = usuariosDia.reduce(
+        (soma, item) => soma + item.capacidadeMaxima,
+        0,
+      );
+      const minutosTotais = usuariosDia.reduce(
+        (soma, item) => soma + item.minutosPlanejados,
+        0,
+      );
+      const minutosExtrasTotais = usuariosDia.reduce(
+        (soma, item) => soma + item.minutosExtrasPlanejados,
+        0,
+      );
+      const segmentosAgrupados: SegmentoBarraDia[] = [];
 
       for (const usuarioDia of usuariosDia) {
         for (const segmento of usuarioDia.segmentos) {
-          acumularSegmento(segmentosAgrupados, segmento.cor, segmento.minutos)
+          acumularSegmento(segmentosAgrupados, segmento.cor, segmento.minutos);
         }
       }
 
       mapa.set(data, {
         totalMinutos: minutosTotais,
         totalExtraMinutos: minutosExtrasTotais,
-        segmentos: calcularSegmentosPercentuais(segmentosAgrupados, capacidadeTotal),
-      })
+        segmentos: calcularSegmentosPercentuais(
+          segmentosAgrupados,
+          capacidadeTotal,
+        ),
+      });
     }
 
-    return mapa
-  }, [detalhesPorDia])
+    return mapa;
+  }, [detalhesPorDia]);
 
-  const conteudoTooltipPorDia = useMemo(() => ({
-    get: (date: Date) => (detalhesPorDia.get(format(date, 'yyyy-MM-dd')) ?? []).map((item) => ({
-      usuarioId: item.usuarioId,
-      nome: item.nome,
-      minutosPlanejados: item.minutosPlanejados,
-      capacidadeMaxima: item.capacidadeMaxima,
-      segmentos: calcularSegmentosPercentuais(item.segmentos, item.capacidadeMaxima),
-    })),
-  }), [detalhesPorDia])
+  const conteudoTooltipPorDia = useMemo(
+    () => ({
+      get: (date: Date) =>
+        (detalhesPorDia.get(format(date, "yyyy-MM-dd")) ?? []).map((item) => ({
+          usuarioId: item.usuarioId,
+          nome: item.nome,
+          minutosPlanejados: item.minutosPlanejados,
+          capacidadeMaxima: item.capacidadeMaxima,
+          segmentos: calcularSegmentosPercentuais(
+            item.segmentos,
+            item.capacidadeMaxima,
+          ),
+        })),
+    }),
+    [detalhesPorDia],
+  );
 
-  function abrirEdicaoAtividade(atividade: AtividadeDetalheDia, detalheUsuario: UsuarioResumoDia) {
-    setEdicaoErrors({})
+  const tiposAtividadeOrdenados = useMemo(
+    () => [...tiposAtividade].sort((a, b) => a.nome.localeCompare(b.nome)),
+    [tiposAtividade],
+  );
+
+  const tiposAtividadePorGrupo = useMemo(() => {
+    return {
+      blocos: tiposAtividadeOrdenados.filter((tipo) => tipo.origem === "BLOCO"),
+      tipos: tiposAtividadeOrdenados.filter((tipo) => tipo.origem !== "BLOCO"),
+    };
+  }, [tiposAtividadeOrdenados]);
+
+  function abrirEdicaoAtividade(
+    atividade: AtividadeDetalheDia,
+    detalheUsuario: UsuarioResumoDia,
+  ) {
+    setEdicaoErrors({});
     setPlanejamentoEmEdicao({
       planejamentoId: atividade.planejamentoId,
       usuarioId: atividade.usuarioId,
@@ -574,104 +777,133 @@ export default function AgendaPrevista() {
       descricao: atividade.descricao,
       capacidadeMaxima: detalheUsuario.capacidadeMaxima,
       totalNormalDia: detalheUsuario.minutosNormaisPlanejados,
-    })
-    setEdicaoMinutos(String(atividade.minutos))
-    setEdicaoDescricao(atividade.descricao)
+    });
+    setEdicaoMinutos(String(atividade.minutos));
+    setEdicaoDescricao(atividade.descricao);
   }
 
   const editarPlanejamentoMutation = useMutation({
     mutationFn: async () => {
-      if (!planejamentoEmEdicao) throw new Error('Nenhum planejamento selecionado.')
-      const novosErros: Record<string, string> = {}
-      const minutos = Number(edicaoMinutos)
+      if (!planejamentoEmEdicao)
+        throw new Error("Nenhum planejamento selecionado.");
+      const novosErros: Record<string, string> = {};
+      const minutos = Number(edicaoMinutos);
 
       if (!Number.isFinite(minutos) || minutos <= 0) {
-        novosErros.minutos = 'Informe uma quantidade válida de minutos.'
+        novosErros.minutos = "Informe uma quantidade válida de minutos.";
       }
 
-      if (planejamentoEmEdicao.faixa === 'NORMAL' && Number.isFinite(minutos) && minutos > 0) {
-        const capacidadePermitida = planejamentoEmEdicao.capacidadeMaxima
-        const totalSemItemAtual = planejamentoEmEdicao.totalNormalDia - planejamentoEmEdicao.minutos
+      if (
+        planejamentoEmEdicao.faixa === "NORMAL" &&
+        Number.isFinite(minutos) &&
+        minutos > 0
+      ) {
+        const capacidadePermitida = planejamentoEmEdicao.capacidadeMaxima;
+        const totalSemItemAtual =
+          planejamentoEmEdicao.totalNormalDia - planejamentoEmEdicao.minutos;
         if (totalSemItemAtual + minutos > capacidadePermitida) {
-          novosErros.minutos = `Este ajuste ultrapassa ${formatarHorasMinutos(capacidadePermitida)} em horário normal. Reduza a atividade ou use hora extra em um novo lançamento.`
+          novosErros.minutos = `Este ajuste ultrapassa ${formatarHorasMinutos(capacidadePermitida)} em horário normal. Reduza a atividade ou use hora extra em um novo lançamento.`;
         }
       }
 
-      setEdicaoErrors(novosErros)
+      setEdicaoErrors(novosErros);
       if (Object.keys(novosErros).length > 0) {
-        throw new Error('Existem erros no planejamento selecionado.')
+        throw new Error("Existem erros no planejamento selecionado.");
       }
 
       return editarPlanejamento(planejamentoEmEdicao.planejamentoId, {
-        minutos_planejados_normais: planejamentoEmEdicao.faixa === 'NORMAL' ? minutos : undefined,
-        minutos_planejados_extras: planejamentoEmEdicao.faixa === 'EXTRA' ? minutos : undefined,
+        minutos_planejados_normais:
+          planejamentoEmEdicao.faixa === "NORMAL" ? minutos : undefined,
+        minutos_planejados_extras:
+          planejamentoEmEdicao.faixa === "EXTRA" ? minutos : undefined,
         descricao: edicaoDescricao.trim() || undefined,
-      })
+      });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['agenda'] })
-      await queryClient.invalidateQueries({ queryKey: ['capacidade'] })
-      await queryClient.invalidateQueries({ queryKey: ['agenda-prevista-multiusuario'] })
-      invalidate()
-      setPlanejamentoEmEdicao(null)
+      await queryClient.invalidateQueries({ queryKey: ["agenda"] });
+      await queryClient.invalidateQueries({ queryKey: ["capacidade"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["agenda-prevista-multiusuario"],
+      });
+      invalidate();
+      setPlanejamentoEmEdicao(null);
     },
     onError: (error) => {
       setEdicaoErrors((atual) => ({
         ...atual,
-        submit: error instanceof Error ? error.message : 'Não foi possível editar o planejamento.',
-      }))
+        submit:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível editar o planejamento.",
+      }));
     },
-  })
+  });
 
   const removerPlanejamentoMutation = useMutation({
     mutationFn: async () => {
-      if (!planejamentoEmEdicao) throw new Error('Nenhum planejamento selecionado.')
-      return removerPlanejamento(planejamentoEmEdicao.planejamentoId)
+      if (!planejamentoEmEdicao)
+        throw new Error("Nenhum planejamento selecionado.");
+      return removerPlanejamento(planejamentoEmEdicao.planejamentoId);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['agenda'] })
-      await queryClient.invalidateQueries({ queryKey: ['capacidade'] })
-      await queryClient.invalidateQueries({ queryKey: ['agenda-prevista-multiusuario'] })
-      invalidate()
-      setPlanejamentoEmEdicao(null)
+      await queryClient.invalidateQueries({ queryKey: ["agenda"] });
+      await queryClient.invalidateQueries({ queryKey: ["capacidade"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["agenda-prevista-multiusuario"],
+      });
+      invalidate();
+      setPlanejamentoEmEdicao(null);
     },
     onError: (error) => {
       setEdicaoErrors((atual) => ({
         ...atual,
-        submit: error instanceof Error ? error.message : 'Não foi possível remover o planejamento.',
-      }))
+        submit:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível remover o planejamento.",
+      }));
     },
-  })
+  });
 
   const removerPlanejamentoLoteMutation = useMutation({
     mutationFn: async () => {
-      if (selectedUsuarioIds.length === 0) throw new Error('Selecione ao menos um usuário.')
-      if (calendar.selectedDates.length === 0) throw new Error('Selecione ao menos uma data.')
+      if (selectedUsuarioIds.length === 0)
+        throw new Error("Selecione ao menos um usuário.");
+      if (calendar.selectedDates.length === 0)
+        throw new Error("Selecione ao menos uma data.");
       return removerPlanejamentoLote({
         usuario_ids: selectedUsuarioIds,
-        datas: calendar.selectedDates.map((data) => format(data, 'yyyy-MM-dd')),
-      })
+        datas: calendar.selectedDates.map((data) => format(data, "yyyy-MM-dd")),
+      });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['agenda'] })
-      await queryClient.invalidateQueries({ queryKey: ['capacidade'] })
-      await queryClient.invalidateQueries({ queryKey: ['agenda-prevista-multiusuario'] })
-      invalidate()
+      await queryClient.invalidateQueries({ queryKey: ["agenda"] });
+      await queryClient.invalidateQueries({ queryKey: ["capacidade"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["agenda-prevista-multiusuario"],
+      });
+      invalidate();
     },
     onError: (error) => {
       setErrors((atual) => ({
         ...atual,
-        submit: error instanceof Error ? error.message : 'Não foi possível remover os planejamentos selecionados.',
-      }))
+        submit:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível remover os planejamentos selecionados.",
+      }));
     },
-  })
+  });
 
   return (
     <div className={styles.page}>
       <aside className={styles.sidebar}>
         <div className={styles.sidebarHeader}>
           <h2 className={styles.sidebarTitle}>Agenda prevista</h2>
-          <p className={styles.sidebarSubtitle}>Planejamento administrativo com leitura clara, filtros compactos e calendário sempre visível.</p>
+          <p className={styles.sidebarSubtitle}>
+            Planejamento administrativo com leitura clara, filtros compactos e
+            calendário sempre visível.
+          </p>
         </div>
 
         {ehAdmin ? (
@@ -679,7 +911,11 @@ export default function AgendaPrevista() {
             <div className={styles.sectionHeaderCompact}>
               <span className={styles.selectorLabel}>Usuários</span>
               {selectedUsuarioIds.length > 0 && (
-                <button type="button" className={styles.clearLink} onClick={limparSelecaoUsuarios}>
+                <button
+                  type="button"
+                  className={styles.clearLink}
+                  onClick={limparSelecaoUsuarios}
+                >
                   Limpar
                 </button>
               )}
@@ -692,10 +928,16 @@ export default function AgendaPrevista() {
               aria-expanded={usuariosOpen}
             >
               <div className={styles.userDropdownTriggerText}>
-                <span className={styles.userDropdownTitle}>{resumoUsuariosSelecionados()}</span>
-                <span className={styles.userDropdownHint}>Selecione por checkbox dentro do dropdown</span>
+                <span className={styles.userDropdownTitle}>
+                  {resumoUsuariosSelecionados()}
+                </span>
+                <span className={styles.userDropdownHint}>
+                  Selecione por checkbox dentro do dropdown
+                </span>
               </div>
-              <span className={styles.userDropdownMeta}>{selectedUsuarioIds.length}</span>
+              <span className={styles.userDropdownMeta}>
+                {selectedUsuarioIds.length}
+              </span>
             </button>
 
             {usuariosOpen && (
@@ -708,29 +950,42 @@ export default function AgendaPrevista() {
                 />
                 <div className={styles.userDropdownList}>
                   {loadingUsuarios ? (
-                    <div className={styles.userDropdownLoading}>Carregando usuários...</div>
+                    <div className={styles.userDropdownLoading}>
+                      Carregando usuários...
+                    </div>
                   ) : usuariosFiltrados.length === 0 ? (
-                    <div className={styles.userDropdownLoading}>Nenhum usuário encontrado.</div>
+                    <div className={styles.userDropdownLoading}>
+                      Nenhum usuário encontrado.
+                    </div>
                   ) : (
                     usuariosFiltrados.map((item) => {
-                      const nomeCurto = obterNomeUsuario(item)
-                      const nomeCompleto = item.nome.trim()
-                      const selecionado = selectedUsuarioIds.includes(item.id)
+                      const nomeCurto = obterNomeUsuario(item);
+                      const nomeCompleto = item.nome.trim();
+                      const selecionado = selectedUsuarioIds.includes(item.id);
                       return (
-                        <label key={item.id} className={`${styles.userOption} ${selecionado ? styles.userOptionSelected : ''}`}>
+                        <label
+                          key={item.id}
+                          className={`${styles.userOption} ${selecionado ? styles.userOptionSelected : ""}`}
+                        >
                           <input
                             type="checkbox"
                             checked={selecionado}
                             onChange={() => alternarUsuario(item.id)}
                           />
                           <div className={styles.userOptionTextWrap}>
-                            <span className={styles.userOptionText}>{nomeCurto}</span>
-                            {nomeCompleto && nomeCompleto.toLowerCase() !== nomeCurto.toLowerCase() && (
-                              <span className={styles.userOptionSubtext}>{nomeCompleto}</span>
-                            )}
+                            <span className={styles.userOptionText}>
+                              {nomeCurto}
+                            </span>
+                            {nomeCompleto &&
+                              nomeCompleto.toLowerCase() !==
+                                nomeCurto.toLowerCase() && (
+                                <span className={styles.userOptionSubtext}>
+                                  {nomeCompleto}
+                                </span>
+                              )}
                           </div>
                         </label>
-                      )
+                      );
                     })
                   )}
                 </div>
@@ -740,7 +995,9 @@ export default function AgendaPrevista() {
             {usuariosSelecionados.length > 0 && (
               <div className={styles.selectedUsersPreview}>
                 {usuariosSelecionados.map((item) => (
-                  <span key={item.id} className={styles.userChip}>{obterNomeUsuario(item)}</span>
+                  <span key={item.id} className={styles.userChip}>
+                    {obterNomeUsuario(item)}
+                  </span>
                 ))}
               </div>
             )}
@@ -748,7 +1005,9 @@ export default function AgendaPrevista() {
         ) : (
           <div className={styles.userViewer}>
             <span className={styles.selectorLabel}>Usuário</span>
-            <div className={styles.userViewerCard}>{usuario?.nome_guerra || usuario?.nome || 'Usuário atual'}</div>
+            <div className={styles.userViewerCard}>
+              {usuario?.nome_guerra || usuario?.nome || "Usuário atual"}
+            </div>
           </div>
         )}
 
@@ -762,24 +1021,147 @@ export default function AgendaPrevista() {
             </>
           ) : (
             <>
-              <Card padding="sm"><StatCard label="Previsto normal" value={resumoPeriodo?.minutos_previstos_normais ?? 0} suffix="min" variant="default" size="sm" /></Card>
-              <Card padding="sm"><StatCard label="Realizado em bloco" value={resumoPeriodo?.minutos_realizados_bloco_normais ?? 0} suffix="min" variant="accent" size="sm" /></Card>
-              <Card padding="sm"><StatCard label="Horas extras" value={resumoPeriodo?.minutos_extras_totais ?? 0} suffix="min" variant="warning" size="sm" /></Card>
-              <Card padding="sm"><StatCard label="Capacidade diária" value={formatarHorasMinutos(capacidadePadraoMinutos)} variant="default" size="sm" /></Card>
+              <Card padding="sm">
+                <StatCard
+                  label="Previsto normal"
+                  value={resumoPeriodo?.minutos_previstos_normais ?? 0}
+                  suffix="min"
+                  variant="default"
+                  size="sm"
+                />
+              </Card>
+              <Card padding="sm">
+                <StatCard
+                  label="Realizado em bloco"
+                  value={resumoPeriodo?.minutos_realizados_bloco_normais ?? 0}
+                  suffix="min"
+                  variant="accent"
+                  size="sm"
+                />
+              </Card>
+              <Card padding="sm">
+                <StatCard
+                  label="Horas extras"
+                  value={resumoPeriodo?.minutos_extras_totais ?? 0}
+                  suffix="min"
+                  variant="warning"
+                  size="sm"
+                />
+              </Card>
+              <Card padding="sm">
+                <StatCard
+                  label="Capacidade diária"
+                  value={formatarHorasMinutos(capacidadePadraoMinutos)}
+                  variant="default"
+                  size="sm"
+                />
+              </Card>
             </>
           )}
         </div>
 
         <div className={styles.legend}>
-          <h4 className={styles.legendTitle}>Contexto exibido</h4>
-          <div className={styles.legendItems}>
-            <div className={styles.legendItem}><span className={`${styles.legendColor} ${styles.legendColorNormal}`} /><span>Capacidade normal</span></div>
-            <div className={styles.legendItem}><span className={`${styles.legendColor} ${styles.legendColorExtra}`} /><span>Hora extra</span></div>
-            <div className={styles.legendItem}><span className={`${styles.legendColor} ${styles.legendColorConsolidado}`} /><span>Consolidado</span></div>
-            <div className={styles.legendItem}><span className={`${styles.legendColor} ${styles.legendColorFeriado}`} /><span>Feriado</span></div>
+          <div className={styles.legendHeader}>
+            <div>
+              <h4 className={styles.legendTitle}>Contexto exibido</h4>
+              <p className={styles.legendSubtitle}>
+                A agenda combina capacidade do dia com a paleta real das
+                atividades configuradas pelo administrador.
+              </p>
+            </div>
+            <span className={styles.legendBadge}>
+              {tiposAtividade.length} atividades
+            </span>
           </div>
+
+          <div className={styles.activityPaletteSection}>
+            <div className={styles.activityPaletteHeader}>
+              <span className={styles.activityPaletteTitle}>
+                Cores das atividades
+              </span>
+              <span className={styles.activityPaletteMeta}>
+                Legenda operacional
+              </span>
+            </div>
+
+            {loadingTipos ? (
+              <div className={styles.activityPaletteEmpty}>
+                Carregando atividades configuradas...
+              </div>
+            ) : tiposAtividade.length === 0 ? (
+              <div className={styles.activityPaletteEmpty}>
+                Nenhuma atividade configurada encontrada.
+              </div>
+            ) : (
+              <>
+                {tiposAtividadePorGrupo.blocos.length > 0 && (
+                  <div className={styles.activityPaletteGroup}>
+                    <div className={styles.activityPaletteGroupTitle}>
+                      Blocos de produção
+                    </div>
+                    <div className={styles.activityPaletteGrid}>
+                      {tiposAtividadePorGrupo.blocos.map((tipo) => (
+                        <article
+                          key={tipo.id}
+                          className={styles.activityPaletteCard}
+                        >
+                          <span
+                            className={styles.activityPaletteSwatch}
+                            style={{ background: normalizarCorHex(tipo.cor) }}
+                          />
+                          <div className={styles.activityPaletteContent}>
+                            <span className={styles.activityPaletteName}>
+                              {tipo.nome}
+                            </span>
+                            <span className={styles.activityPaletteDescription}>
+                              {obterDescricaoOrigemTipo(tipo)}
+                            </span>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {tiposAtividadePorGrupo.tipos.length > 0 && (
+                  <div className={styles.activityPaletteGroup}>
+                    <div className={styles.activityPaletteGroupTitle}>
+                      Demais atividades selecionáveis
+                    </div>
+                    <div className={styles.activityPaletteGrid}>
+                      {tiposAtividadePorGrupo.tipos.map((tipo) => (
+                        <article
+                          key={tipo.id}
+                          className={styles.activityPaletteCard}
+                        >
+                          <span
+                            className={styles.activityPaletteSwatch}
+                            style={{ background: normalizarCorHex(tipo.cor) }}
+                          />
+                          <div className={styles.activityPaletteContent}>
+                            <span className={styles.activityPaletteName}>
+                              {tipo.nome}
+                            </span>
+                            <span className={styles.activityPaletteDescription}>
+                              {obterDescricaoOrigemTipo(tipo)}
+                            </span>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
           {ehAdmin && usuarioPrincipal && (
-            <p className={styles.renderHint}>Passe o mouse sobre um dia para ver a carga de cada usuário selecionado. Ao clicar, a lateral mostra os lançamentos acumulados do dia e as ações só aparecem quando você abre uma atividade específica.</p>
+            <p className={styles.renderHint}>
+              Passe o mouse sobre um dia para ver a carga de cada usuário
+              selecionado. Ao clicar, a lateral mostra os lançamentos acumulados
+              do dia e as ações só aparecem quando você abre uma atividade
+              específica.
+            </p>
           )}
         </div>
       </aside>
@@ -788,15 +1170,20 @@ export default function AgendaPrevista() {
         <div className={styles.topActionsBar}>
           <div>
             <h3 className={styles.topActionsTitle}>Planejamento do período</h3>
-            <p className={styles.topActionsSubtitle}>Novos lançamentos são somados ao que já existe. Em horário normal, o sistema limita a carga diária a 6 horas por usuário.</p>
+            <p className={styles.topActionsSubtitle}>
+              Novos lançamentos são somados ao que já existe. Em horário normal,
+              o sistema limita a carga diária a 6 horas por usuário.
+            </p>
           </div>
           {ehAdmin && (
             <div className={styles.topActionsButtons}>
               <Button
                 variant="secondary"
                 onClick={() => {
-                  setConsolidacaoOpen(true)
-                  void consolidacaoCsvMutation.mutateAsync().catch(() => undefined)
+                  setConsolidacaoOpen(true);
+                  void consolidacaoCsvMutation
+                    .mutateAsync()
+                    .catch(() => undefined);
                 }}
                 disabled={!podeConsolidar}
               >
@@ -804,13 +1191,27 @@ export default function AgendaPrevista() {
               </Button>
               <Button
                 variant="danger"
-                onClick={() => { void removerPlanejamentoLoteMutation.mutateAsync().catch(() => undefined) }}
-                disabled={!(ehAdmin && selectedUsuarioIds.length > 0 && calendar.selectedDates.length > 0)}
+                onClick={() => {
+                  void removerPlanejamentoLoteMutation
+                    .mutateAsync()
+                    .catch(() => undefined);
+                }}
+                disabled={
+                  !(
+                    ehAdmin &&
+                    selectedUsuarioIds.length > 0 &&
+                    calendar.selectedDates.length > 0
+                  )
+                }
                 loading={removerPlanejamentoLoteMutation.isPending}
               >
                 Remover selecionados
               </Button>
-              <Button variant="primary" onClick={abrirPlanejamento} disabled={!podeCriarPlanejamento}>
+              <Button
+                variant="primary"
+                onClick={abrirPlanejamento}
+                disabled={!podeCriarPlanejamento}
+              >
                 Criar planejamento
               </Button>
             </div>
@@ -818,9 +1219,20 @@ export default function AgendaPrevista() {
         </div>
 
         <div className={styles.selectionSummary}>
-          <div className={styles.selectionPill}><strong>Período</strong><span>{intervaloSelecionadoLabel}</span></div>
-          <div className={styles.selectionPill}><strong>Dias</strong><span>{quantidadeDiasResumo}</span></div>
-          {ehAdmin && <div className={styles.selectionPill}><strong>Usuários</strong><span>{selectedUsuarioIds.length || '0'}</span></div>}
+          <div className={styles.selectionPill}>
+            <strong>Período</strong>
+            <span>{intervaloSelecionadoLabel}</span>
+          </div>
+          <div className={styles.selectionPill}>
+            <strong>Dias</strong>
+            <span>{quantidadeDiasResumo}</span>
+          </div>
+          {ehAdmin && (
+            <div className={styles.selectionPill}>
+              <strong>Usuários</strong>
+              <span>{selectedUsuarioIds.length || "0"}</span>
+            </div>
+          )}
         </div>
 
         <CalendarHeader
@@ -836,7 +1248,9 @@ export default function AgendaPrevista() {
         <div className={styles.calendarWorkspace}>
           <div className={styles.calendarContainer}>
             {isError ? (
-              <div className={styles.errorState}><p>Erro ao carregar dados da agenda.</p></div>
+              <div className={styles.errorState}>
+                <p>Erro ao carregar dados da agenda.</p>
+              </div>
             ) : (
               <CalendarGrid
                 days={calendar.calendarDays}
@@ -844,17 +1258,21 @@ export default function AgendaPrevista() {
                 view={calendar.view}
                 getDiaData={getDiaData}
                 getHoverUsuarios={(date) => conteudoTooltipPorDia.get(date)}
-                getCapacityDisplay={(date) => capacidadeVisualPorDia.get(format(date, 'yyyy-MM-dd')) ?? null}
+                getCapacityDisplay={(date) =>
+                  capacidadeVisualPorDia.get(format(date, "yyyy-MM-dd")) ?? null
+                }
                 selectedDates={calendar.selectedDates}
                 onSelectDate={calendar.selectDate}
                 onSelectRange={calendar.selectRange}
                 onDayClick={(date) => {
-                  calendar.selectDate(date)
-                  setDiaDetalheSelecionado(date)
+                  calendar.selectDate(date);
+                  setDiaDetalheSelecionado(date);
                 }}
                 isAdmin={ehAdmin}
                 loading={isLoading || agendasMultiplosUsuariosQuery.isLoading}
-                exibirIndicadorOcioso={!ehAdmin || selectedUsuarioIds.length > 0}
+                exibirIndicadorOcioso={
+                  !ehAdmin || selectedUsuarioIds.length > 0
+                }
               />
             )}
           </div>
@@ -863,127 +1281,234 @@ export default function AgendaPrevista() {
             <div className={styles.dayDetailsHeader}>
               <span className={styles.selectorLabel}>Detalhe do dia</span>
               <h4 className={styles.dayDetailsTitle}>
-                {diaDetalheSelecionado ? format(diaDetalheSelecionado, 'dd/MM/yyyy') : 'Selecione um dia'}
+                {diaDetalheSelecionado
+                  ? format(diaDetalheSelecionado, "dd/MM/yyyy")
+                  : "Selecione um dia"}
               </h4>
               <p className={styles.dayDetailsSubtitle}>
                 {diaDetalheSelecionado
-                  ? 'Usuários, atividades e tempo alocado para o dia selecionado.'
-                  : 'Clique em uma célula da agenda para abrir o detalhamento na lateral.'}
+                  ? "Usuários, atividades e tempo alocado para o dia selecionado."
+                  : "Clique em uma célula da agenda para abrir o detalhamento na lateral."}
               </p>
             </div>
 
             {diaDetalheSelecionado ? (
               <div className={styles.dayDetailsContent}>
-                {detalhesDiaSelecionado.length > 0 ? detalhesDiaSelecionado.map((detalheUsuario) => {
-                  const percentual = detalheUsuario.capacidadeMaxima > 0
-                    ? Math.min(100, (detalheUsuario.minutosPlanejados / detalheUsuario.capacidadeMaxima) * 100)
-                    : 0
-                  return (
-                    <section key={`${detalheUsuario.usuarioId}-${dataDetalheSelecionadoChave}`} className={styles.dayUserCard}>
-                      <div className={styles.dayUserHeader}>
-                        <div>
-                          <h5 className={styles.dayUserName}>{detalheUsuario.nome}</h5>
-                          <p className={styles.dayUserMeta}>
-                            {formatarHorasMinutos(detalheUsuario.minutosPlanejados)} alocados de {formatarHorasMinutos(detalheUsuario.capacidadeMaxima)}
-                          </p>
+                {detalhesDiaSelecionado.length > 0 ? (
+                  detalhesDiaSelecionado.map((detalheUsuario) => {
+                    const percentual =
+                      detalheUsuario.capacidadeMaxima > 0
+                        ? Math.min(
+                            100,
+                            (detalheUsuario.minutosPlanejados /
+                              detalheUsuario.capacidadeMaxima) *
+                              100,
+                          )
+                        : 0;
+                    return (
+                      <section
+                        key={`${detalheUsuario.usuarioId}-${dataDetalheSelecionadoChave}`}
+                        className={styles.dayUserCard}
+                      >
+                        <div className={styles.dayUserHeader}>
+                          <div>
+                            <h5 className={styles.dayUserName}>
+                              {detalheUsuario.nome}
+                            </h5>
+                            <p className={styles.dayUserMeta}>
+                              {formatarHorasMinutos(
+                                detalheUsuario.minutosPlanejados,
+                              )}{" "}
+                              alocados de{" "}
+                              {formatarHorasMinutos(
+                                detalheUsuario.capacidadeMaxima,
+                              )}
+                            </p>
+                          </div>
+                          <span className={styles.dayUserTotal}>
+                            {formatarHorasMinutos(
+                              detalheUsuario.minutosPlanejados,
+                            )}
+                          </span>
                         </div>
-                        <span className={styles.dayUserTotal}>{formatarHorasMinutos(detalheUsuario.minutosPlanejados)}</span>
-                      </div>
 
-                      <div className={styles.dayUserBarTrack}>
-                        {calcularSegmentosPercentuais(detalheUsuario.segmentos, detalheUsuario.capacidadeMaxima).map((segmento, index) => (
-                          <div
-                            key={`${detalheUsuario.usuarioId}-${index}-${segmento.cor}`}
-                            className={styles.dayUserBarFill}
-                            style={{ width: `${segmento.percentual ?? 0}%`, background: segmento.cor }}
-                          />
-                        ))}
-                        {percentual === 0 && <div className={styles.dayUserBarFill} style={{ width: '0%' }} />}
-                      </div>
+                        <div className={styles.dayUserBarTrack}>
+                          {calcularSegmentosPercentuais(
+                            detalheUsuario.segmentos,
+                            detalheUsuario.capacidadeMaxima,
+                          ).map((segmento, index) => (
+                            <div
+                              key={`${detalheUsuario.usuarioId}-${index}-${segmento.cor}`}
+                              className={styles.dayUserBarFill}
+                              style={{
+                                width: `${segmento.percentual ?? 0}%`,
+                                background: segmento.cor,
+                              }}
+                            />
+                          ))}
+                          {percentual === 0 && (
+                            <div
+                              className={styles.dayUserBarFill}
+                              style={{ width: "0%" }}
+                            />
+                          )}
+                        </div>
 
-                      <div className={styles.dayUserMetricsRow}>
-                        <span className={styles.dayMetricPill}>Normal: {formatarHorasMinutos(detalheUsuario.minutosNormaisPlanejados)}</span>
-                        <span className={styles.dayMetricPill}>Extra: {formatarHorasMinutos(detalheUsuario.minutosExtrasPlanejados)}</span>
-                      </div>
+                        <div className={styles.dayUserMetricsRow}>
+                          <span className={styles.dayMetricPill}>
+                            Normal:{" "}
+                            {formatarHorasMinutos(
+                              detalheUsuario.minutosNormaisPlanejados,
+                            )}
+                          </span>
+                          <span className={styles.dayMetricPill}>
+                            Extra:{" "}
+                            {formatarHorasMinutos(
+                              detalheUsuario.minutosExtrasPlanejados,
+                            )}
+                          </span>
+                        </div>
 
-                      <div className={styles.dayActivitiesList}>
-                        {detalheUsuario.atividades.length > 0 ? detalheUsuario.atividades.map((atividade) => (
-                          <article
-                            key={`${atividade.planejamentoId}-${atividade.faixa}`}
-                            className={`${styles.dayActivityItem} ${ehAdmin ? styles.dayActivityItemInteractive : ''}`}
-                            onClick={ehAdmin ? () => abrirEdicaoAtividade(atividade, detalheUsuario) : undefined}
-                          >
-                            <div>
-                              <div className={styles.dayActivityTitle}><span className={styles.dayActivityColorDot} style={{ background: atividade.cor }} />{atividade.descricao}</div>
-                              <div className={styles.dayActivityMeta}>
-                                {atividade.faixa === 'NORMAL' ? 'Normal' : 'Hora extra'} · {formatarHorasMinutos(atividade.minutos)}
-                              </div>
+                        <div className={styles.dayActivitiesList}>
+                          {detalheUsuario.atividades.length > 0 ? (
+                            detalheUsuario.atividades.map((atividade) => (
+                              <article
+                                key={`${atividade.planejamentoId}-${atividade.faixa}`}
+                                className={`${styles.dayActivityItem} ${ehAdmin ? styles.dayActivityItemInteractive : ""}`}
+                                onClick={
+                                  ehAdmin
+                                    ? () =>
+                                        abrirEdicaoAtividade(
+                                          atividade,
+                                          detalheUsuario,
+                                        )
+                                    : undefined
+                                }
+                              >
+                                <div>
+                                  <div className={styles.dayActivityTitle}>
+                                    <span
+                                      className={styles.dayActivityColorDot}
+                                      style={{ background: atividade.cor }}
+                                    />
+                                    {atividade.descricao}
+                                  </div>
+                                  <div className={styles.dayActivityMeta}>
+                                    {atividade.faixa === "NORMAL"
+                                      ? "Normal"
+                                      : "Hora extra"}{" "}
+                                    · {formatarHorasMinutos(atividade.minutos)}
+                                  </div>
+                                </div>
+                                {ehAdmin && (
+                                  <span className={styles.dayActivityAction}>
+                                    Editar
+                                  </span>
+                                )}
+                              </article>
+                            ))
+                          ) : (
+                            <div className={styles.dayEmptyState}>
+                              Nenhuma atividade planejada.
                             </div>
-                            {ehAdmin && <span className={styles.dayActivityAction}>Editar</span>}
-                          </article>
-                        )) : (
-                          <div className={styles.dayEmptyState}>Nenhuma atividade planejada.</div>
-                        )}
-                      </div>
-                    </section>
-                  )
-                }) : (
-                  <div className={styles.dayDetailsEmpty}>Nenhum dado encontrado para o dia selecionado.</div>
+                          )}
+                        </div>
+                      </section>
+                    );
+                  })
+                ) : (
+                  <div className={styles.dayDetailsEmpty}>
+                    Nenhum dado encontrado para o dia selecionado.
+                  </div>
                 )}
               </div>
             ) : (
-              <div className={styles.dayDetailsEmpty}>Nenhum dia selecionado ainda.</div>
+              <div className={styles.dayDetailsEmpty}>
+                Nenhum dia selecionado ainda.
+              </div>
             )}
           </aside>
         </div>
       </main>
 
-      <Modal open={planejamentoOpen} onClose={() => setPlanejamentoOpen(false)} title="Criar planejamento" size="xl">
-        <form className={styles.planejamentoForm} onSubmit={(evento) => { evento.preventDefault(); criarPlanejamentoMutation.mutate() }}>
+      <Modal
+        open={planejamentoOpen}
+        onClose={() => setPlanejamentoOpen(false)}
+        title="Criar planejamento"
+        size="xl"
+      >
+        <form
+          className={styles.planejamentoForm}
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            criarPlanejamentoMutation.mutate();
+          }}
+        >
           <section className={styles.modalSection}>
             <div className={styles.modalSectionHeader}>
               <h4 className={styles.modalSectionTitle}>Resumo do lançamento</h4>
-              <p className={styles.modalSectionSubtitle}>Cada novo lançamento será somado ao que já existe no dia. Horário normal respeita o teto diário de 6 horas.</p>
+              <p className={styles.modalSectionSubtitle}>
+                Cada novo lançamento será somado ao que já existe no dia.
+                Horário normal respeita o teto diário de 6 horas.
+              </p>
             </div>
 
             <div className={styles.infoGrid}>
               <div className={styles.infoCard}>
                 <span className={styles.infoLabel}>Período selecionado</span>
                 <strong>{intervaloSelecionadoLabel}</strong>
-                <span className={styles.infoDetail}>Seleção atual do calendário</span>
+                <span className={styles.infoDetail}>
+                  Seleção atual do calendário
+                </span>
               </div>
               <div className={styles.infoCard}>
                 <span className={styles.infoLabel}>Dias</span>
                 <strong>{quantidadeDiasResumo}</strong>
-                <span className={styles.infoDetail}>Aceita lançamento em apenas um dia</span>
+                <span className={styles.infoDetail}>
+                  Aceita lançamento em apenas um dia
+                </span>
               </div>
               <div className={styles.infoCard}>
                 <span className={styles.infoLabel}>Usuários</span>
                 <strong>{selectedUsuarioIds.length}</strong>
-                <span className={styles.infoDetail}>Aplicação simultânea para todos os selecionados</span>
+                <span className={styles.infoDetail}>
+                  Aplicação simultânea para todos os selecionados
+                </span>
               </div>
               <div className={styles.infoCard}>
                 <span className={styles.infoLabel}>Carga por dia</span>
                 <strong>{cargaPlanejadaLabel}</strong>
-                <span className={styles.infoDetail}>Capacidade padrão: {formatarHorasMinutos(capacidadePadraoMinutos)}</span>
+                <span className={styles.infoDetail}>
+                  Capacidade padrão:{" "}
+                  {formatarHorasMinutos(capacidadePadraoMinutos)}
+                </span>
               </div>
             </div>
 
             <div className={styles.chipsWrap}>
               {usuariosSelecionados.length > 0 ? (
                 usuariosSelecionados.map((item) => (
-                  <span key={item.id} className={styles.userChip}>{obterNomeUsuario(item)}</span>
+                  <span key={item.id} className={styles.userChip}>
+                    {obterNomeUsuario(item)}
+                  </span>
                 ))
               ) : (
-                <span className={styles.emptyHint}>Nenhum usuário selecionado.</span>
+                <span className={styles.emptyHint}>
+                  Nenhum usuário selecionado.
+                </span>
               )}
             </div>
           </section>
 
           <section className={styles.modalSection}>
             <div className={styles.modalSectionHeader}>
-              <h4 className={styles.modalSectionTitle}>Configuração da atividade</h4>
-              <p className={styles.modalSectionSubtitle}>Defina tipo, faixa de horário e quantidade de tempo com alinhamento consistente.</p>
+              <h4 className={styles.modalSectionTitle}>
+                Configuração da atividade
+              </h4>
+              <p className={styles.modalSectionSubtitle}>
+                Defina tipo, faixa de horário e quantidade de tempo com
+                alinhamento consistente.
+              </p>
             </div>
 
             <div className={styles.formGrid}>
@@ -991,29 +1516,56 @@ export default function AgendaPrevista() {
                 <label className={styles.formLabel}>Tipo de atividade</label>
                 <Select
                   value={form.tipoAtividadeId}
-                  onChange={(valor) => setForm((atual) => ({ ...atual, tipoAtividadeId: valor }))}
-                  options={tiposAtividade.map((tipo) => ({ value: String(tipo.id), label: tipo.nome }))}
-                  placeholder={loadingTipos ? 'Carregando...' : 'Selecione'}
+                  onChange={(valor) =>
+                    setForm((atual) => ({ ...atual, tipoAtividadeId: valor }))
+                  }
+                  options={tiposAtividade.map((tipo) => ({
+                    value: String(tipo.id),
+                    label: tipo.nome,
+                  }))}
+                  placeholder={loadingTipos ? "Carregando..." : "Selecione"}
                 />
-                {errors.tipoAtividadeId && <span className={styles.formError}>{errors.tipoAtividadeId}</span>}
+                {errors.tipoAtividadeId && (
+                  <span className={styles.formError}>
+                    {errors.tipoAtividadeId}
+                  </span>
+                )}
               </div>
 
               <div className={styles.formField}>
                 <label className={styles.formLabel}>Tipo de horário</label>
                 <Select
                   value={form.tipoHorario}
-                  onChange={(valor) => setForm((atual) => ({ ...atual, tipoHorario: valor as 'NORMAL' | 'EXTRA' }))}
-                  options={[{ value: 'NORMAL', label: 'Normal' }, { value: 'EXTRA', label: 'Hora extra' }]}
+                  onChange={(valor) =>
+                    setForm((atual) => ({
+                      ...atual,
+                      tipoHorario: valor as "NORMAL" | "EXTRA",
+                    }))
+                  }
+                  options={[
+                    { value: "NORMAL", label: "Normal" },
+                    { value: "EXTRA", label: "Hora extra" },
+                  ]}
                 />
-                {errors.tipoHorario && <span className={styles.formError}>{errors.tipoHorario}</span>}
+                {errors.tipoHorario && (
+                  <span className={styles.formError}>{errors.tipoHorario}</span>
+                )}
               </div>
 
               <div className={styles.formField}>
                 <label className={styles.formLabel}>Unidade do tempo</label>
                 <Select
                   value={form.unidadeTempo}
-                  onChange={(valor) => setForm((atual) => ({ ...atual, unidadeTempo: valor as 'HORAS' | 'MINUTOS' }))}
-                  options={[{ value: 'HORAS', label: 'Horas' }, { value: 'MINUTOS', label: 'Minutos' }]}
+                  onChange={(valor) =>
+                    setForm((atual) => ({
+                      ...atual,
+                      unidadeTempo: valor as "HORAS" | "MINUTOS",
+                    }))
+                  }
+                  options={[
+                    { value: "HORAS", label: "Horas" },
+                    { value: "MINUTOS", label: "Minutos" },
+                  ]}
                 />
               </div>
 
@@ -1024,7 +1576,12 @@ export default function AgendaPrevista() {
                   min="1"
                   step="1"
                   value={form.quantidade}
-                  onChange={(evento) => setForm((atual) => ({ ...atual, quantidade: evento.target.value }))}
+                  onChange={(evento) =>
+                    setForm((atual) => ({
+                      ...atual,
+                      quantidade: evento.target.value,
+                    }))
+                  }
                   error={errors.quantidade}
                 />
               </div>
@@ -1034,31 +1591,64 @@ export default function AgendaPrevista() {
           <section className={styles.modalSection}>
             <div className={styles.modalSectionHeader}>
               <h4 className={styles.modalSectionTitle}>Descrição</h4>
-              <p className={styles.modalSectionSubtitle}>Use este campo para dar contexto ao planejamento e facilitar a leitura futura.</p>
+              <p className={styles.modalSectionSubtitle}>
+                Use este campo para dar contexto ao planejamento e facilitar a
+                leitura futura.
+              </p>
             </div>
             <Textarea
               label="Descrição opcional"
               rows={5}
               value={form.descricao}
-              onChange={(evento) => setForm((atual) => ({ ...atual, descricao: evento.target.value }))}
+              onChange={(evento) =>
+                setForm((atual) => ({
+                  ...atual,
+                  descricao: evento.target.value,
+                }))
+              }
               placeholder="Ex.: apoio ao processamento, afastamento, treinamento interno, atividade administrativa"
             />
           </section>
 
           {(errors.submit || errors.usuarios || errors.periodo) && (
-            <div className={styles.submitError}>{errors.submit || errors.usuarios || errors.periodo}</div>
+            <div className={styles.submitError}>
+              {errors.submit || errors.usuarios || errors.periodo}
+            </div>
           )}
 
           <Modal.Footer>
-            <Button type="button" variant="ghost" onClick={() => setPlanejamentoOpen(false)}>Cancelar</Button>
-            <Button type="submit" variant="primary" loading={criarPlanejamentoMutation.isPending}>Criar lançamento</Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setPlanejamentoOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={criarPlanejamentoMutation.isPending}
+            >
+              Criar lançamento
+            </Button>
           </Modal.Footer>
         </form>
       </Modal>
 
-      <Modal open={!!planejamentoEmEdicao} onClose={() => setPlanejamentoEmEdicao(null)} title="Gerenciar atividade planejada" size="md">
+      <Modal
+        open={!!planejamentoEmEdicao}
+        onClose={() => setPlanejamentoEmEdicao(null)}
+        title="Gerenciar atividade planejada"
+        size="md"
+      >
         {planejamentoEmEdicao && (
-          <form className={styles.activityManageForm} onSubmit={(evento) => { evento.preventDefault(); editarPlanejamentoMutation.mutate() }}>
+          <form
+            className={styles.activityManageForm}
+            onSubmit={(evento) => {
+              evento.preventDefault();
+              editarPlanejamentoMutation.mutate();
+            }}
+          >
             <div className={styles.activityManageSummary}>
               <div className={styles.activityManageCard}>
                 <span className={styles.infoLabel}>Usuário</span>
@@ -1066,15 +1656,26 @@ export default function AgendaPrevista() {
               </div>
               <div className={styles.activityManageCard}>
                 <span className={styles.infoLabel}>Data</span>
-                <strong>{format(new Date(`${planejamentoEmEdicao.data}T00:00:00`), 'dd/MM/yyyy')}</strong>
+                <strong>
+                  {format(
+                    new Date(`${planejamentoEmEdicao.data}T00:00:00`),
+                    "dd/MM/yyyy",
+                  )}
+                </strong>
               </div>
               <div className={styles.activityManageCard}>
                 <span className={styles.infoLabel}>Faixa</span>
-                <strong>{planejamentoEmEdicao.faixa === 'NORMAL' ? 'Normal' : 'Hora extra'}</strong>
+                <strong>
+                  {planejamentoEmEdicao.faixa === "NORMAL"
+                    ? "Normal"
+                    : "Hora extra"}
+                </strong>
               </div>
               <div className={styles.activityManageCard}>
                 <span className={styles.infoLabel}>Teto normal</span>
-                <strong>{formatarHorasMinutos(planejamentoEmEdicao.capacidadeMaxima)}</strong>
+                <strong>
+                  {formatarHorasMinutos(planejamentoEmEdicao.capacidadeMaxima)}
+                </strong>
               </div>
             </div>
 
@@ -1088,7 +1689,10 @@ export default function AgendaPrevista() {
                 onChange={(evento) => setEdicaoMinutos(evento.target.value)}
                 error={edicaoErrors.minutos}
               />
-              <p className={styles.inlineHint}>Ao editar ou remover, o backend deve versionar o registro antigo como inativo e manter o histórico.</p>
+              <p className={styles.inlineHint}>
+                Ao editar ou remover, o backend deve versionar o registro antigo
+                como inativo e manter o histórico.
+              </p>
             </div>
 
             <div className={styles.formField}>
@@ -1100,7 +1704,9 @@ export default function AgendaPrevista() {
               />
             </div>
 
-            {edicaoErrors.submit && <div className={styles.submitError}>{edicaoErrors.submit}</div>}
+            {edicaoErrors.submit && (
+              <div className={styles.submitError}>{edicaoErrors.submit}</div>
+            )}
 
             <Modal.Footer>
               <Button
@@ -1112,8 +1718,20 @@ export default function AgendaPrevista() {
                 Remover
               </Button>
               <div className={styles.modalSpacer} />
-              <Button type="button" variant="ghost" onClick={() => setPlanejamentoEmEdicao(null)}>Cancelar</Button>
-              <Button type="submit" variant="primary" loading={editarPlanejamentoMutation.isPending}>Salvar edição</Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setPlanejamentoEmEdicao(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                loading={editarPlanejamentoMutation.isPending}
+              >
+                Salvar edição
+              </Button>
             </Modal.Footer>
           </form>
         )}
@@ -1126,5 +1744,5 @@ export default function AgendaPrevista() {
         usuarioIds={selectedUsuarioIds}
       />
     </div>
-  )
+  );
 }

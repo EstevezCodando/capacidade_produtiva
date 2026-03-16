@@ -27,6 +27,11 @@ interface CapacityDisplay {
   segmentos: SegmentoBarra[]
 }
 
+interface OciosoDisplay {
+  minutos: number
+  ativo: boolean
+}
+
 interface CalendarGridProps {
   days: CalendarDay[]
   weekDays: { short: string; full: string }[]
@@ -34,6 +39,7 @@ interface CalendarGridProps {
   getDiaData: (date: Date) => DiaDaAgenda | undefined
   getHoverUsuarios?: (date: Date) => HoverUsuarioResumo[]
   getCapacityDisplay?: (date: Date) => CapacityDisplay | null
+  getOciosoDisplay?: (date: Date) => OciosoDisplay | null
   selectedDates: Date[]
   onSelectDate: (date: Date, addToSelection?: boolean) => void
   onSelectRange: (start: Date, end: Date) => void
@@ -50,6 +56,7 @@ export default function CalendarGrid({
   getDiaData,
   getHoverUsuarios,
   getCapacityDisplay,
+  getOciosoDisplay,
   selectedDates,
   onSelectDate,
   onSelectRange,
@@ -133,6 +140,7 @@ export default function CalendarGrid({
               diaData={diaData}
               hoverUsuarios={getHoverUsuarios?.(calDay.date) ?? []}
               capacityDisplay={getCapacityDisplay?.(calDay.date) ?? null}
+              ociosoDisplay={getOciosoDisplay?.(calDay.date) ?? null}
               isSelected={selected}
               isInDragRange={inDragRange}
               isAdmin={isAdmin}
