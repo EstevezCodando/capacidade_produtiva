@@ -7,11 +7,24 @@ import type { CalendarDay, DiaDaAgenda, CalendarView } from '@/types/agenda'
 import DayCell from './DayCell'
 import styles from './Calendar.module.css'
 
+interface SegmentoBarra {
+  cor: string
+  percentual: number
+  minutos: number
+}
+
 interface HoverUsuarioResumo {
   usuarioId: number
   nome: string
   minutosPlanejados: number
   capacidadeMaxima: number
+  segmentos?: SegmentoBarra[]
+}
+
+interface CapacityDisplay {
+  totalMinutos: number
+  totalExtraMinutos?: number
+  segmentos: SegmentoBarra[]
 }
 
 interface CalendarGridProps {
@@ -20,6 +33,7 @@ interface CalendarGridProps {
   view: CalendarView
   getDiaData: (date: Date) => DiaDaAgenda | undefined
   getHoverUsuarios?: (date: Date) => HoverUsuarioResumo[]
+  getCapacityDisplay?: (date: Date) => CapacityDisplay | null
   selectedDates: Date[]
   onSelectDate: (date: Date, addToSelection?: boolean) => void
   onSelectRange: (start: Date, end: Date) => void
@@ -35,6 +49,7 @@ export default function CalendarGrid({
   view,
   getDiaData,
   getHoverUsuarios,
+  getCapacityDisplay,
   selectedDates,
   onSelectDate,
   onSelectRange,
@@ -117,6 +132,7 @@ export default function CalendarGrid({
               calendarDay={calDay}
               diaData={diaData}
               hoverUsuarios={getHoverUsuarios?.(calDay.date) ?? []}
+              capacityDisplay={getCapacityDisplay?.(calDay.date) ?? null}
               isSelected={selected}
               isInDragRange={inDragRange}
               isAdmin={isAdmin}

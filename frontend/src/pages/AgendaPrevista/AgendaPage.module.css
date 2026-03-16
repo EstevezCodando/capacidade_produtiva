@@ -646,8 +646,6 @@
 
 .dayUserBarFill {
   height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #34d399 0%, #4fded0 100%);
 }
 
 .dayActivitiesList {
@@ -667,10 +665,21 @@
 }
 
 .dayActivityTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: #eef4ff;
   font-size: 14px;
   font-weight: 600;
   line-height: 1.45;
+}
+
+.dayActivityColorDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
 }
 
 .dayActivityMeta {

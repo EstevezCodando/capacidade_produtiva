@@ -30,6 +30,12 @@ interface FormularioPlanejamento {
   descricao: string
 }
 
+interface SegmentoBarraDia {
+  cor: string
+  minutos: number
+  percentual?: number
+}
+
 interface AtividadeDetalheDia {
   planejamentoId: number
   usuarioId: number
@@ -37,6 +43,7 @@ interface AtividadeDetalheDia {
   descricao: string
   minutos: number
   faixa: 'NORMAL' | 'EXTRA'
+  cor: string
 }
 
 interface UsuarioResumoDia {
@@ -47,6 +54,7 @@ interface UsuarioResumoDia {
   minutosExtrasPlanejados: number
   capacidadeMaxima: number
   atividades: AtividadeDetalheDia[]
+  segmentos: SegmentoBarraDia[]
 }
 
 interface PlanejamentoEdicaoState {
@@ -90,7 +98,60 @@ function criarResumoUsuarioDia(usuarioId: number, nome: string, capacidadeMaxima
     minutosExtrasPlanejados: 0,
     capacidadeMaxima,
     atividades: [],
+    segmentos: [],
   }
+}
+
+function normalizarCorHex(cor?: string | null): string {
+  const valor = (cor ?? '').trim().toUpperCase()
+  if (/^#[0-9A-F]{6}$/.test(valor)) return valor
+  return 'var(--accent)'
+}
+
+function extrairNomeTipoDaDescricao(descricao?: string | null): string | null {
+  const texto = descricao?.trim()
+  if (!texto) return null
+  const match = texto.match(/^\[([^\]]+)]/)
+  return match?.[1]?.trim() || null
+}
+
+function obterCorPlanejamento(
+  planejamento: { bloco_id: number | null; descricao: string | null },
+  tiposAtividade: TipoAtividade[],
+): string {
+  if (planejamento.bloco_id) {
+    const tipoBloco = tiposAtividade.find((item) => item.origem === 'BLOCO' && item.bloco_id === planejamento.bloco_id)
+    if (tipoBloco?.cor) return normalizarCorHex(tipoBloco.cor)
+  }
+
+  const nomeTipo = extrairNomeTipoDaDescricao(planejamento.descricao)
+  if (nomeTipo) {
+    const tipoDescricao = tiposAtividade.find((item) => item.nome.trim().toLowerCase() === nomeTipo.toLowerCase())
+    if (tipoDescricao?.cor) return normalizarCorHex(tipoDescricao.cor)
+  }
+
+  return 'var(--accent)'
+}
+
+function acumularSegmento(segmentos: SegmentoBarraDia[], cor: string, minutos: number) {
+  if (minutos <= 0) return
+  const corNormalizada = normalizarCorHex(cor)
+  const existente = segmentos.find((item) => item.cor === corNormalizada)
+  if (existente) {
+    existente.minutos += minutos
+    return
+  }
+  segmentos.push({ cor: corNormalizada, minutos })
+}
+
+function calcularSegmentosPercentuais(segmentos: SegmentoBarraDia[], capacidadeTotal: number): SegmentoBarraDia[] {
+  if (capacidadeTotal <= 0 || segmentos.length === 0) return []
+  return segmentos
+    .filter((segmento) => segmento.minutos > 0)
+    .map((segmento) => ({
+      ...segmento,
+      percentual: Math.min(100, (segmento.minutos / capacidadeTotal) * 100),
+    }))
 }
 
 function converterQuantidadeParaMinutos(unidadeTempo: 'HORAS' | 'MINUTOS', quantidade: number): number {
@@ -310,6 +371,8 @@ export default function AgendaPrevista() {
         resumoUsuario.capacidadeMaxima = dia.teto_normal_min || capacidadePadraoMinutos
 
         for (const planejamento of dia.planejamento) {
+          const corPlanejamento = obterCorPlanejamento(planejamento, tiposAtividade)
+
           if (planejamento.minutos_planejados_normais > 0) {
             resumoUsuario.minutosNormaisPlanejados += planejamento.minutos_planejados_normais
             resumoUsuario.atividades.push({
@@ -319,7 +382,9 @@ export default function AgendaPrevista() {
               descricao: planejamento.descricao?.trim() || 'Planejamento administrativo',
               minutos: planejamento.minutos_planejados_normais,
               faixa: 'NORMAL',
+              cor: corPlanejamento,
             })
+            acumularSegmento(resumoUsuario.segmentos, corPlanejamento, planejamento.minutos_planejados_normais)
           }
           if (planejamento.minutos_planejados_extras > 0) {
             resumoUsuario.minutosExtrasPlanejados += planejamento.minutos_planejados_extras
@@ -330,7 +395,9 @@ export default function AgendaPrevista() {
               descricao: planejamento.descricao?.trim() || 'Planejamento administrativo',
               minutos: planejamento.minutos_planejados_extras,
               faixa: 'EXTRA',
+              cor: corPlanejamento,
             })
+            acumularSegmento(resumoUsuario.segmentos, corPlanejamento, planejamento.minutos_planejados_extras)
           }
         }
 
@@ -340,7 +407,7 @@ export default function AgendaPrevista() {
     }
 
     return mapa
-  }, [agendaDetalheUsuarios, calendar.calendarDays, capacidadePadraoMinutos, idsUsuariosPainel, mapaUsuariosPorId])
+  }, [agendaDetalheUsuarios, calendar.calendarDays, capacidadePadraoMinutos, idsUsuariosPainel, mapaUsuariosPorId, tiposAtividade])
 
   function obterResumoDiaUsuario(usuarioId: number, data: string): UsuarioResumoDia | undefined {
     return (detalhesPorDia.get(data) ?? []).find((item) => item.usuarioId === usuarioId)
@@ -458,8 +525,41 @@ export default function AgendaPrevista() {
   const dataDetalheSelecionadoChave = diaDetalheSelecionado ? format(diaDetalheSelecionado, 'yyyy-MM-dd') : null
   const detalhesDiaSelecionado = dataDetalheSelecionadoChave ? detalhesPorDia.get(dataDetalheSelecionadoChave) ?? [] : []
 
+
+
+  const capacidadeVisualPorDia = useMemo(() => {
+    const mapa = new Map<string, { totalMinutos: number; totalExtraMinutos: number; segmentos: SegmentoBarraDia[] }>()
+
+    for (const [data, usuariosDia] of detalhesPorDia.entries()) {
+      const capacidadeTotal = usuariosDia.reduce((soma, item) => soma + item.capacidadeMaxima, 0)
+      const minutosTotais = usuariosDia.reduce((soma, item) => soma + item.minutosPlanejados, 0)
+      const minutosExtrasTotais = usuariosDia.reduce((soma, item) => soma + item.minutosExtrasPlanejados, 0)
+      const segmentosAgrupados: SegmentoBarraDia[] = []
+
+      for (const usuarioDia of usuariosDia) {
+        for (const segmento of usuarioDia.segmentos) {
+          acumularSegmento(segmentosAgrupados, segmento.cor, segmento.minutos)
+        }
+      }
+
+      mapa.set(data, {
+        totalMinutos: minutosTotais,
+        totalExtraMinutos: minutosExtrasTotais,
+        segmentos: calcularSegmentosPercentuais(segmentosAgrupados, capacidadeTotal),
+      })
+    }
+
+    return mapa
+  }, [detalhesPorDia])
+
   const conteudoTooltipPorDia = useMemo(() => ({
-    get: (date: Date) => detalhesPorDia.get(format(date, 'yyyy-MM-dd')) ?? [],
+    get: (date: Date) => (detalhesPorDia.get(format(date, 'yyyy-MM-dd')) ?? []).map((item) => ({
+      usuarioId: item.usuarioId,
+      nome: item.nome,
+      minutosPlanejados: item.minutosPlanejados,
+      capacidadeMaxima: item.capacidadeMaxima,
+      segmentos: calcularSegmentosPercentuais(item.segmentos, item.capacidadeMaxima),
+    })),
   }), [detalhesPorDia])
 
   function abrirEdicaoAtividade(atividade: AtividadeDetalheDia, detalheUsuario: UsuarioResumoDia) {
@@ -744,6 +844,7 @@ export default function AgendaPrevista() {
                 view={calendar.view}
                 getDiaData={getDiaData}
                 getHoverUsuarios={(date) => conteudoTooltipPorDia.get(date)}
+                getCapacityDisplay={(date) => capacidadeVisualPorDia.get(format(date, 'yyyy-MM-dd')) ?? null}
                 selectedDates={calendar.selectedDates}
                 onSelectDate={calendar.selectDate}
                 onSelectRange={calendar.selectRange}
@@ -790,7 +891,14 @@ export default function AgendaPrevista() {
                       </div>
 
                       <div className={styles.dayUserBarTrack}>
-                        <div className={styles.dayUserBarFill} style={{ width: `${percentual}%` }} />
+                        {calcularSegmentosPercentuais(detalheUsuario.segmentos, detalheUsuario.capacidadeMaxima).map((segmento, index) => (
+                          <div
+                            key={`${detalheUsuario.usuarioId}-${index}-${segmento.cor}`}
+                            className={styles.dayUserBarFill}
+                            style={{ width: `${segmento.percentual ?? 0}%`, background: segmento.cor }}
+                          />
+                        ))}
+                        {percentual === 0 && <div className={styles.dayUserBarFill} style={{ width: '0%' }} />}
                       </div>
 
                       <div className={styles.dayUserMetricsRow}>
@@ -806,7 +914,7 @@ export default function AgendaPrevista() {
                             onClick={ehAdmin ? () => abrirEdicaoAtividade(atividade, detalheUsuario) : undefined}
                           >
                             <div>
-                              <div className={styles.dayActivityTitle}>{atividade.descricao}</div>
+                              <div className={styles.dayActivityTitle}><span className={styles.dayActivityColorDot} style={{ background: atividade.cor }} />{atividade.descricao}</div>
                               <div className={styles.dayActivityMeta}>
                                 {atividade.faixa === 'NORMAL' ? 'Normal' : 'Hora extra'} · {formatarHorasMinutos(atividade.minutos)}
                               </div>

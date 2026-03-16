@@ -7,17 +7,31 @@ import { format } from 'date-fns'
 import type { CalendarDay, DiaDaAgenda } from '@/types/agenda'
 import styles from './Calendar.module.css'
 
+interface SegmentoBarra {
+  cor: string
+  percentual: number
+  minutos: number
+}
+
 interface HoverUsuarioResumo {
   usuarioId: number
   nome: string
   minutosPlanejados: number
   capacidadeMaxima: number
+  segmentos?: SegmentoBarra[]
+}
+
+interface CapacityDisplay {
+  totalMinutos: number
+  totalExtraMinutos?: number
+  segmentos: SegmentoBarra[]
 }
 
 interface DayCellProps {
   calendarDay: CalendarDay
   diaData?: DiaDaAgenda
   hoverUsuarios?: HoverUsuarioResumo[]
+  capacityDisplay?: CapacityDisplay | null
   isSelected: boolean
   isInDragRange: boolean
   isAdmin?: boolean
@@ -40,6 +54,7 @@ export default function DayCell({
   calendarDay,
   diaData,
   hoverUsuarios = [],
+  capacityDisplay = null,
   isSelected,
   isInDragRange,
   isAdmin = false,
@@ -103,6 +118,15 @@ export default function DayCell({
     }
   }, [diaData])
 
+  const capacidadeRender = capacityDisplay ?? (capacityInfo ? {
+    totalMinutos: capacityInfo.normalUsed,
+    totalExtraMinutos: capacityInfo.extraUsed,
+    segmentos: [
+      ...(capacityInfo.normalPct > 0 ? [{ cor: 'var(--accent)', percentual: capacityInfo.normalPct, minutos: capacityInfo.normalUsed }] : []),
+      ...(capacityInfo.extraPct > 0 ? [{ cor: 'var(--warn)', percentual: capacityInfo.extraPct, minutos: capacityInfo.extraUsed }] : []),
+    ],
+  } : null)
+
   const badges = useMemo(() => {
     const items: { key: string; label: string; variant: string }[] = []
 
@@ -155,25 +179,25 @@ export default function DayCell({
             </div>
           )}
 
-          {capacityInfo && !diaData.eh_feriado && !diaData.eh_indisponivel && (
+          {capacidadeRender && !diaData.eh_feriado && !diaData.eh_indisponivel && (
             <div className={styles.dayCapacity}>
               <div className={styles.miniCapacityBar}>
-                <div
-                  className={`${styles.miniCapacityFill} ${styles[`miniCapacity-${capacityInfo.status}`]}`}
-                  style={{ width: `${capacityInfo.normalPct}%` }}
-                />
-                {capacityInfo.extraUsed > 0 && (
+                {capacidadeRender.segmentos.map((segmento, index) => (
                   <div
-                    className={styles.miniCapacityExtra}
-                    style={{ width: `${capacityInfo.extraPct}%` }}
+                    key={`${index}-${segmento.cor}-${segmento.minutos}`}
+                    className={styles.miniCapacitySegment}
+                    style={{ width: `${segmento.percentual}%`, background: segmento.cor }}
                   />
+                ))}
+                {capacidadeRender.segmentos.length === 0 && (
+                  <div className={`${styles.miniCapacityFill} ${styles['miniCapacity-empty']}`} style={{ width: '0%' }} />
                 )}
               </div>
               <span className={styles.miniCapacityLabel}>
-                {capacityInfo.normalUsed}
-                {capacityInfo.extraUsed > 0 && (
+                {formatarHorasMinutos(capacidadeRender.totalMinutos)}
+                {(capacidadeRender.totalExtraMinutos ?? 0) > 0 && (
                   <span className={styles.miniCapacityExtraLabel}>
-                    +{capacityInfo.extraUsed}
+                    +{formatarHorasMinutos(capacidadeRender.totalExtraMinutos ?? 0)}
                   </span>
                 )}
               </span>
@@ -214,7 +238,15 @@ export default function DayCell({
                     <span className={styles.dayHoverValue}>{formatarHorasMinutos(item.minutosPlanejados)} / {formatarHorasMinutos(item.capacidadeMaxima)}</span>
                   </div>
                   <div className={styles.dayHoverTrack}>
-                    <div className={styles.dayHoverFill} style={{ width: `${percentual}%` }} />
+                    {(item.segmentos && item.segmentos.length > 0) ? item.segmentos.map((segmento, index) => (
+                      <div
+                        key={`${item.usuarioId}-${index}-${segmento.cor}`}
+                        className={styles.dayHoverSegment}
+                        style={{ width: `${segmento.percentual}%`, background: segmento.cor }}
+                      />
+                    )) : (
+                      <div className={styles.dayHoverFill} style={{ width: `${percentual}%` }} />
+                    )}
                   </div>
                 </div>
               )

@@ -360,6 +360,11 @@
   transition: width 0.3s ease;
 }
 
+.miniCapacitySegment {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
 .miniCapacity-empty {
   background: transparent;
 }
@@ -613,7 +618,11 @@
 .dayHoverFill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #34d399 0%, #4fded0 100%);
+  background: var(--accent);
+}
+
+.dayHoverSegment {
+  height: 100%;
 }
 
 .dayHoverHint {
