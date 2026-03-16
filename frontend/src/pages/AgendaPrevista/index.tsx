@@ -1287,8 +1287,8 @@ export default function AgendaPrevista() {
               </h4>
               <p className={styles.dayDetailsSubtitle}>
                 {diaDetalheSelecionado
-                  ? "Usuários, atividades e tempo alocado para o dia selecionado."
-                  : "Clique em uma célula da agenda para abrir o detalhamento na lateral."}
+                  ? "Resumo compacto dos usuários e atividades do dia."
+                  : "Clique em uma célula da agenda para abrir o detalhamento lateral."}
               </p>
             </div>
 
@@ -1316,13 +1316,9 @@ export default function AgendaPrevista() {
                               {detalheUsuario.nome}
                             </h5>
                             <p className={styles.dayUserMeta}>
-                              {formatarHorasMinutos(
-                                detalheUsuario.minutosPlanejados,
-                              )}{" "}
-                              alocados de{" "}
-                              {formatarHorasMinutos(
+                              {percentual}% da capacidade ocupada · {formatarHorasMinutos(
                                 detalheUsuario.capacidadeMaxima,
-                              )}
+                              )} disponíveis
                             </p>
                           </div>
                           <span className={styles.dayUserTotal}>
@@ -1385,13 +1381,15 @@ export default function AgendaPrevista() {
                                     : undefined
                                 }
                               >
-                                <div>
+                                <div className={styles.dayActivityInfo}>
                                   <div className={styles.dayActivityTitle}>
                                     <span
                                       className={styles.dayActivityColorDot}
                                       style={{ background: atividade.cor }}
                                     />
-                                    {atividade.descricao}
+                                    <span className={styles.dayActivityTitleText}>
+                                      {atividade.descricao}
+                                    </span>
                                   </div>
                                   <div className={styles.dayActivityMeta}>
                                     {atividade.faixa === "NORMAL"
