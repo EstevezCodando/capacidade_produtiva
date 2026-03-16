@@ -218,3 +218,28 @@
   font-size: 20px;
   opacity: 0.5;
 }
+
+
+.syncButton {
+  border: 1px solid var(--bd-default);
+  background: var(--bg-surface);
+  color: var(--tx-primary);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+}
+
+.syncButton:hover:not(:disabled) {
+  border-color: var(--bd-strong);
+  transform: translateY(-1px);
+}
+
+.syncButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

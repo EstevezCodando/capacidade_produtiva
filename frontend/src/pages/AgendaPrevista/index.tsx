@@ -1446,62 +1446,6 @@ export default function AgendaPrevista() {
         >
           <section className={styles.modalSection}>
             <div className={styles.modalSectionHeader}>
-              <h4 className={styles.modalSectionTitle}>Resumo do lançamento</h4>
-              <p className={styles.modalSectionSubtitle}>
-                Cada novo lançamento será somado ao que já existe no dia.
-                Horário normal respeita o teto diário de 6 horas.
-              </p>
-            </div>
-
-            <div className={styles.infoGrid}>
-              <div className={styles.infoCard}>
-                <span className={styles.infoLabel}>Período selecionado</span>
-                <strong>{intervaloSelecionadoLabel}</strong>
-                <span className={styles.infoDetail}>
-                  Seleção atual do calendário
-                </span>
-              </div>
-              <div className={styles.infoCard}>
-                <span className={styles.infoLabel}>Dias</span>
-                <strong>{quantidadeDiasResumo}</strong>
-                <span className={styles.infoDetail}>
-                  Aceita lançamento em apenas um dia
-                </span>
-              </div>
-              <div className={styles.infoCard}>
-                <span className={styles.infoLabel}>Usuários</span>
-                <strong>{selectedUsuarioIds.length}</strong>
-                <span className={styles.infoDetail}>
-                  Aplicação simultânea para todos os selecionados
-                </span>
-              </div>
-              <div className={styles.infoCard}>
-                <span className={styles.infoLabel}>Carga por dia</span>
-                <strong>{cargaPlanejadaLabel}</strong>
-                <span className={styles.infoDetail}>
-                  Capacidade padrão:{" "}
-                  {formatarHorasMinutos(capacidadePadraoMinutos)}
-                </span>
-              </div>
-            </div>
-
-            <div className={styles.chipsWrap}>
-              {usuariosSelecionados.length > 0 ? (
-                usuariosSelecionados.map((item) => (
-                  <span key={item.id} className={styles.userChip}>
-                    {obterNomeUsuario(item)}
-                  </span>
-                ))
-              ) : (
-                <span className={styles.emptyHint}>
-                  Nenhum usuário selecionado.
-                </span>
-              )}
-            </div>
-          </section>
-
-          <section className={styles.modalSection}>
-            <div className={styles.modalSectionHeader}>
               <h4 className={styles.modalSectionTitle}>
                 Configuração da atividade
               </h4>
@@ -1608,6 +1552,61 @@ export default function AgendaPrevista() {
               }
               placeholder="Ex.: apoio ao processamento, afastamento, treinamento interno, atividade administrativa"
             />
+          </section>
+          <section className={styles.modalSection}>
+            <div className={styles.modalSectionHeader}>
+              <h4 className={styles.modalSectionTitle}>Resumo do lançamento</h4>
+              <p className={styles.modalSectionSubtitle}>
+                Cada novo lançamento será somado ao que já existe no dia.
+                Horário normal respeita o teto diário de 6 horas.
+              </p>
+            </div>
+
+            <div className={styles.infoGrid}>
+              <div className={styles.infoCard}>
+                <span className={styles.infoLabel}>Período selecionado</span>
+                <strong>{intervaloSelecionadoLabel}</strong>
+                <span className={styles.infoDetail}>
+                  Seleção atual do calendário
+                </span>
+              </div>
+              <div className={styles.infoCard}>
+                <span className={styles.infoLabel}>Dias</span>
+                <strong>{quantidadeDiasResumo}</strong>
+                <span className={styles.infoDetail}>
+                  Aceita lançamento em apenas um dia
+                </span>
+              </div>
+              <div className={styles.infoCard}>
+                <span className={styles.infoLabel}>Usuários</span>
+                <strong>{selectedUsuarioIds.length}</strong>
+                <span className={styles.infoDetail}>
+                  Aplicação simultânea para todos os selecionados
+                </span>
+              </div>
+              <div className={styles.infoCard}>
+                <span className={styles.infoLabel}>Carga por dia</span>
+                <strong>{cargaPlanejadaLabel}</strong>
+                <span className={styles.infoDetail}>
+                  Capacidade padrão:{" "}
+                  {formatarHorasMinutos(capacidadePadraoMinutos)}
+                </span>
+              </div>
+            </div>
+
+            <div className={styles.chipsWrap}>
+              {usuariosSelecionados.length > 0 ? (
+                usuariosSelecionados.map((item) => (
+                  <span key={item.id} className={styles.userChip}>
+                    {obterNomeUsuario(item)}
+                  </span>
+                ))
+              ) : (
+                <span className={styles.emptyHint}>
+                  Nenhum usuário selecionado.
+                </span>
+              )}
+            </div>
           </section>
 
           {(errors.submit || errors.usuarios || errors.periodo) && (

@@ -210,9 +210,12 @@ class DashboardResponse(BaseModel):
     sap_snapshot_atualizado_em: str | None
     kpi_calculado_em: str | None
     projetos_ativos: int
+    blocos_sap_cadastrados: int
     progresso_geral: float | None
     pontos_totais: float
     pontos_realizados: float
+    horas_previstas_producao_min: int
+    horas_lancadas_producao_min: int
     hierarquia: list[ProjetoHierarquia]
     top_executor: TopUsuario | None
     top_revisor: TopUsuario | None
@@ -612,6 +615,9 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
     projetos_ativos = 0
     pontos_totais = 0.0
     pontos_realizados = 0.0
+    blocos_sap_cadastrados = 0
+    horas_previstas_producao_min = 0
+    horas_lancadas_producao_min = 0
     hierarquia: list[ProjetoHierarquia] = []
     top_executor: TopUsuario | None = None
     top_revisor: TopUsuario | None = None
@@ -624,6 +630,33 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
             result = conn.execute(text("SELECT COUNT(*) FROM sap_snapshot.macrocontrole_projeto WHERE status_id = 1"))
             row = result.fetchone()
             projetos_ativos = row[0] if row else 0
+
+            # 1.1. Contagem de blocos cadastrados no snapshot SAP
+            result = conn.execute(text("SELECT COUNT(*) FROM sap_snapshot.macrocontrole_bloco"))
+            row = result.fetchone()
+            blocos_sap_cadastrados = int(row[0]) if row else 0
+
+            # 1.2. Horas previstas e horas lançadas em produção (bloco)
+            result = conn.execute(
+                text("""
+                SELECT
+                    COALESCE(SUM(ap.minutos_planejados_normais + ap.minutos_planejados_extras), 0) AS horas_previstas_producao_min,
+                    COALESCE((
+                        SELECT SUM(al.minutos)
+                        FROM capacidade.agenda_lancamento al
+                        JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
+                        WHERE al.em_uso = TRUE
+                          AND ta.codigo = 'BLOCO'
+                    ), 0) AS horas_lancadas_producao_min
+                FROM capacidade.agenda_prevista_admin ap
+                WHERE ap.em_uso = TRUE
+                  AND ap.bloco_id IS NOT NULL
+                """)
+            )
+            row = result.fetchone()
+            if row:
+                horas_previstas_producao_min = int(row.horas_previstas_producao_min or 0)
+                horas_lancadas_producao_min = int(row.horas_lancadas_producao_min or 0)
 
             # 2. Pontos totais e realizados
             result = conn.execute(
@@ -854,9 +887,12 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
         sap_snapshot_atualizado_em=snapshot_ts,
         kpi_calculado_em=kpi_ts,
         projetos_ativos=projetos_ativos,
-        progresso_geral=round(progresso_geral, 2) if progresso_geral else None,
+        blocos_sap_cadastrados=blocos_sap_cadastrados,
+        progresso_geral=round(progresso_geral, 2) if progresso_geral is not None else None,
         pontos_totais=pontos_totais,
         pontos_realizados=pontos_realizados,
+        horas_previstas_producao_min=horas_previstas_producao_min,
+        horas_lancadas_producao_min=horas_lancadas_producao_min,
         hierarquia=hierarquia,
         top_executor=top_executor,
         top_revisor=top_revisor,

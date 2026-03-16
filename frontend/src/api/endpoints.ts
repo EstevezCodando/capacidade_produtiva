@@ -3,6 +3,7 @@
 // ============================================================
 import type {
     InconsistenciasResponse,
+    KpiDashboardResponse,
     KpiProjetosResponse,
     SyncStatus,
     UsuarioMe,
@@ -64,8 +65,7 @@ export async function getHealth(): Promise<{ status: string }> {
   return res.data;
 }
 
-export const getKpiDashboard = async () => {
-  // Ajuste "api" para o nome da sua instância do axios, se for diferente
-  const res = await apiClient.get("/kpi/dashboard");
-  return res.data;
-};
+export async function getKpiDashboard(): Promise<KpiDashboardResponse> {
+  const res = await apiClient.get<KpiDashboardResponse>("/kpi/dashboard")
+  return res.data
+}

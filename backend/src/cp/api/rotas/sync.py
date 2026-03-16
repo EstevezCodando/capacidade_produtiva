@@ -7,7 +7,6 @@ Politica de autorizacao:
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from typing import cast
 
@@ -17,22 +16,19 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from cp.api.deps import SomenteAdmin
-from cp.infrastructure.sap_sync.sync import sincronizar_sap_para_snapshot
+from cp.application.sap_sync_service import executar_sync_sap_com_engines
+from cp.application.sync_history_service import obter_ultima_execucao
 
 router = APIRouter(prefix="/sync", tags=["sync"])
-_logger = logging.getLogger(__name__)
-
-# Estado global simples para rastrear última execução
-_ultima_execucao: dict[str, str | None] = {
-    "timestamp": None,
-    "status": "nao_executado",
-}
 
 
 class SyncStatus(BaseModel):
     sap_snapshot_atualizado_em: str | None
     kpi_calculado_em: str | None
     ultima_execucao_status: str | None
+    ultima_execucao_em: str | None
+    ultima_execucao_origem: str | None
+    ultima_execucao_mensagem: str | None
 
 
 class SyncIniciado(BaseModel):
@@ -40,7 +36,11 @@ class SyncIniciado(BaseModel):
 
 
 def _obter_timestamp_snapshot(engine_cp: Engine) -> str | None:
-    """Obtém timestamp da última atualização do snapshot."""
+    """Obtém timestamp da última atualização efetiva do snapshot."""
+    ultima_execucao = obter_ultima_execucao(engine_cp)
+    if ultima_execucao.status == "sucesso":
+        return ultima_execucao.finalizado_em or ultima_execucao.iniciado_em
+
     sql = text("""
         SELECT MAX(data_fim) as ultima_atualizacao
         FROM sap_snapshot.macrocontrole_atividade
@@ -59,7 +59,7 @@ def _obter_timestamp_snapshot(engine_cp: Engine) -> str | None:
 
 
 def _obter_timestamp_kpi(engine_cp: Engine) -> str | None:
-    """Obtém timestamp do último cálculo de KPI verificando se tabelas têm dados."""
+    """Obtém timestamp do último cálculo de KPI a partir da última sync concluída."""
     sql = text("""
         SELECT COUNT(*) as total FROM kpi.estado_ut
     """)
@@ -68,49 +68,31 @@ def _obter_timestamp_kpi(engine_cp: Engine) -> str | None:
             result = conn.execute(sql)
             row = result.fetchone()
             if row and row.total > 0:
-                timestamp = _ultima_execucao.get("timestamp")
-                return timestamp if isinstance(timestamp, str) else None
+                ultima_execucao = obter_ultima_execucao(engine_cp)
+                return ultima_execucao.finalizado_em or ultima_execucao.iniciado_em
     except Exception:
         pass
     return None
 
 
 def _executar_sync_background(engine_sap: Engine, engine_cp: Engine) -> None:
-    """Executa sincronização em background."""
-    global _ultima_execucao
-    try:
-        _logger.info("Iniciando sincronização SAP -> sap_snapshot")
-        resultados = sincronizar_sap_para_snapshot(engine_sap, engine_cp)
-
-        total_lidas = sum(r.lidas for r in resultados)
-        total_gravadas = sum(r.gravadas for r in resultados)
-
-        _ultima_execucao = {
-            "timestamp": datetime.now().isoformat(),
-            "status": "sucesso",
-        }
-        _logger.info(
-            "Sincronização concluída: %d registros lidos, %d gravados",
-            total_lidas,
-            total_gravadas,
-        )
-    except Exception as e:
-        _ultima_execucao = {
-            "timestamp": datetime.now().isoformat(),
-            "status": f"erro: {e}",
-        }
-        _logger.exception("Erro na sincronização: %s", e)
+    """Executa sincronização em background persistindo histórico no banco."""
+    executar_sync_sap_com_engines(engine_sap, engine_cp, origem="api")
 
 
 @router.get("/status", summary="Status da ultima sincronizacao")
 def sync_status(_: SomenteAdmin, request: Request) -> SyncStatus:
-    """Retorna timestamp e resultado do ultimo pipeline SAP -> sap_snapshot -> kpi."""
+    """Retorna timestamps e o resultado da última execução do pipeline."""
     engine_cp = request.app.state.engine_cp
+    ultima_execucao = obter_ultima_execucao(engine_cp)
 
     return SyncStatus(
         sap_snapshot_atualizado_em=_obter_timestamp_snapshot(engine_cp),
         kpi_calculado_em=_obter_timestamp_kpi(engine_cp),
-        ultima_execucao_status=_ultima_execucao.get("status", "nao_executado"),
+        ultima_execucao_status=ultima_execucao.status,
+        ultima_execucao_em=ultima_execucao.finalizado_em or ultima_execucao.iniciado_em,
+        ultima_execucao_origem=ultima_execucao.origem,
+        ultima_execucao_mensagem=ultima_execucao.mensagem,
     )
 
 
@@ -120,11 +102,8 @@ def sync_executar(
     request: Request,
     background_tasks: BackgroundTasks,
 ) -> SyncIniciado:
-    """Aciona o pipeline completo de forma imediata (botao Sincronizar SAP)."""
+    """Aciona o pipeline completo de forma imediata."""
     engine_sap = request.app.state.engine_sap
     engine_cp = request.app.state.engine_cp
-
-    # Executa em background para não bloquear a requisição
     background_tasks.add_task(_executar_sync_background, engine_sap, engine_cp)
-
     return SyncIniciado(detail="sincronização enfileirada")

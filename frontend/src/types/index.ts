@@ -33,6 +33,9 @@ export interface SyncStatus {
   sap_snapshot_atualizado_em: string | null
   kpi_calculado_em:           string | null
   ultima_execucao_status:     string | null
+  ultima_execucao_em:         string | null
+  ultima_execucao_origem:     string | null
+  ultima_execucao_mensagem:   string | null
 }
 
 // ── KPI ──────────────────────────────────────────────────────
@@ -82,4 +85,22 @@ export interface LogAcesso {
   login_em:      string
   ip?:           string
   user_agent?:   string
+}
+
+
+export interface KpiDashboardResponse {
+  sap_snapshot_atualizado_em: string | null
+  kpi_calculado_em: string | null
+  projetos_ativos: number
+  blocos_sap_cadastrados: number
+  progresso_geral: number | null
+  pontos_totais: number
+  pontos_realizados: number
+  horas_previstas_producao_min: number
+  horas_lancadas_producao_min: number
+  hierarquia: Array<unknown>
+  top_executor: unknown | null
+  top_revisor: unknown | null
+  top_executores_subfase: Array<Record<string, unknown>>
+  top_revisores_subfase: Array<Record<string, unknown>>
 }
