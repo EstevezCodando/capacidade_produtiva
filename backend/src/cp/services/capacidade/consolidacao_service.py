@@ -79,7 +79,7 @@ class ConsolidacaoService:
                         PendenciaConsolidacao(
                             usuario_id=usuario_id,
                             data=data_atual,
-                            tipo=TipoPendencia.SEM_LANCAMENTO.value,
+                            tipo=TipoPendencia.SEM_LANCAMENTO,
                             motivo="Dia útil sem capacidade materializada nem lançamentos",
                         )
                     )
@@ -102,7 +102,7 @@ class ConsolidacaoService:
                         PendenciaConsolidacao(
                             usuario_id=usuario_id,
                             data=data_atual,
-                            tipo=TipoPendencia.INDISPONIBILIDADE_NAO_TRATADA.value,
+                            tipo=TipoPendencia.INDISPONIBILIDADE_NAO_TRATADA,
                             motivo="Dia marcado como indisponível mas sem cadastro de indisponibilidade",
                         )
                     )
@@ -119,16 +119,16 @@ class ConsolidacaoService:
                         PendenciaConsolidacao(
                             usuario_id=usuario_id,
                             data=data_atual,
-                            tipo=TipoPendencia.SEM_LANCAMENTO.value,
+                            tipo=TipoPendencia.SEM_LANCAMENTO,
                             motivo="Dia útil sem nenhum lançamento",
                         )
                     )
                 else:
                     # Verificar soma de minutos normais
                     soma_normal = sum(
-                        l.minutos
-                        for l in lancamentos
-                        if l.faixa_minuto == FaixaMinuto.NORMAL
+                        lanc.minutos
+                        for lanc in lancamentos
+                        if lanc.faixa_minuto == FaixaMinuto.NORMAL
                     )
 
                     # Se a soma é muito baixa (menos de 50% do esperado), alertar
@@ -138,7 +138,7 @@ class ConsolidacaoService:
                             PendenciaConsolidacao(
                                 usuario_id=usuario_id,
                                 data=data_atual,
-                                tipo=TipoPendencia.LANCAMENTO_INCOMPLETO.value,
+                                tipo=TipoPendencia.LANCAMENTO_INCOMPLETO,
                                 motivo=(
                                     f"Soma de minutos normais ({soma_normal}) abaixo de 50% "
                                     f"do esperado ({capacidade.minutos_capacidade_normal_prevista})"
@@ -273,7 +273,7 @@ class ConsolidacaoService:
 
     def obter_status_dias(
         self, data_inicio: date, data_fim: date
-    ) -> list[dict[str, date | str]]:
+    ) -> list[dict[str, date | str | int]]:
         """Obtém status de todos os dias no período."""
         capacidades = self._capacidade_repo.listar_por_status(data_inicio, data_fim)
 

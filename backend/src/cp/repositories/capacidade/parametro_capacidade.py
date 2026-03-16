@@ -89,36 +89,40 @@ class ParametroCapacidadeRepository:
     ) -> bool:
         """Verifica se há conflito de vigência com parâmetros existentes."""
         with Session(self._engine) as session:
-            query = select(ParametroCapacidade).where(
-                or_(
-                    # Novo período inicia dentro de um existente
-                    and_(
-                        ParametroCapacidade.data_inicio_vigencia <= data_inicio,
-                        or_(
-                            ParametroCapacidade.data_fim_vigencia.is_(None),
-                            ParametroCapacidade.data_fim_vigencia >= data_inicio,
-                        ),
+            # Novo período inicia dentro de um existente
+            overlap_conditions = [
+                and_(
+                    ParametroCapacidade.data_inicio_vigencia <= data_inicio,
+                    or_(
+                        ParametroCapacidade.data_fim_vigencia.is_(None),
+                        ParametroCapacidade.data_fim_vigencia >= data_inicio,
                     ),
-                    # Novo período termina dentro de um existente
+                ),
+            ]
+            if data_fim is not None:
+                # Novo período termina dentro de um existente
+                overlap_conditions.append(
                     and_(
-                        data_fim.is_not(None) if data_fim else False,
                         ParametroCapacidade.data_inicio_vigencia <= data_fim,
                         or_(
                             ParametroCapacidade.data_fim_vigencia.is_(None),
                             ParametroCapacidade.data_fim_vigencia >= data_fim,
                         ),
-                    ),
-                    # Novo período engloba um existente
+                    )
+                )
+                # Novo período engloba um existente (com fim definido)
+                overlap_conditions.append(
                     and_(
                         ParametroCapacidade.data_inicio_vigencia >= data_inicio,
-                        or_(
-                            data_fim is None,
-                            ParametroCapacidade.data_fim_vigencia <= data_fim,
-                        ),
-                    ),
+                        ParametroCapacidade.data_fim_vigencia <= data_fim,
+                    )
                 )
-            )
+            else:
+                # Novo período sem fim engloba todos que começam depois
+                overlap_conditions.append(
+                    ParametroCapacidade.data_inicio_vigencia >= data_inicio
+                )
+            query = select(ParametroCapacidade).where(or_(*overlap_conditions))
             if excluir_id:
                 query = query.where(ParametroCapacidade.id != excluir_id)
-            result = session.execute(query).scalar_one_or_none()
-            return result is not None
+            return session.execute(query).scalar_one_or_none() is not None

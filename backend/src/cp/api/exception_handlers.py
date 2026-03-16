@@ -5,6 +5,8 @@ Elimina a duplicação de _handle_exception() nos routers de agenda e capacidade
 
 from __future__ import annotations
 
+from typing import NoReturn
+
 from fastapi import HTTPException, status
 
 from cp.domain.capacidade.exceptions import (
@@ -41,7 +43,7 @@ _EXCECAO_PARA_STATUS: list[tuple[type[Exception], int]] = [
 ]
 
 
-def handle_domain_exception(exc: Exception) -> None:
+def handle_domain_exception(exc: Exception) -> NoReturn:
     """Converte exceções de domínio em HTTPException.
 
     Percorre o mapeamento estático em ordem de prioridade.

@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 from cp.api.deps import SomenteAdmin, UsuarioLogado
 from cp.api.exception_handlers import handle_domain_exception
 from cp.domain.capacidade.constants import MINUTOS_DIA_UTIL_DEFAULT, MINUTOS_EXTRA_MAXIMO_DEFAULT
+from cp.domain.capacidade.models import TipoAtividade
 from cp.domain.capacidade.schemas import (
     CapacidadePeriodoResponse,
     ConfigTetoResponse,
@@ -115,12 +116,12 @@ def _get_consolidacao_service(request: Request) -> ConsolidacaoService:
 
 
 
-def _mapear_tipo_atividade(tipo: object) -> TipoAtividadeConfigResponse:
+def _mapear_tipo_atividade(tipo: TipoAtividade) -> TipoAtividadeConfigResponse:
     return TipoAtividadeConfigResponse(
         id=tipo.id,
-        codigo=tipo.codigo.value if hasattr(tipo.codigo, "value") else str(tipo.codigo),
+        codigo=tipo.codigo.value,
         nome=tipo.nome,
-        grupo=tipo.grupo.value if hasattr(tipo.grupo, "value") else str(tipo.grupo),
+        grupo=tipo.grupo.value,
         bloco_id=tipo.bloco_id,
         cor=tipo.cor,
     )

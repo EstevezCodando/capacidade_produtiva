@@ -119,6 +119,8 @@ class CapacidadeService:
             data_fim=data_fim,
         )
 
+        if depois is None:
+            raise RegistroNaoEncontradoError("ParametroCapacidade", id)
         self._audit.auditar_parametro_atualizado(antes, depois, atualizado_por)
         return depois
 

@@ -7,6 +7,7 @@ lançamentos, parâmetros e auditoria.
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -75,7 +76,7 @@ class TipoAtividade(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    codigo: Mapped[str] = mapped_column(
+    codigo: Mapped[CodigoAtividade] = mapped_column(
         Enum(CodigoAtividade, name="codigo_atividade", schema="capacidade"),
         nullable=False,
     )
@@ -87,7 +88,7 @@ class TipoAtividade(Base):
         default="#5B8DEE",
         server_default="#5B8DEE",
     )
-    grupo: Mapped[str] = mapped_column(
+    grupo: Mapped[GrupoAtividade] = mapped_column(
         Enum(GrupoAtividade, name="grupo_atividade", schema="capacidade"),
         nullable=False,
     )
@@ -162,11 +163,11 @@ class CapacidadeDia(Base):
     eh_dia_util: Mapped[bool] = mapped_column(default=True, nullable=False)
     eh_feriado: Mapped[bool] = mapped_column(default=False, nullable=False)
     eh_indisponivel: Mapped[bool] = mapped_column(default=False, nullable=False)
-    tipo_indisponibilidade: Mapped[str | None] = mapped_column(
+    tipo_indisponibilidade: Mapped[TipoIndisponibilidade | None] = mapped_column(
         Enum(TipoIndisponibilidade, name="tipo_indisponibilidade_enum", schema="capacidade"),
         nullable=True,
     )
-    status_dia: Mapped[str] = mapped_column(
+    status_dia: Mapped[StatusDia] = mapped_column(
         Enum(StatusDia, name="status_dia_enum", schema="capacidade"),
         nullable=False,
         default=StatusDia.ABERTO,
@@ -248,7 +249,7 @@ class AgendaLancamento(Base):
     tipo_atividade_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("capacidade.tipo_atividade.id"), nullable=False
     )
-    faixa_minuto: Mapped[str] = mapped_column(
+    faixa_minuto: Mapped[FaixaMinuto] = mapped_column(
         Enum(FaixaMinuto, name="faixa_minuto_enum", schema="capacidade"),
         nullable=False,
     )
@@ -359,8 +360,8 @@ class AuditLog(Base):
         Enum(AcaoAuditoria, name="acao_auditoria_enum", schema="capacidade"),
         nullable=False,
     )
-    antes_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    depois_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    antes_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    depois_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     usuario_executor: Mapped[int] = mapped_column(Integer, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -124,7 +124,7 @@ class CapacidadeDiaRepository:
                 .values(status_dia=StatusDia.CONSOLIDADO)
             )
             session.commit()
-            return result.rowcount
+            return result.rowcount  # type: ignore[attr-defined, no-any-return]
 
     def listar_por_status(
         self, data_inicio: date, data_fim: date, status: StatusDia | None = None
