@@ -23,23 +23,10 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, Query, Request
 
 from cp.api.deps import SomenteAdmin, UsuarioLogado
-from cp.domain.capacidade.exceptions import (
-    AcessoNegadoError,
-    CapacidadeError,
-    DataFuturaError,
-    DiaConsolidadoError,
-    DiaIndisponivelError,
-    FeriadoDuplicadoError,
-    IndisponibilidadeSobrepostaError,
-    IntervaloInvalidoError,
-    LimiteCapacidadeExcedidoError,
-    PermissaoError,
-    RegistroNaoEncontradoError,
-    ValidacaoError,
-)
+from cp.api.exception_handlers import handle_domain_exception
 from cp.domain.capacidade.schemas import (
     AgendaCompletaResponse,
     FeriadoInput,
@@ -68,69 +55,6 @@ def _get_agenda_service(request: Request) -> AgendaService:
     return AgendaService(engine)
 
 
-def _handle_exception(exc: Exception) -> None:
-    """Converte exceções de domínio em HTTPException."""
-    if isinstance(exc, DataFuturaError):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(exc),
-        )
-    if isinstance(exc, DiaConsolidadoError):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(exc),
-        )
-    if isinstance(exc, AcessoNegadoError):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(exc),
-        )
-    if isinstance(exc, LimiteCapacidadeExcedidoError):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
-        )
-    if isinstance(exc, DiaIndisponivelError):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
-        )
-    if isinstance(exc, IntervaloInvalidoError):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
-        )
-    if isinstance(exc, FeriadoDuplicadoError):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
-        )
-    if isinstance(exc, IndisponibilidadeSobrepostaError):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
-        )
-    if isinstance(exc, RegistroNaoEncontradoError):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        )
-    if isinstance(exc, ValidacaoError):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
-        )
-    if isinstance(exc, PermissaoError):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(exc),
-        )
-    if isinstance(exc, CapacidadeError):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        )
-    raise exc
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -164,7 +88,7 @@ def meu_planejamento(
             dias=dias,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -188,23 +112,23 @@ def meus_lancamentos(
 
     return [
         LancamentoResponse(
-            id=l.id,
-            usuario_id=l.usuario_id,
-            data_lancamento=l.data_lancamento,
-            bloco_id=l.bloco_id,
-            tipo_atividade_id=l.tipo_atividade_id,
-            tipo_atividade_codigo=l.tipo_atividade.codigo,
-            tipo_atividade_nome=l.tipo_atividade.nome,
-            tipo_atividade_cor=l.tipo_atividade.cor,
-            faixa_minuto=l.faixa_minuto,
-            minutos=l.minutos,
-            descricao=l.descricao,
-            criado_por=l.criado_por,
-            atualizado_por=l.atualizado_por,
-            criado_em=l.criado_em,
-            atualizado_em=l.atualizado_em,
+            id=lanc.id,
+            usuario_id=lanc.usuario_id,
+            data_lancamento=lanc.data_lancamento,
+            bloco_id=lanc.bloco_id,
+            tipo_atividade_id=lanc.tipo_atividade_id,
+            tipo_atividade_codigo=lanc.tipo_atividade.codigo,
+            tipo_atividade_nome=lanc.tipo_atividade.nome,
+            tipo_atividade_cor=lanc.tipo_atividade.cor,
+            faixa_minuto=lanc.faixa_minuto,
+            minutos=lanc.minutos,
+            descricao=lanc.descricao,
+            criado_por=lanc.criado_por,
+            atualizado_por=lanc.atualizado_por,
+            criado_em=lanc.criado_em,
+            atualizado_em=lanc.atualizado_em,
         )
-        for l in lancamentos
+        for lanc in lancamentos
     ]
 
 
@@ -256,7 +180,7 @@ def criar_lancamento(
             alertas=alertas,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.put("/lancamento/{lancamento_id}", summary="Editar lançamento próprio")
@@ -302,7 +226,7 @@ def editar_lancamento(
             alertas=alertas,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.delete("/lancamento/{lancamento_id}", summary="Remover lançamento próprio")
@@ -327,7 +251,7 @@ def remover_lancamento(
         )
         return RemovidoResponse(removido=removido)
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -355,7 +279,7 @@ def agenda_usuario(
             dias=dias,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -396,7 +320,7 @@ def criar_planejamento(
             atualizado_em=planejamento.atualizado_em,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.post("/planejamento/lote", summary="Criar planejamento em lote (admin)", status_code=201)
@@ -434,7 +358,7 @@ def criar_planejamento_lote(
             for planejamento in planejamentos
         ]
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.post("/planejamento/remover-lote", summary="Remover planejamentos em lote (admin)")
@@ -454,7 +378,7 @@ def remover_planejamento_lote(
         )
         return RemovidoResponse(removido=quantidade > 0, mensagem=f"{quantidade} planejamento(s) removido(s).")
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.put("/planejamento/{planejamento_id}", summary="Atualizar planejamento (admin)")
@@ -489,7 +413,7 @@ def atualizar_planejamento(
             atualizado_em=planejamento.atualizado_em,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.delete("/planejamento/{planejamento_id}", summary="Remover planejamento (admin)")
@@ -508,7 +432,7 @@ def remover_planejamento(
         )
         return RemovidoResponse(removido=removido)
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -561,7 +485,7 @@ def criar_lancamento_admin(
             alertas=alertas,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.put("/lancamento-admin/{lancamento_id}", summary="Editar lançamento de usuário (admin)")
@@ -602,7 +526,7 @@ def editar_lancamento_admin(
             alertas=alertas,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.delete("/lancamento-admin/{lancamento_id}", summary="Remover lançamento de usuário (admin)")
@@ -622,7 +546,7 @@ def remover_lancamento_admin(
         )
         return RemovidoResponse(removido=removido)
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -654,7 +578,7 @@ def criar_feriado(
             criado_em=feriado.criado_em,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.delete("/feriado/{feriado_id}", summary="Remover feriado (admin)")
@@ -673,7 +597,7 @@ def remover_feriado(
         )
         return RemovidoResponse(removido=removido)
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -712,7 +636,7 @@ def criar_indisponibilidade(
             criado_em=indisponibilidade.criado_em,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.delete("/indisponibilidade/{indisponibilidade_id}", summary="Remover indisponibilidade (admin)")
@@ -731,4 +655,4 @@ def remover_indisponibilidade(
         )
         return RemovidoResponse(removido=removido)
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)

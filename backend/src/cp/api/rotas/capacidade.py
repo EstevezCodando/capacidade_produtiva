@@ -25,23 +25,20 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
 from cp.api.deps import SomenteAdmin, UsuarioLogado
-from cp.domain.capacidade.exceptions import (
-    CapacidadeError,
-    IntervaloInvalidoError,
-    PermissaoError,
-    RegistroNaoEncontradoError,
-    ValidacaoError,
-    VigenciaConflitanteError,
-)
+from cp.api.exception_handlers import handle_domain_exception
+from cp.domain.capacidade.constants import MINUTOS_DIA_UTIL_DEFAULT, MINUTOS_EXTRA_MAXIMO_DEFAULT
 from cp.domain.capacidade.schemas import (
     CapacidadePeriodoResponse,
     ConfigTetoResponse,
     ConsolidacaoInput,
     ConsolidacaoResponse,
+    FeriadoInput,
+    FeriadoResponse,
     FeriadosListResponse,
     ParametroCapacidadeInput,
     ParametroCapacidadeResponse,
     PendenciaResponse,
+    RemovidoResponse,
     StatusDiasResponse,
 )
 from cp.services.capacidade import AgendaService, CapacidadeService, ConsolidacaoService
@@ -61,14 +58,6 @@ class TipoAtividadeConfigResponse(BaseModel):
 class TipoAtividadeCorInput(BaseModel):
     cor: str = Field(..., pattern=r"^#[0-9A-Fa-f]{6}$")
 
-
-class FeriadoInput(BaseModel):
-    data: date
-    descricao: str = Field(..., min_length=1, max_length=255)
-
-
-class RemovidoResponse(BaseModel):
-    removido: bool
 
 
 class ConfigTetoInput(BaseModel):
@@ -125,22 +114,6 @@ def _get_consolidacao_service(request: Request) -> ConsolidacaoService:
     return ConsolidacaoService(engine)
 
 
-def _handle_exception(exc: Exception) -> None:
-    """Converte exceções de domínio em HTTPException."""
-    if isinstance(exc, VigenciaConflitanteError):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
-    if isinstance(exc, IntervaloInvalidoError):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
-    if isinstance(exc, RegistroNaoEncontradoError):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    if isinstance(exc, ValidacaoError):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
-    if isinstance(exc, PermissaoError):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
-    if isinstance(exc, CapacidadeError):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    raise exc
-
 
 def _mapear_tipo_atividade(tipo: object) -> TipoAtividadeConfigResponse:
     return TipoAtividadeConfigResponse(
@@ -182,8 +155,8 @@ def config_teto(request: Request, _: SomenteAdmin) -> ConfigTetoResponse:
 
     if not parametro:
         return ConfigTetoResponse(
-            teto_normal_min=360,
-            teto_extra_min=240,
+            teto_normal_min=MINUTOS_DIA_UTIL_DEFAULT,
+            teto_extra_min=MINUTOS_EXTRA_MAXIMO_DEFAULT,
             vigencia_inicio=date(2026, 1, 1),
             vigencia_fim=None,
             configurado_em=None,
@@ -237,7 +210,7 @@ def atualizar_config_teto(
             configurado_por=parametro.criado_por,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.post("/parametro", summary="Criar parâmetro de capacidade (admin)", status_code=201)
@@ -267,7 +240,7 @@ def criar_parametro(
             criado_em=parametro.criado_em,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.put("/parametro/{parametro_id}", summary="Atualizar parâmetro de capacidade (admin)")
@@ -298,7 +271,7 @@ def atualizar_parametro(
             criado_em=parametro.criado_em,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.get("/status", summary="Status dos dias no intervalo")
@@ -354,15 +327,13 @@ def consolidar_periodo(
     except HTTPException:
         raise
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.get("/feriados", summary="Lista feriados cadastrados")
 def listar_feriados(request: Request, _: UsuarioLogado) -> FeriadosListResponse:
     """Lista todos os feriados cadastrados."""
     service = _get_agenda_service(request)
-    from cp.domain.capacidade.schemas import FeriadoResponse
-
     feriados = service.listar_feriados()
     return FeriadosListResponse(
         feriados=[
@@ -392,7 +363,7 @@ def criar_feriado(request: Request, body: FeriadoInput, admin: SomenteAdmin) -> 
             "criado_em": feriado.criado_em,
         }
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.delete("/feriados/{feriado_id}", summary="Remover feriado")
@@ -403,7 +374,7 @@ def remover_feriado(request: Request, feriado_id: int, admin: SomenteAdmin) -> R
         removido = service.remover_feriado(feriado_id, admin.usuario_id)
         return RemovidoResponse(removido=removido)
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.get("/meu-periodo", summary="Capacidade do usuário autenticado no período")
@@ -428,7 +399,7 @@ def meu_periodo(
         detalhes = agenda_service.obter_agenda_completa(usuario.usuario_id, data_inicio, data_fim)
         return CapacidadePeriodoResponse(resumo=resumo, detalhes_por_dia=detalhes)
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.get("/usuario/{usuario_id}", summary="Capacidade de um usuário (admin)")
@@ -454,7 +425,7 @@ def capacidade_usuario(
         detalhes = agenda_service.obter_agenda_completa(usuario_id, data_inicio, data_fim)
         return CapacidadePeriodoResponse(resumo=resumo, detalhes_por_dia=detalhes)
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.post("/materializar", summary="Materializar capacidade diária (admin)", status_code=201)
@@ -475,4 +446,4 @@ def materializar_capacidade(
         )
         return {"dias_materializados": len(capacidades)}
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
