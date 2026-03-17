@@ -1123,6 +1123,13 @@ export default function AgendaRealizada() {
                                         format(date, "yyyy-MM-dd"),
                                     ) ?? null
                                 }
+                                getOciosoDisplay={(date) => {
+                                    if (isDiaFuturo(date)) return { ativo: false, minutos: 0 };
+                                    const diaData = getDiaData(date);
+                                    if (!diaData || !diaData.eh_dia_util || diaData.eh_feriado || diaData.eh_indisponivel) return null;
+                                    const ociosos = Math.max(0, diaData.teto_normal_min - diaData.apontado_normal_min);
+                                    return { ativo: ociosos > 0, minutos: ociosos };
+                                }}
                                 selectedDates={calendar.selectedDates}
                                 onSelectDate={calendar.selectDate}
                                 onSelectRange={calendar.selectRange}
