@@ -133,34 +133,12 @@ function obterDescricaoOrigemTipo(tipo: TipoAtividade): string {
     return "Tipo configurado";
 }
 
-function obterCorLancamento(
-    lancamento: ApontamentoResumo,
-    tiposAtividade: TipoAtividade[],
-): string {
-    if (lancamento.tipo_atividade === "BLOCO" && lancamento.bloco_id) {
-        const tipoBloco = tiposAtividade.find(
-            (t) => t.origem === "BLOCO" && t.bloco_id === lancamento.bloco_id,
-        );
-        if (tipoBloco?.cor) return normalizarCorHex(tipoBloco.cor);
-    }
-    const tipo = tiposAtividade.find(
-        (t) => t.codigo === lancamento.tipo_atividade && t.origem !== "BLOCO",
-    );
-    if (tipo?.cor) return normalizarCorHex(tipo.cor);
-    return "var(--accent)";
+function obterCorLancamento(lancamento: ApontamentoResumo): string {
+    return normalizarCorHex(lancamento.tipo_atividade_cor);
 }
 
-function obterNomeLancamento(
-    lancamento: ApontamentoResumo,
-    tiposAtividade: TipoAtividade[],
-): string {
-    if (lancamento.tipo_atividade === "BLOCO" && lancamento.bloco_nome) {
-        return lancamento.bloco_nome;
-    }
-    const tipo = tiposAtividade.find(
-        (t) => t.codigo === lancamento.tipo_atividade && t.origem !== "BLOCO",
-    );
-    return tipo?.nome ?? lancamento.tipo_atividade;
+function obterNomeLancamento(lancamento: ApontamentoResumo): string {
+    return lancamento.tipo_atividade_nome;
 }
 
 function acumularSegmento(
@@ -349,12 +327,12 @@ export default function AgendaRealizada() {
                 (l) => ({
                     lancamentoId: l.id,
                     data: dia.data,
-                    tipoAtividadeNome: obterNomeLancamento(l, tiposAtividade),
+                    tipoAtividadeNome: obterNomeLancamento(l),
                     tipoAtividadeCodigo: l.tipo_atividade,
                     blocoNome: l.bloco_nome ?? null,
                     faixa: l.faixa,
                     minutos: l.minutos,
-                    cor: obterCorLancamento(l, tiposAtividade),
+                    cor: obterCorLancamento(l),
                 }),
             );
 
@@ -378,7 +356,7 @@ export default function AgendaRealizada() {
         }
 
         return mapa;
-    }, [agenda, tiposAtividade, capacidadePadraoMinutos]);
+    }, [agenda, capacidadePadraoMinutos]);
 
     const capacidadeVisualPorDia = useMemo(() => {
         const mapa = new Map<
@@ -462,12 +440,19 @@ export default function AgendaRealizada() {
             const tipoSelecionado = tiposAtividade.find(
                 (t) => t.id === Number(form.tipoAtividadeId),
             );
+            if (!tipoSelecionado) {
+                setErrors({ tipoAtividadeId: "Tipo de atividade não encontrado. Recarregue a página." });
+                throw new Error("Tipo de atividade não encontrado.");
+            }
             const blocoId =
-                tipoSelecionado?.origem === "BLOCO"
+                tipoSelecionado.origem === "BLOCO"
                     ? (tipoSelecionado.bloco_id ?? null)
                     : null;
-            const tipoAtividade =
-                tipoSelecionado?.codigo ?? ("BLOCO" as CodigoAtividade);
+            if (tipoSelecionado.origem === "BLOCO" && blocoId === null) {
+                setErrors({ tipoAtividadeId: "Bloco não configurado para este tipo de atividade." });
+                throw new Error("bloco_id ausente para atividade BLOCO.");
+            }
+            const tipoAtividade = tipoSelecionado.codigo;
 
             const payload = {
                 data: format(diaDetalheSelecionado!, "yyyy-MM-dd"),
