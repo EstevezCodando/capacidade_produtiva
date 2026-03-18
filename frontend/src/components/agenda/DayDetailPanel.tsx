@@ -1,6 +1,3 @@
-// ============================================================
-// DayDetailPanel — Painel lateral com detalhes do dia/período
-// ============================================================
 import { useMemo } from 'react'
 import { format, differenceInDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -20,6 +17,10 @@ interface DayDetailPanelProps {
   onAddPlanejamento?: (date: Date) => void
   onEditLancamento?: (id: number) => void
   onConsolidar?: () => void
+  exibirPlanejamento?: boolean
+  tituloLancamentos?: string
+  tituloPlanejamento?: string
+  podeAdicionarLancamento?: (date: Date, dia: DiaDaAgenda) => boolean
 }
 
 export default function DayDetailPanel({
@@ -33,6 +34,10 @@ export default function DayDetailPanel({
   onAddPlanejamento,
   onEditLancamento,
   onConsolidar,
+  exibirPlanejamento = true,
+  tituloLancamentos = 'Lançamentos',
+  tituloPlanejamento = 'Planejamento',
+  podeAdicionarLancamento,
 }: DayDetailPanelProps) {
   const isSingleDay = selectedDates.length === 1
   const singleDayData = isSingleDay ? getDiaData(selectedDates[0]) : undefined
@@ -55,8 +60,16 @@ export default function DayDetailPanel({
   const agregado = useMemo(() => {
     if (selectedDates.length === 0) return null
 
-    let tetoNormal = 0, tetoExtra = 0, apontadoNormal = 0, apontadoExtra = 0, ociosos = 0
-    let diasUteis = 0, diasFeriado = 0, diasIndisponivel = 0, diasConsolidados = 0, diasAbertos = 0
+    let tetoNormal = 0
+    let tetoExtra = 0
+    let apontadoNormal = 0
+    let apontadoExtra = 0
+    let ociosos = 0
+    let diasUteis = 0
+    let diasFeriado = 0
+    let diasIndisponivel = 0
+    let diasConsolidados = 0
+    let diasAbertos = 0
     const lancamentosTotal: DiaDaAgenda['lancamentos'] = []
     const planejamentosTotal: DiaDaAgenda['planejamento'] = []
 
@@ -64,11 +77,11 @@ export default function DayDetailPanel({
       const dia = getDiaData(date)
       if (!dia) continue
 
-      if (dia.eh_dia_util) diasUteis++
-      if (dia.eh_feriado) diasFeriado++
-      if (dia.eh_indisponivel) diasIndisponivel++
-      if (dia.status === 'CONSOLIDADO') diasConsolidados++
-      if (dia.status === 'ABERTO') diasAbertos++
+      if (dia.eh_dia_util) diasUteis += 1
+      if (dia.eh_feriado) diasFeriado += 1
+      if (dia.eh_indisponivel) diasIndisponivel += 1
+      if (dia.status === 'CONSOLIDADO') diasConsolidados += 1
+      if (dia.status === 'ABERTO') diasAbertos += 1
 
       tetoNormal += dia.teto_normal_min
       tetoExtra += dia.teto_extra_min
@@ -80,10 +93,23 @@ export default function DayDetailPanel({
       planejamentosTotal.push(...dia.planejamento)
     }
 
-    return { tetoNormal, tetoExtra, apontadoNormal, apontadoExtra, ociosos, diasUteis, diasFeriado, diasIndisponivel, diasConsolidados, diasAbertos, lancamentos: lancamentosTotal, planejamentos: planejamentosTotal }
+    return {
+      tetoNormal,
+      tetoExtra,
+      apontadoNormal,
+      apontadoExtra,
+      ociosos,
+      diasUteis,
+      diasFeriado,
+      diasIndisponivel,
+      diasConsolidados,
+      diasAbertos,
+      lancamentos: lancamentosTotal,
+      planejamentos: planejamentosTotal,
+    }
   }, [selectedDates, getDiaData])
 
-  const formatMinutos = (min: number) => {
+  function formatMinutos(min: number) {
     const h = Math.floor(min / 60)
     const m = min % 60
     if (h === 0) return `${m}min`
@@ -104,6 +130,13 @@ export default function DayDetailPanel({
       </Drawer>
     )
   }
+
+  const botaoLancamentoHabilitado = Boolean(
+    isSingleDay &&
+    singleDayData &&
+    onAddLancamento &&
+    (podeAdicionarLancamento ? podeAdicionarLancamento(selectedDates[0], singleDayData) : singleDayData.status === 'ABERTO')
+  )
 
   return (
     <Drawer open={open} onClose={onClose} title={drawerTitle} subtitle={drawerSubtitle} width={460}>
@@ -137,8 +170,8 @@ export default function DayDetailPanel({
         </Drawer.Section>
       )}
 
-      {agregado && agregado.planejamentos.length > 0 && (
-        <Drawer.Section title={`Planejamento (${agregado.planejamentos.length})`}>
+      {exibirPlanejamento && agregado && agregado.planejamentos.length > 0 && (
+        <Drawer.Section title={`${tituloPlanejamento} (${agregado.planejamentos.length})`}>
           <div className={styles.itemsList}>
             {agregado.planejamentos.slice(0, 8).map((p) => (
               <div key={p.id} className={styles.itemCard}>
@@ -154,17 +187,18 @@ export default function DayDetailPanel({
       )}
 
       {agregado && agregado.lancamentos.length > 0 && (
-        <Drawer.Section title={`Lançamentos (${agregado.lancamentos.length})`}>
+        <Drawer.Section title={`${tituloLancamentos} (${agregado.lancamentos.length})`}>
           <div className={styles.itemsList}>
             {agregado.lancamentos.slice(0, 8).map((l) => (
               <div key={l.id} className={`${styles.itemCard} ${styles.itemCardClickable}`} onClick={() => onEditLancamento?.(l.id)}>
                 <div className={styles.itemHeader}>
                   <span className={styles.itemTipo}>
-                    <span className={styles.tipoIcon} style={{ color: l.tipo_atividade_cor }}>●</span>
-                    {l.tipo_atividade_nome}
+                    <span className={styles.tipoIcon} style={{ color: l.tipo_atividade_cor ?? 'var(--accent)' }}>●</span>
+                    {l.usuario_nome ? `${l.usuario_nome} • ` : ''}{l.tipo_atividade_nome ?? l.tipo_atividade}
                   </span>
                   <span className={`${styles.itemMinutos} ${l.faixa === 'EXTRA' ? styles.itemExtra : ''}`}>{l.minutos}min{l.faixa === 'EXTRA' && <Badge variant="warning" size="sm">HE</Badge>}</span>
                 </div>
+                {l.descricao && <p className={styles.itemDesc}>{l.descricao}</p>}
               </div>
             ))}
           </div>
@@ -183,13 +217,13 @@ export default function DayDetailPanel({
       )}
 
       <Drawer.Footer>
-        {isSingleDay && singleDayData && singleDayData.status === 'ABERTO' && (
-          <>
-            <Button variant="secondary" size="sm" onClick={() => onAddLancamento?.(selectedDates[0])}>+ Lançamento</Button>
-            {isAdmin && <Button variant="secondary" size="sm" onClick={() => onAddPlanejamento?.(selectedDates[0])}>+ Planejamento</Button>}
-          </>
+        {botaoLancamentoHabilitado && (
+          <Button variant="secondary" size="sm" onClick={() => onAddLancamento?.(selectedDates[0])}>+ Lançamento</Button>
         )}
-        {isAdmin && agregado && agregado.diasAbertos > 0 && <Button variant="primary" size="sm" onClick={onConsolidar}>Consolidar período</Button>}
+        {isAdmin && isSingleDay && singleDayData && exibirPlanejamento && singleDayData.status === 'ABERTO' && onAddPlanejamento && (
+          <Button variant="secondary" size="sm" onClick={() => onAddPlanejamento?.(selectedDates[0])}>+ Planejamento</Button>
+        )}
+        {isAdmin && agregado && agregado.diasAbertos > 0 && onConsolidar && <Button variant="primary" size="sm" onClick={onConsolidar}>Consolidar período</Button>}
       </Drawer.Footer>
     </Drawer>
   )

@@ -1,7 +1,3 @@
-// ============================================================
-// DayCell — Célula individual do calendário
-// Mostra status, capacidade e indicadores visuais do dia
-// ============================================================
 import { useMemo } from 'react'
 import { format } from 'date-fns'
 import type { CalendarDay, DiaDaAgenda } from '@/types/agenda'
@@ -43,6 +39,8 @@ interface DayCellProps {
   isAdmin?: boolean
   loading?: boolean
   exibirIndicadorOcioso?: boolean
+  hoverTitle?: string
+  exibirPlanejamento?: boolean
   onMouseDown: (e: React.MouseEvent) => void
   onMouseEnter: () => void
   onClick: () => void
@@ -67,6 +65,8 @@ export default function DayCell({
   isAdmin = false,
   loading = false,
   exibirIndicadorOcioso = true,
+  hoverTitle = 'Carga planejada por usuário',
+  exibirPlanejamento = true,
   onMouseDown,
   onMouseEnter,
   onClick,
@@ -211,7 +211,7 @@ export default function DayCell({
             </div>
           )}
 
-          {diaData.planejamento.length > 0 && (
+          {exibirPlanejamento && diaData.planejamento.length > 0 && (
             <div className={styles.dayPlanejamento}>
               <span className={styles.planejamentoIcon}>◈</span>
               <span className={styles.planejamentoCount}>
@@ -232,7 +232,7 @@ export default function DayCell({
 
       {hoverUsuarios.length > 0 && (
         <div className={styles.dayHoverCard}>
-          <div className={styles.dayHoverTitle}>Carga planejada por usuário</div>
+          <div className={styles.dayHoverTitle}>{hoverTitle}</div>
           <div className={styles.dayHoverList}>
             {hoverUsuarios.map((item) => {
               const percentual = item.capacidadeMaxima > 0
@@ -259,23 +259,6 @@ export default function DayCell({
               )
             })}
           </div>
-          {isAdmin && <div className={styles.dayHoverHint}>Clique para abrir o detalhamento do dia.</div>}
-        </div>
-      )}
-
-      {loading && (
-        <div className={styles.daySkeleton}>
-          <div className={styles.skeletonBar} />
-          <div className={styles.skeletonBar} style={{ width: '60%' }} />
-        </div>
-      )}
-
-      {exibirIndicadorOcioso && (ociosoDisplay?.ativo ?? capacityInfo?.hasOcioso) && diaData?.status === 'ABERTO' && (
-        <div className={styles.ociosoIndicator} title={`${ociosoDisplay?.minutos ?? diaData?.minutos_ociosos ?? 0}min ociosos`}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 6v6l4 2" />
-          </svg>
         </div>
       )}
     </div>

@@ -47,6 +47,8 @@ interface CalendarGridProps {
   isAdmin?: boolean
   loading?: boolean
   exibirIndicadorOcioso?: boolean
+  hoverTitle?: string
+  exibirPlanejamento?: boolean
 }
 
 export default function CalendarGrid({
@@ -64,6 +66,8 @@ export default function CalendarGrid({
   isAdmin = false,
   loading = false,
   exibirIndicadorOcioso = true,
+  hoverTitle,
+  exibirPlanejamento = true,
 }: CalendarGridProps) {
   const [dragStart, setDragStart] = useState<Date | null>(null)
   const [dragEnd, setDragEnd] = useState<Date | null>(null)
@@ -146,6 +150,8 @@ export default function CalendarGrid({
               isAdmin={isAdmin}
               loading={loading && !diaData}
               exibirIndicadorOcioso={exibirIndicadorOcioso}
+              hoverTitle={hoverTitle}
+              exibirPlanejamento={exibirPlanejamento}
               onMouseDown={(e) => handleMouseDown(calDay.date, e)}
               onMouseEnter={() => handleMouseEnter(calDay.date)}
               onClick={() => onDayClick(calDay.date, diaData)}
