@@ -738,3 +738,170 @@
   font-size: 12px;
   color: var(--tx-muted);
 }
+
+/* ── Section header com controles alinhados ──────────────── */
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.sectionHeader .sectionTitle {
+  margin-bottom: 0;
+}
+
+/* ── Controles de mês / usuário ──────────────────────────── */
+
+.mesInput {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-surface);
+  border: 1px solid var(--bd-default);
+  border-radius: var(--r-md);
+  padding: 6px 10px;
+  color: var(--tx-primary);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.12s;
+}
+
+.mesInput:hover,
+.mesInput:focus {
+  border-color: var(--bd-strong);
+}
+
+.usuarioSelect {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-surface);
+  border: 1px solid var(--bd-default);
+  border-radius: var(--r-md);
+  padding: 6px 10px;
+  color: var(--tx-primary);
+  cursor: pointer;
+  outline: none;
+  min-width: 160px;
+  transition: border-color 0.12s;
+}
+
+.usuarioSelect:hover,
+.usuarioSelect:focus {
+  border-color: var(--bd-strong);
+}
+
+.pizzaControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Gráfico de pizza (donut) ────────────────────────────── */
+
+.pizzaWrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  flex-wrap: wrap;
+  background: var(--bg-surface);
+  border: 1px solid var(--bd-subtle);
+  border-radius: var(--r-lg);
+  padding: 24px 28px;
+}
+
+.pizzaSvg {
+  width: 240px;
+  height: 240px;
+  flex-shrink: 0;
+}
+
+.pizzaSlice {
+  cursor: pointer;
+  transition: opacity 0.15s;
+  stroke: var(--bg-page, #ffffff);
+  stroke-width: 1.5px;
+}
+
+.pizzaCenterPct {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  fill: var(--tx-primary);
+}
+
+.pizzaCenterSub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--tx-muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.pizzaCenterMin {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--tx-secondary);
+}
+
+/* ── Legenda do pizza ────────────────────────────────────── */
+
+.pizzaLegenda {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.pizzaLegItem {
+  display: grid;
+  grid-template-columns: 14px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: var(--r-sm);
+  cursor: default;
+  transition: background 0.12s;
+}
+
+.pizzaLegItemHov {
+  background: var(--bg-raised);
+}
+
+.pizzaDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.pizzaNome {
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--tx-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pizzaPct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tx-secondary);
+  white-space: nowrap;
+}
+
+.pizzaHoras {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--tx-muted);
+  white-space: nowrap;
+  min-width: 52px;
+  text-align: right;
+}

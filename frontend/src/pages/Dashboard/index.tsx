@@ -3,9 +3,12 @@
 // Operador: blocos vinculados, pontos por papel, timeline
 // Admin:    visão global, projetos, sync SAP
 // ============================================================
-import { getMeuDashboard, executarSync, getKpiDashboard, getKpiProjetos, getSyncStatus } from "@/api/endpoints"
+import {
+  getMeuDashboard, executarSync, getKpiDashboard, getKpiProjetos, getSyncStatus,
+  getMinhaPizzaMensal, getPizzaMensal, getUsuarios,
+} from "@/api/endpoints"
 import { useAuth } from "@/context/AuthContext"
-import type { BlocoDetalheUsuario, DiaHorasResposta, MesTrilha, PontosSubfaseResposta } from "@/types"
+import type { BlocoDetalheUsuario, DiaHorasResposta, MesTrilha, PizzaFatia, PontosSubfaseResposta } from "@/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format, formatDistanceToNow, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -40,7 +43,7 @@ function fmtDataHora(iso: string | null | undefined): string {
 }
 
 // ─────────────────────────────────────────────────────────────
-// SVG Gráfico mensal acumulado — 3 retas: J previsto, K normal, P total
+// SVG Gráfico diário acumulado — 3 retas: J previsto, K normal, P total
 // ─────────────────────────────────────────────────────────────
 
 const CHART_W = 800
@@ -49,40 +52,43 @@ const PAD = { top: 14, right: 20, bottom: 40, left: 50 }
 const INNER_W = CHART_W - PAD.left - PAD.right
 const INNER_H = CHART_H - PAD.top - PAD.bottom
 
-// Mantido apenas para satisfazer a tipagem herdada — não renderizado
-function _LineChartLegado(_: { dados: DiaHorasResposta[] }) { return null }
-void _LineChartLegado
+// Legado — mantido para satisfazer tipagem herdada, não renderizado
+function _GraficoMensalLegado(_: { dados: MesTrilha[] }) { return null }
+void _GraficoMensalLegado
 
-function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
+function GraficoDiario({ dados }: { dados: DiaHorasResposta[] }) {
   const [hovIdx, setHovIdx] = useState<number | null>(null)
 
+  // Acumula J/K/P dia-a-dia
+  const acum = useMemo(() => {
+    let j = 0, k = 0, p = 0
+    return dados.map((d) => {
+      j += d.minutos_previstos
+      k += d.minutos_lancados_normal
+      p += d.minutos_lancados
+      return { j, k, p }
+    })
+  }, [dados])
+
   const maxMin = useMemo(
-    () => Math.max(
-      ...dados.map((d) => Math.max(
-        d.minutos_previstos_acum,
-        d.minutos_lancados_normal_acum,
-        d.minutos_lancados_total_acum,
-      )),
-      60,
-    ),
-    [dados],
+    () => Math.max(...acum.map((a) => Math.max(a.j, a.k, a.p)), 60),
+    [acum],
   )
-  // Arredonda para próxima hora inteira com folga de 10%
   const maxH = Math.ceil((maxMin * 1.1) / 60)
 
   const n = dados.length
   const xOf = (i: number) => PAD.left + (n > 1 ? (i / (n - 1)) * INNER_W : INNER_W / 2)
   const yOf = (min: number) => PAD.top + INNER_H - (min / (maxH * 60)) * INNER_H
 
-  const polyJ = dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_previstos_acum)}`).join(" ")
-  const polyK = dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_lancados_normal_acum)}`).join(" ")
-  const polyP = dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_lancados_total_acum)}`).join(" ")
+  const polyJ = acum.map((a, i) => `${xOf(i)},${yOf(a.j)}`).join(" ")
+  const polyK = acum.map((a, i) => `${xOf(i)},${yOf(a.k)}`).join(" ")
+  const polyP = acum.map((a, i) => `${xOf(i)},${yOf(a.p)}`).join(" ")
 
-  // Ticks Y: a cada hora inteira, mas limitar a ~6 ticks
   const yStep = Math.max(1, Math.ceil(maxH / 6))
   const yTicks = Array.from({ length: Math.floor(maxH / yStep) + 1 }, (_, k) => k * yStep)
 
-  const hov = hovIdx !== null ? dados[hovIdx] : null
+  // Só mostra 1 label por semana para não sobrecarregar o eixo X
+  const xLabelStep = Math.max(1, Math.floor(n / 7))
 
   return (
     <div className={styles.chartWrap}>
@@ -105,20 +111,20 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
           </g>
         ))}
 
-        {/* Rótulos X — meses */}
-        {dados.map((d, i) => (
-          <text key={d.mes} x={xOf(i)} y={CHART_H - 6} className={styles.axisLabel} textAnchor="middle">
-            {format(parseISO(d.mes), "MMM/yy", { locale: ptBR })}
+        {/* Rótulos X — datas (a cada ~7 dias) */}
+        {dados.map((d, i) => i % xLabelStep === 0 && (
+          <text key={d.data} x={xOf(i)} y={CHART_H - 6} className={styles.axisLabel} textAnchor="middle">
+            {format(parseISO(d.data), "dd/MM")}
           </text>
         ))}
 
-        {/* Reta J — Previsto (tracejada, info) */}
+        {/* Reta J — Previsto acumulado (tracejada) */}
         {n > 1 && <polyline points={polyJ} fill="none" className={styles.linePrevista} strokeDasharray="6 3" />}
 
-        {/* Reta K — Normal lançado (contínua, secundária) */}
+        {/* Reta K — Normal lançado acumulado */}
         {n > 1 && <polyline points={polyK} fill="none" className={styles.lineNormal} />}
 
-        {/* Reta P — Total lançado normal+extra (contínua, accent) */}
+        {/* Reta P — Total lançado acumulado (normal + extra) */}
         {n > 1 && <polyline points={polyP} fill="none" className={styles.lineLancada} />}
 
         {/* Áreas de hover */}
@@ -145,30 +151,232 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
               x2={xOf(hovIdx)} y2={PAD.top + INNER_H}
               className={styles.hoverLine}
             />
+            <circle cx={xOf(hovIdx)} cy={yOf(acum[hovIdx].j)} r={4} className={styles.dotPrev} />
+            <circle cx={xOf(hovIdx)} cy={yOf(acum[hovIdx].k)} r={4} className={styles.dotNormal} />
+            <circle cx={xOf(hovIdx)} cy={yOf(acum[hovIdx].p)} r={4} className={styles.dotLanc} />
+          </>
+        )}
+      </svg>
+
+      {/* Tooltip */}
+      {hovIdx !== null && (
+        <div className={styles.chartTooltip}>
+          <span className={styles.tooltipDate}>
+            {format(parseISO(dados[hovIdx].data), "dd/MM/yyyy", { locale: ptBR })}
+          </span>
+          <span className={styles.tooltipJ}>J Previsto: {fmtMin(acum[hovIdx].j)}</span>
+          <span className={styles.tooltipK}>K Normal: {fmtMin(acum[hovIdx].k)}</span>
+          <span className={styles.tooltipP}>P Total: {fmtMin(acum[hovIdx].p)}</span>
+        </div>
+      )}
+
+      {/* Legenda */}
+      <div className={styles.chartLegend}>
+        <span className={styles.legendJ}>- - J Previsto acum.</span>
+        <span className={styles.legendK}>── K Normal acum.</span>
+        <span className={styles.legendP}>── P Total acum. (normal + extra)</span>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// SVG Gráfico mensal acumulado (admin) — mesma estrutura, dados mensais
+// ─────────────────────────────────────────────────────────────
+
+function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
+  const [hovIdx, setHovIdx] = useState<number | null>(null)
+
+  const maxMin = useMemo(
+    () => Math.max(
+      ...dados.map((d) => Math.max(
+        d.minutos_previstos_acum,
+        d.minutos_lancados_normal_acum,
+        d.minutos_lancados_total_acum,
+      )),
+      60,
+    ),
+    [dados],
+  )
+  const maxH = Math.ceil((maxMin * 1.1) / 60)
+
+  const n = dados.length
+  const xOf = (i: number) => PAD.left + (n > 1 ? (i / (n - 1)) * INNER_W : INNER_W / 2)
+  const yOf = (min: number) => PAD.top + INNER_H - (min / (maxH * 60)) * INNER_H
+
+  const polyJ = dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_previstos_acum)}`).join(" ")
+  const polyK = dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_lancados_normal_acum)}`).join(" ")
+  const polyP = dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_lancados_total_acum)}`).join(" ")
+
+  const yStep = Math.max(1, Math.ceil(maxH / 6))
+  const yTicks = Array.from({ length: Math.floor(maxH / yStep) + 1 }, (_, k) => k * yStep)
+
+  return (
+    <div className={styles.chartWrap}>
+      <svg
+        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+        className={styles.chartSvg}
+        onMouseLeave={() => setHovIdx(null)}
+      >
+        {yTicks.map((h) => (
+          <g key={h}>
+            <line x1={PAD.left} y1={yOf(h * 60)} x2={PAD.left + INNER_W} y2={yOf(h * 60)} className={styles.gridLine} />
+            <text x={PAD.left - 8} y={yOf(h * 60) + 4} className={styles.axisLabel} textAnchor="end">{h}h</text>
+          </g>
+        ))}
+        {dados.map((d, i) => (
+          <text key={d.mes} x={xOf(i)} y={CHART_H - 6} className={styles.axisLabel} textAnchor="middle">
+            {format(parseISO(d.mes), "MMM/yy", { locale: ptBR })}
+          </text>
+        ))}
+        {n > 1 && <polyline points={polyJ} fill="none" className={styles.linePrevista} strokeDasharray="6 3" />}
+        {n > 1 && <polyline points={polyK} fill="none" className={styles.lineNormal} />}
+        {n > 1 && <polyline points={polyP} fill="none" className={styles.lineLancada} />}
+        {dados.map((_, i) => {
+          const w = n > 1 ? INNER_W / (n - 1) : INNER_W
+          return (
+            <rect key={i} x={xOf(i) - w / 2} y={PAD.top} width={w} height={INNER_H} fill="transparent"
+              onMouseEnter={() => setHovIdx(i)} />
+          )
+        })}
+        {hovIdx !== null && (
+          <>
+            <line x1={xOf(hovIdx)} y1={PAD.top} x2={xOf(hovIdx)} y2={PAD.top + INNER_H} className={styles.hoverLine} />
             <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_previstos_acum)} r={4} className={styles.dotPrev} />
             <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_lancados_normal_acum)} r={4} className={styles.dotNormal} />
             <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_lancados_total_acum)} r={4} className={styles.dotLanc} />
           </>
         )}
       </svg>
-
-      {/* Tooltip */}
-      {hov && (
+      {hovIdx !== null && (
         <div className={styles.chartTooltip}>
-          <span className={styles.tooltipDate}>
-            {format(parseISO(hov.mes), "MMMM yyyy", { locale: ptBR })}
-          </span>
-          <span className={styles.tooltipJ}>J Previsto: {fmtMin(hov.minutos_previstos_acum)}</span>
-          <span className={styles.tooltipK}>K Normal: {fmtMin(hov.minutos_lancados_normal_acum)}</span>
-          <span className={styles.tooltipP}>P Total: {fmtMin(hov.minutos_lancados_total_acum)}</span>
+          <span className={styles.tooltipDate}>{format(parseISO(dados[hovIdx].mes), "MMMM yyyy", { locale: ptBR })}</span>
+          <span className={styles.tooltipJ}>J Previsto: {fmtMin(dados[hovIdx].minutos_previstos_acum)}</span>
+          <span className={styles.tooltipK}>K Normal: {fmtMin(dados[hovIdx].minutos_lancados_normal_acum)}</span>
+          <span className={styles.tooltipP}>P Total: {fmtMin(dados[hovIdx].minutos_lancados_total_acum)}</span>
         </div>
       )}
-
-      {/* Legenda */}
       <div className={styles.chartLegend}>
-        <span className={styles.legendJ}>- - J Previsto</span>
-        <span className={styles.legendK}>── K Normal</span>
-        <span className={styles.legendP}>── P Total (normal + extra)</span>
+        <span className={styles.legendJ}>- - J Previsto acum.</span>
+        <span className={styles.legendK}>── K Normal acum.</span>
+        <span className={styles.legendP}>── P Total acum. (normal + extra)</span>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// SVG Gráfico de Pizza (donut) — distribuição de horas por atividade
+// ─────────────────────────────────────────────────────────────
+
+const PIZZA_R  = 88   // raio externo
+const PIZZA_r  = 50   // raio interno (buraco)
+const PIZZA_CX = 120
+const PIZZA_CY = 120
+
+function arcPath(sa: number, ea: number, R: number, ri: number, cx: number, cy: number): string {
+  if (Math.abs(ea - sa) >= 2 * Math.PI - 0.001) {
+    // Círculo completo: desenha dois arcos de 180°
+    const mid = sa + Math.PI
+    const x1o = cx + R * Math.cos(sa), y1o = cy + R * Math.sin(sa)
+    const xmo = cx + R * Math.cos(mid), ymo = cy + R * Math.sin(mid)
+    const x1i = cx + ri * Math.cos(ea), y1i = cy + ri * Math.sin(ea)
+    const xmi = cx + ri * Math.cos(mid), ymi = cy + ri * Math.sin(mid)
+    return `M ${x1o} ${y1o} A ${R} ${R} 0 1 1 ${xmo} ${ymo} A ${R} ${R} 0 1 1 ${x1o} ${y1o}
+            M ${x1i} ${y1i} A ${ri} ${ri} 0 1 0 ${xmi} ${ymi} A ${ri} ${ri} 0 1 0 ${x1i} ${y1i} Z`
+  }
+  const la = ea - sa > Math.PI ? 1 : 0
+  const x1 = cx + R * Math.cos(sa),  y1 = cy + R * Math.sin(sa)
+  const x2 = cx + R * Math.cos(ea),  y2 = cy + R * Math.sin(ea)
+  const x3 = cx + ri * Math.cos(ea), y3 = cy + ri * Math.sin(ea)
+  const x4 = cx + ri * Math.cos(sa), y4 = cy + ri * Math.sin(sa)
+  return `M ${x1} ${y1} A ${R} ${R} 0 ${la} 1 ${x2} ${y2} L ${x3} ${y3} A ${ri} ${ri} 0 ${la} 0 ${x4} ${y4} Z`
+}
+
+interface PizzaSlice extends PizzaFatia { isNaoAlocado?: boolean }
+
+function GraficoPizza({
+  fatias,
+  totalCapacidadeMin,
+  naoAlocadoMin,
+}: {
+  fatias: PizzaFatia[]
+  totalCapacidadeMin: number
+  naoAlocadoMin: number
+}) {
+  const [hovIdx, setHovIdx] = useState<number | null>(null)
+
+  const base = Math.max(totalCapacidadeMin, fatias.reduce((s, f) => s + f.minutos, 0), 1)
+
+  const allSlices: PizzaSlice[] = useMemo(() => {
+    const slices: PizzaSlice[] = fatias.map((f) => ({ ...f }))
+    if (naoAlocadoMin > 0) {
+      slices.push({
+        nome: "Não alocado",
+        cor: "#d0d5dd",
+        minutos: naoAlocadoMin,
+        percentual: Math.round((naoAlocadoMin / base) * 1000) / 10,
+        isNaoAlocado: true,
+      })
+    }
+    return slices
+  }, [fatias, naoAlocadoMin, base])
+
+  const arcs = useMemo(() => {
+    let angle = -Math.PI / 2
+    return allSlices.map((slice) => {
+      const span = (slice.minutos / base) * 2 * Math.PI
+      const sa = angle
+      angle += span
+      return { sa, ea: angle, slice }
+    })
+  }, [allSlices, base])
+
+  const pctAlocado = Math.round(((base - naoAlocadoMin) / base) * 100)
+
+  return (
+    <div className={styles.pizzaWrap}>
+      <svg viewBox="0 0 240 240" className={styles.pizzaSvg}>
+        {arcs.map(({ sa, ea, slice }, i) => (
+          <path
+            key={i}
+            d={arcPath(sa, ea, PIZZA_R, PIZZA_r, PIZZA_CX, PIZZA_CY)}
+            fill={slice.cor}
+            opacity={hovIdx === null || hovIdx === i ? 1 : 0.55}
+            className={styles.pizzaSlice}
+            onMouseEnter={() => setHovIdx(i)}
+            onMouseLeave={() => setHovIdx(null)}
+          />
+        ))}
+        {/* Centro */}
+        <text x={PIZZA_CX} y={PIZZA_CY - 10} textAnchor="middle" className={styles.pizzaCenterPct}>
+          {pctAlocado}%
+        </text>
+        <text x={PIZZA_CX} y={PIZZA_CY + 8} textAnchor="middle" className={styles.pizzaCenterSub}>
+          alocado
+        </text>
+        {/* Tooltip da fatia hovered */}
+        {hovIdx !== null && (
+          <text x={PIZZA_CX} y={PIZZA_CY + 24} textAnchor="middle" className={styles.pizzaCenterMin}>
+            {fmtMin(allSlices[hovIdx].minutos)}
+          </text>
+        )}
+      </svg>
+
+      <div className={styles.pizzaLegenda}>
+        {allSlices.map((s, i) => (
+          <div
+            key={i}
+            className={`${styles.pizzaLegItem} ${hovIdx === i ? styles.pizzaLegItemHov : ""}`}
+            onMouseEnter={() => setHovIdx(i)}
+            onMouseLeave={() => setHovIdx(null)}
+          >
+            <span className={styles.pizzaDot} style={{ background: s.cor }} />
+            <span className={styles.pizzaNome}>{s.nome}</span>
+            <span className={styles.pizzaPct}>{s.percentual.toFixed(1)}%</span>
+            <span className={styles.pizzaHoras}>{fmtMin(s.minutos)}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -317,6 +525,12 @@ function OperadorDashboard() {
     refetchInterval: 120_000,
   })
 
+  const [mesPizza, setMesPizza] = useState(() => format(new Date(), "yyyy-MM"))
+  const { data: pizzaData } = useQuery({
+    queryKey: ["minhaPizza", mesPizza],
+    queryFn: () => getMinhaPizzaMensal(mesPizza),
+  })
+
   const kpiTs = data?.kpi_calculado_em
     ? formatDistanceToNow(parseISO(data.kpi_calculado_em), { addSuffix: true, locale: ptBR })
     : null
@@ -388,17 +602,41 @@ function OperadorDashboard() {
         </div>
       </div>
 
-      {data && data.timeline_mensal.length > 0 && (
+      {data && data.timeline.length > 0 && (
         <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>Evolução acumulada de horas em produção</h2>
+          <h2 className={styles.sectionTitle}>Evolução acumulada de horas em produção (últimos 45 dias)</h2>
           <div className={styles.chartCard}>
-            <GraficoMensal dados={data.timeline_mensal} />
+            <GraficoDiario dados={data.timeline} />
           </div>
           <p className={styles.chartCaption}>
-            Reta J = meta prevista pelo administrador · Reta K = horas normais realizadas · Reta P = normal + hora extra
+            Reta J = meta prevista acum. · Reta K = horas normais acum. · Reta P = normal + extra acum.
           </p>
         </div>
       )}
+
+      <div className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>
+            Distribuição de horas —{" "}
+            {format(parseISO(`${mesPizza}-01`), "MMMM yyyy", { locale: ptBR })}
+          </h2>
+          <input
+            type="month"
+            value={mesPizza}
+            onChange={(e) => setMesPizza(e.target.value)}
+            className={styles.mesInput}
+          />
+        </div>
+        {pizzaData && pizzaData.total_capacidade_min > 0 ? (
+          <GraficoPizza
+            fatias={pizzaData.fatias}
+            totalCapacidadeMin={pizzaData.total_capacidade_min}
+            naoAlocadoMin={pizzaData.nao_alocado_min}
+          />
+        ) : (
+          <div className={styles.emptyState}>Nenhum lançamento registrado neste mês.</div>
+        )}
+      </div>
 
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>
@@ -445,6 +683,18 @@ function AdminDashboard() {
     queryFn: getSyncStatus,
     refetchInterval: (query) =>
       query.state.data?.ultima_execucao_status === "executando" ? 5_000 : 60_000,
+  })
+
+  const { data: usuarios } = useQuery({
+    queryKey: ["usuarios"],
+    queryFn: getUsuarios,
+  })
+
+  const [mesPizza, setMesPizza] = useState(() => format(new Date(), "yyyy-MM"))
+  const [usuarioPizza, setUsuarioPizza] = useState(0)
+  const { data: pizzaData } = useQuery({
+    queryKey: ["pizzaAdmin", mesPizza, usuarioPizza],
+    queryFn: () => getPizzaMensal(mesPizza, usuarioPizza),
   })
 
   const sincMutation = useMutation({
@@ -524,10 +774,48 @@ function AdminDashboard() {
             <GraficoMensal dados={dashboard.timeline_mensal ?? []} />
           </div>
           <p className={styles.chartCaption}>
-            Reta J = meta prevista · Reta K = horas normais realizadas · Reta P = normal + hora extra
+            Reta J = meta prevista acum. · Reta K = horas normais acum. · Reta P = normal + extra acum.
           </p>
         </div>
       )}
+
+      <div className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>
+            Distribuição de horas —{" "}
+            {format(parseISO(`${mesPizza}-01`), "MMMM yyyy", { locale: ptBR })}
+          </h2>
+          <div className={styles.pizzaControls}>
+            <input
+              type="month"
+              value={mesPizza}
+              onChange={(e) => setMesPizza(e.target.value)}
+              className={styles.mesInput}
+            />
+            <select
+              value={usuarioPizza}
+              onChange={(e) => setUsuarioPizza(Number(e.target.value))}
+              className={styles.usuarioSelect}
+            >
+              <option value={0}>Todos os operadores</option>
+              {(usuarios ?? []).map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.nome_guerra ?? u.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {pizzaData && pizzaData.total_capacidade_min > 0 ? (
+          <GraficoPizza
+            fatias={pizzaData.fatias}
+            totalCapacidadeMin={pizzaData.total_capacidade_min}
+            naoAlocadoMin={pizzaData.nao_alocado_min}
+          />
+        ) : (
+          <div className={styles.emptyState}>Nenhum lançamento registrado neste mês.</div>
+        )}
+      </div>
 
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>Projetos</h2>

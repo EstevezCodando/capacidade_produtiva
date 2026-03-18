@@ -129,6 +129,27 @@ export interface DiaHorasResposta {
   data: string
   minutos_previstos: number
   minutos_lancados: number
+  minutos_lancados_normal: number
+}
+
+export interface PizzaFatia {
+  nome: string
+  cor: string
+  minutos: number
+  percentual: number
+}
+
+export interface PizzaDistribuicaoResponse {
+  mes: string
+  total_capacidade_min: number
+  nao_alocado_min: number
+  fatias: PizzaFatia[]
+}
+
+export interface UsuarioResumo {
+  id: number
+  nome: string
+  nome_guerra: string | null
 }
 
 export interface MesTrilha {

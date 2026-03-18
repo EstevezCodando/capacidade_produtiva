@@ -15,7 +15,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Request
+from datetime import date
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import text
 
@@ -1013,6 +1014,21 @@ class DiaHorasResposta(BaseModel):
     data: str
     minutos_previstos: int
     minutos_lancados: int
+    minutos_lancados_normal: int = 0
+
+
+class PizzaFatia(BaseModel):
+    nome: str
+    cor: str
+    minutos: int
+    percentual: float
+
+
+class PizzaDistribuicaoResponse(BaseModel):
+    mes: str
+    total_capacidade_min: int
+    nao_alocado_min: int
+    fatias: list[PizzaFatia]
 
 
 class MeuDashboardResposta(BaseModel):
@@ -1202,7 +1218,9 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request) -> MeuDashboardRespo
                 ),
                 lancados AS (
                     SELECT al.data_lancamento AS data,
-                           SUM(al.minutos) AS minutos
+                           SUM(al.minutos) AS minutos,
+                           SUM(CASE WHEN al.faixa_minuto::text = 'NORMAL'
+                                    THEN al.minutos ELSE 0 END) AS minutos_normal
                     FROM capacidade.agenda_lancamento al
                     JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
                     WHERE al.usuario_id = :uid
@@ -1214,7 +1232,8 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request) -> MeuDashboardRespo
                 SELECT
                     d.data::text,
                     COALESCE(p.minutos, 0) AS minutos_previstos,
-                    COALESCE(l.minutos, 0) AS minutos_lancados
+                    COALESCE(l.minutos, 0) AS minutos_lancados,
+                    COALESCE(l.minutos_normal, 0) AS minutos_lancados_normal
                 FROM dias d
                 LEFT JOIN previstos p ON p.data = d.data
                 LEFT JOIN lancados  l ON l.data = d.data
@@ -1225,6 +1244,7 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request) -> MeuDashboardRespo
                     data=str(row.data),
                     minutos_previstos=int(row.minutos_previstos),
                     minutos_lancados=int(row.minutos_lancados),
+                    minutos_lancados_normal=int(row.minutos_lancados_normal),
                 ))
 
             # ── 6. Timeline mensal acumulada ──────────────────────────────
@@ -1320,3 +1340,141 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request) -> MeuDashboardRespo
         timeline=timeline,
         timeline_mensal=timeline_mensal,
     )
+
+
+# ---------------------------------------------------------------------------
+# Helper — parse mes string para date
+# ---------------------------------------------------------------------------
+
+def _parse_mes(mes: str) -> date:
+    """Converte 'YYYY-MM' para o 1º dia do mês. Default: mês atual."""
+    if mes:
+        try:
+            ano, m = mes.split("-")
+            return date(int(ano), int(m), 1)
+        except Exception:
+            pass
+    today = date.today()
+    return today.replace(day=1)
+
+
+def _pizza_query(
+    engine_cp: Any,
+    mes_inicio: date,
+    usuario_id: int | None,
+) -> PizzaDistribuicaoResponse:
+    """Calcula a distribuição de lançamentos para um mês, opcionalmente filtrado por usuário."""
+    mes_str = mes_inicio.strftime("%Y-%m-%d")
+
+    uid_filter = "AND al.usuario_id = :uid" if usuario_id else ""
+    cap_filter = "AND cd.usuario_id = :uid" if usuario_id else ""
+
+    sql_fatias = text(f"""
+        SELECT
+            ta.nome AS nome,
+            ta.cor  AS cor,
+            SUM(al.minutos) AS minutos
+        FROM capacidade.agenda_lancamento al
+        JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
+        WHERE al.em_uso = TRUE
+          AND date_trunc('month', al.data_lancamento)::date = :mes_inicio
+          {uid_filter}
+        GROUP BY ta.nome, ta.cor
+        ORDER BY minutos DESC
+    """)
+
+    sql_capacidade = text(f"""
+        SELECT COALESCE(SUM(cd.minutos_capacidade_normal_prevista), 0) AS total
+        FROM capacidade.capacidade_dia cd
+        WHERE date_trunc('month', cd.data)::date = :mes_inicio
+          {cap_filter}
+    """)
+
+    params: dict[str, Any] = {"mes_inicio": mes_str}
+    if usuario_id:
+        params["uid"] = usuario_id
+
+    fatias_raw: list[dict[str, Any]] = []
+    total_lancado = 0
+    total_capacidade = 0
+
+    try:
+        with engine_cp.connect() as conn:
+            for row in conn.execute(sql_fatias, params):
+                fatias_raw.append({
+                    "nome": row.nome,
+                    "cor": row.cor or "#5B8DEE",
+                    "minutos": int(row.minutos),
+                })
+                total_lancado += int(row.minutos)
+
+            row_cap = conn.execute(sql_capacidade, params).fetchone()
+            total_capacidade = int(row_cap.total) if row_cap else 0
+    except Exception:
+        _logger.exception("Erro ao calcular pizza mes=%s uid=%s", mes_str, usuario_id)
+
+    base = max(total_capacidade, total_lancado)
+    nao_alocado = max(0, base - total_lancado)
+
+    fatias = [
+        PizzaFatia(
+            nome=f["nome"],
+            cor=f["cor"],
+            minutos=f["minutos"],
+            percentual=round(f["minutos"] / base * 100, 1) if base > 0 else 0.0,
+        )
+        for f in fatias_raw
+    ]
+
+    return PizzaDistribuicaoResponse(
+        mes=mes_inicio.strftime("%Y-%m"),
+        total_capacidade_min=base,
+        nao_alocado_min=nao_alocado,
+        fatias=fatias,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Rota /kpi/minha-distribuicao — operador
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/minha-distribuicao",
+    summary="Distribuição de lançamentos do usuário em um mês",
+)
+def minha_distribuicao(
+    usuario: UsuarioLogado,
+    request: Request,
+    mes: str = Query(default="", description="Mês no formato YYYY-MM (default: mês atual)"),
+) -> PizzaDistribuicaoResponse:
+    """Retorna a distribuição de lançamentos do usuário autenticado em um determinado mês.
+
+    Cada fatia representa um tipo de atividade com sua cor e percentual.
+    A fatia 'Não alocado' representa a capacidade não utilizada.
+    """
+    engine_cp = request.app.state.engine_cp
+    mes_inicio = _parse_mes(mes)
+    return _pizza_query(engine_cp, mes_inicio, usuario.usuario_id)
+
+
+# ---------------------------------------------------------------------------
+# Rota /kpi/distribuicao-mensal — admin
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/distribuicao-mensal",
+    summary="Distribuição mensal de lançamentos (admin)",
+)
+def distribuicao_mensal(
+    _: SomenteAdmin,
+    request: Request,
+    mes: str = Query(default="", description="Mês no formato YYYY-MM (default: mês atual)"),
+    usuario_id: int = Query(default=0, description="ID do usuário (0 = todos os operadores)"),
+) -> PizzaDistribuicaoResponse:
+    """Retorna a distribuição de lançamentos de todos os operadores (ou de um específico) em um mês."""
+    engine_cp = request.app.state.engine_cp
+    mes_inicio = _parse_mes(mes)
+    uid = usuario_id if usuario_id > 0 else None
+    return _pizza_query(engine_cp, mes_inicio, uid)
