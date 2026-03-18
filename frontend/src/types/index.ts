@@ -103,6 +103,7 @@ export interface KpiDashboardResponse {
   top_revisor: unknown | null
   top_executores_subfase: Array<Record<string, unknown>>
   top_revisores_subfase: Array<Record<string, unknown>>
+  timeline_mensal: MesTrilha[]
 }
 
 // ── Dashboard do operador ─────────────────────────────────────
@@ -130,6 +131,13 @@ export interface DiaHorasResposta {
   minutos_lancados: number
 }
 
+export interface MesTrilha {
+  mes: string                        // "YYYY-MM-DD" 1º do mês
+  minutos_previstos_acum: number     // J: previsto acumulado
+  minutos_lancados_normal_acum: number  // K: normal acumulado
+  minutos_lancados_total_acum: number   // P: normal+extra acumulado
+}
+
 export interface MeuDashboardResponse {
   sap_snapshot_atualizado_em: string | null
   kpi_calculado_em: string | null
@@ -140,4 +148,5 @@ export interface MeuDashboardResponse {
   horas_lancadas_producao_min: number
   horas_lancadas_externas_min: number
   timeline: DiaHorasResposta[]
+  timeline_mensal: MesTrilha[]
 }

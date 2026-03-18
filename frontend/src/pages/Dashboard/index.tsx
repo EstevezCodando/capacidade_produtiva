@@ -5,7 +5,7 @@
 // ============================================================
 import { getMeuDashboard, executarSync, getKpiDashboard, getKpiProjetos, getSyncStatus } from "@/api/endpoints"
 import { useAuth } from "@/context/AuthContext"
-import type { BlocoDetalheUsuario, DiaHorasResposta, PontosSubfaseResposta } from "@/types"
+import type { BlocoDetalheUsuario, DiaHorasResposta, MesTrilha, PontosSubfaseResposta } from "@/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format, formatDistanceToNow, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -40,31 +40,48 @@ function fmtDataHora(iso: string | null | undefined): string {
 }
 
 // ─────────────────────────────────────────────────────────────
-// SVG Line Chart
+// SVG Gráfico mensal acumulado — 3 retas: J previsto, K normal, P total
 // ─────────────────────────────────────────────────────────────
 
 const CHART_W = 800
-const CHART_H = 180
-const PAD = { top: 10, right: 16, bottom: 36, left: 44 }
+const CHART_H = 200
+const PAD = { top: 14, right: 20, bottom: 40, left: 50 }
 const INNER_W = CHART_W - PAD.left - PAD.right
 const INNER_H = CHART_H - PAD.top - PAD.bottom
 
-function LineChart({ dados }: { dados: DiaHorasResposta[] }) {
+// Mantido apenas para satisfazer a tipagem herdada — não renderizado
+function _LineChartLegado(_: { dados: DiaHorasResposta[] }) { return null }
+void _LineChartLegado
+
+function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
   const [hovIdx, setHovIdx] = useState<number | null>(null)
 
   const maxMin = useMemo(
-    () => Math.max(...dados.map((d) => Math.max(d.minutos_previstos, d.minutos_lancados)), 60),
+    () => Math.max(
+      ...dados.map((d) => Math.max(
+        d.minutos_previstos_acum,
+        d.minutos_lancados_normal_acum,
+        d.minutos_lancados_total_acum,
+      )),
+      60,
+    ),
     [dados],
   )
-  const maxH = Math.ceil(maxMin / 60 + 0.5)
+  // Arredonda para próxima hora inteira com folga de 10%
+  const maxH = Math.ceil((maxMin * 1.1) / 60)
 
-  const xOf = (i: number) => PAD.left + (i / Math.max(dados.length - 1, 1)) * INNER_W
+  const n = dados.length
+  const xOf = (i: number) => PAD.left + (n > 1 ? (i / (n - 1)) * INNER_W : INNER_W / 2)
   const yOf = (min: number) => PAD.top + INNER_H - (min / (maxH * 60)) * INNER_H
 
-  const polyPrev = dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_previstos)}`).join(" ")
-  const polyLanc = dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_lancados)}`).join(" ")
-  const yTicks = Array.from({ length: maxH + 1 }, (_, i) => i)
-  const xLabels = dados.filter((_, i) => i % 7 === 0 || i === dados.length - 1)
+  const polyJ = dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_previstos_acum)}`).join(" ")
+  const polyK = dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_lancados_normal_acum)}`).join(" ")
+  const polyP = dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_lancados_total_acum)}`).join(" ")
+
+  // Ticks Y: a cada hora inteira, mas limitar a ~6 ticks
+  const yStep = Math.max(1, Math.ceil(maxH / 6))
+  const yTicks = Array.from({ length: Math.floor(maxH / yStep) + 1 }, (_, k) => k * yStep)
+
   const hov = hovIdx !== null ? dados[hovIdx] : null
 
   return (
@@ -74,51 +91,84 @@ function LineChart({ dados }: { dados: DiaHorasResposta[] }) {
         className={styles.chartSvg}
         onMouseLeave={() => setHovIdx(null)}
       >
+        {/* Grade Y */}
         {yTicks.map((h) => (
           <g key={h}>
-            <line x1={PAD.left} y1={yOf(h * 60)} x2={PAD.left + INNER_W} y2={yOf(h * 60)} className={styles.gridLine} />
-            <text x={PAD.left - 6} y={yOf(h * 60) + 4} className={styles.axisLabel} textAnchor="end">{h}h</text>
+            <line
+              x1={PAD.left} y1={yOf(h * 60)}
+              x2={PAD.left + INNER_W} y2={yOf(h * 60)}
+              className={styles.gridLine}
+            />
+            <text x={PAD.left - 8} y={yOf(h * 60) + 4} className={styles.axisLabel} textAnchor="end">
+              {h}h
+            </text>
           </g>
         ))}
-        {xLabels.map((d) => {
-          const i = dados.indexOf(d)
+
+        {/* Rótulos X — meses */}
+        {dados.map((d, i) => (
+          <text key={d.mes} x={xOf(i)} y={CHART_H - 6} className={styles.axisLabel} textAnchor="middle">
+            {format(parseISO(d.mes), "MMM/yy", { locale: ptBR })}
+          </text>
+        ))}
+
+        {/* Reta J — Previsto (tracejada, info) */}
+        {n > 1 && <polyline points={polyJ} fill="none" className={styles.linePrevista} strokeDasharray="6 3" />}
+
+        {/* Reta K — Normal lançado (contínua, secundária) */}
+        {n > 1 && <polyline points={polyK} fill="none" className={styles.lineNormal} />}
+
+        {/* Reta P — Total lançado normal+extra (contínua, accent) */}
+        {n > 1 && <polyline points={polyP} fill="none" className={styles.lineLancada} />}
+
+        {/* Áreas de hover */}
+        {dados.map((_, i) => {
+          const w = n > 1 ? INNER_W / (n - 1) : INNER_W
           return (
-            <text key={d.data} x={xOf(i)} y={CHART_H - 4} className={styles.axisLabel} textAnchor="middle">
-              {format(parseISO(d.data), "dd/MM", { locale: ptBR })}
-            </text>
+            <rect
+              key={i}
+              x={xOf(i) - w / 2}
+              y={PAD.top}
+              width={w}
+              height={INNER_H}
+              fill="transparent"
+              onMouseEnter={() => setHovIdx(i)}
+            />
           )
         })}
-        <polyline points={polyPrev} fill="none" className={styles.linePrevista} strokeDasharray="5 3" />
-        <polyline points={polyLanc} fill="none" className={styles.lineLancada} />
-        {dados.map((_, i) => (
-          <rect
-            key={i}
-            x={xOf(i) - INNER_W / (2 * dados.length)}
-            y={PAD.top}
-            width={INNER_W / dados.length}
-            height={INNER_H}
-            fill="transparent"
-            onMouseEnter={() => setHovIdx(i)}
-          />
-        ))}
+
+        {/* Linha de hover + pontos */}
         {hovIdx !== null && (
           <>
-            <line x1={xOf(hovIdx)} y1={PAD.top} x2={xOf(hovIdx)} y2={PAD.top + INNER_H} className={styles.hoverLine} />
-            <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_previstos)} r={4} className={styles.dotPrev} />
-            <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_lancados)} r={4} className={styles.dotLanc} />
+            <line
+              x1={xOf(hovIdx)} y1={PAD.top}
+              x2={xOf(hovIdx)} y2={PAD.top + INNER_H}
+              className={styles.hoverLine}
+            />
+            <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_previstos_acum)} r={4} className={styles.dotPrev} />
+            <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_lancados_normal_acum)} r={4} className={styles.dotNormal} />
+            <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_lancados_total_acum)} r={4} className={styles.dotLanc} />
           </>
         )}
       </svg>
+
+      {/* Tooltip */}
       {hov && (
         <div className={styles.chartTooltip}>
-          <span className={styles.tooltipDate}>{format(parseISO(hov.data), "dd MMM", { locale: ptBR })}</span>
-          <span className={styles.tooltipPrev}>Previsto: {fmtMin(hov.minutos_previstos)}</span>
-          <span className={styles.tooltipLanc}>Realizado: {fmtMin(hov.minutos_lancados)}</span>
+          <span className={styles.tooltipDate}>
+            {format(parseISO(hov.mes), "MMMM yyyy", { locale: ptBR })}
+          </span>
+          <span className={styles.tooltipJ}>J Previsto: {fmtMin(hov.minutos_previstos_acum)}</span>
+          <span className={styles.tooltipK}>K Normal: {fmtMin(hov.minutos_lancados_normal_acum)}</span>
+          <span className={styles.tooltipP}>P Total: {fmtMin(hov.minutos_lancados_total_acum)}</span>
         </div>
       )}
+
+      {/* Legenda */}
       <div className={styles.chartLegend}>
-        <span className={styles.legendPrev}>- - Previsto</span>
-        <span className={styles.legendLanc}>── Realizado</span>
+        <span className={styles.legendJ}>- - J Previsto</span>
+        <span className={styles.legendK}>── K Normal</span>
+        <span className={styles.legendP}>── P Total (normal + extra)</span>
       </div>
     </div>
   )
@@ -338,12 +388,15 @@ function OperadorDashboard() {
         </div>
       </div>
 
-      {data && data.timeline.some((d) => d.minutos_previstos > 0 || d.minutos_lancados > 0) && (
+      {data && data.timeline_mensal.length > 0 && (
         <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>Horas previstas × realizadas em produção (últimos 45 dias)</h2>
+          <h2 className={styles.sectionTitle}>Evolução acumulada de horas em produção</h2>
           <div className={styles.chartCard}>
-            <LineChart dados={data.timeline} />
+            <GraficoMensal dados={data.timeline_mensal} />
           </div>
+          <p className={styles.chartCaption}>
+            Reta J = meta prevista pelo administrador · Reta K = horas normais realizadas · Reta P = normal + hora extra
+          </p>
         </div>
       )}
 
@@ -463,6 +516,18 @@ function AdminDashboard() {
           />
         )}
       </div>
+
+      {dashboard && (dashboard.timeline_mensal ?? []).length > 0 && (
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>Evolução acumulada de horas em produção — todos os operadores</h2>
+          <div className={styles.chartCard}>
+            <GraficoMensal dados={dashboard.timeline_mensal ?? []} />
+          </div>
+          <p className={styles.chartCaption}>
+            Reta J = meta prevista · Reta K = horas normais realizadas · Reta P = normal + hora extra
+          </p>
+        </div>
+      )}
 
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>Projetos</h2>

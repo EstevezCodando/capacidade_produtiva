@@ -174,6 +174,15 @@ class InconsistenciasResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class MesTrilhaResposta(BaseModel):
+    """Ponto mensal da timeline acumulada de horas."""
+
+    mes: str                         # "YYYY-MM-DD" — 1º dia do mês
+    minutos_previstos_acum: int      # J: previsto acumulado até este mês
+    minutos_lancados_normal_acum: int  # K: lançado horário normal acumulado
+    minutos_lancados_total_acum: int   # P: lançado normal + extra acumulado
+
+
 class TopUsuario(BaseModel):
     usuario_id: int
     nome: str
@@ -224,6 +233,7 @@ class DashboardResponse(BaseModel):
     top_revisor: TopUsuario | None
     top_executores_subfase: list[dict[str, Any]]
     top_revisores_subfase: list[dict[str, Any]]
+    timeline_mensal: list[MesTrilhaResposta] = []
 
 
 # ---------------------------------------------------------------------------
@@ -626,6 +636,7 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
     top_revisor: TopUsuario | None = None
     top_executores_subfase: list[dict[str, Any]] = []
     top_revisores_subfase: list[dict[str, Any]] = []
+    timeline_mensal: list[MesTrilhaResposta] = []
 
     try:
         with engine_cp.connect() as conn:
@@ -881,8 +892,80 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                         "pontos": float(row.pontos),
                     }
                 )
+
+            # 8. Timeline mensal acumulada — J (previsto), K (normal), P (total)
+            sql_timeline_mensal = text("""
+                WITH data_inicio AS (
+                    SELECT LEAST(
+                        COALESCE(
+                            (SELECT MIN(ap.data)
+                             FROM capacidade.agenda_prevista_admin ap
+                             WHERE ap.em_uso = TRUE AND ap.bloco_id IS NOT NULL),
+                            date_trunc('month', CURRENT_DATE)::date
+                        ),
+                        COALESCE(
+                            (SELECT MIN(al.data_lancamento)
+                             FROM capacidade.agenda_lancamento al
+                             JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
+                             WHERE al.em_uso = TRUE AND ta.codigo = 'BLOCO'),
+                            date_trunc('month', CURRENT_DATE)::date
+                        )
+                    ) AS inicio
+                ),
+                meses AS (
+                    SELECT generate_series(
+                        date_trunc('month', (SELECT inicio FROM data_inicio)),
+                        date_trunc('month', CURRENT_DATE),
+                        '1 month'::interval
+                    )::date AS mes
+                ),
+                previsto_mensal AS (
+                    SELECT date_trunc('month', ap.data)::date AS mes,
+                           SUM(ap.minutos_planejados_normais + ap.minutos_planejados_extras) AS min_prev
+                    FROM capacidade.agenda_prevista_admin ap
+                    WHERE ap.em_uso = TRUE AND ap.bloco_id IS NOT NULL
+                    GROUP BY 1
+                ),
+                lancado_normal_mensal AS (
+                    SELECT date_trunc('month', al.data_lancamento)::date AS mes,
+                           SUM(al.minutos) AS min_norm
+                    FROM capacidade.agenda_lancamento al
+                    JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
+                    WHERE al.em_uso = TRUE AND ta.codigo = 'BLOCO'
+                      AND al.faixa_minuto::text = 'NORMAL'
+                    GROUP BY 1
+                ),
+                lancado_total_mensal AS (
+                    SELECT date_trunc('month', al.data_lancamento)::date AS mes,
+                           SUM(al.minutos) AS min_total
+                    FROM capacidade.agenda_lancamento al
+                    JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
+                    WHERE al.em_uso = TRUE AND ta.codigo = 'BLOCO'
+                    GROUP BY 1
+                )
+                SELECT
+                    m.mes::text AS mes,
+                    SUM(COALESCE(p.min_prev,   0))
+                        OVER (ORDER BY m.mes ROWS UNBOUNDED PRECEDING) AS minutos_previstos_acum,
+                    SUM(COALESCE(ln.min_norm,  0))
+                        OVER (ORDER BY m.mes ROWS UNBOUNDED PRECEDING) AS minutos_lancados_normal_acum,
+                    SUM(COALESCE(lt.min_total, 0))
+                        OVER (ORDER BY m.mes ROWS UNBOUNDED PRECEDING) AS minutos_lancados_total_acum
+                FROM meses m
+                LEFT JOIN previsto_mensal       p  ON p.mes  = m.mes
+                LEFT JOIN lancado_normal_mensal ln ON ln.mes = m.mes
+                LEFT JOIN lancado_total_mensal  lt ON lt.mes = m.mes
+                ORDER BY m.mes
+            """)
+            for row in conn.execute(sql_timeline_mensal):
+                timeline_mensal.append(MesTrilhaResposta(
+                    mes=str(row.mes),
+                    minutos_previstos_acum=int(row.minutos_previstos_acum),
+                    minutos_lancados_normal_acum=int(row.minutos_lancados_normal_acum),
+                    minutos_lancados_total_acum=int(row.minutos_lancados_total_acum),
+                ))
     except Exception:
-        pass
+        _logger.exception("Erro ao calcular kpi_dashboard")
 
     progresso_geral = (pontos_realizados / pontos_totais * 100) if pontos_totais > 0 else None
 
@@ -901,6 +984,7 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
         top_revisor=top_revisor,
         top_executores_subfase=top_executores_subfase,
         top_revisores_subfase=top_revisores_subfase,
+        timeline_mensal=timeline_mensal,
     )
 
 
@@ -941,6 +1025,7 @@ class MeuDashboardResposta(BaseModel):
     horas_lancadas_producao_min: int
     horas_lancadas_externas_min: int
     timeline: list[DiaHorasResposta]
+    timeline_mensal: list[MesTrilhaResposta] = []
 
 
 # ---------------------------------------------------------------------------
@@ -967,6 +1052,7 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request) -> MeuDashboardRespo
     horas_lancadas_prod = 0
     horas_lancadas_ext = 0
     timeline: list[DiaHorasResposta] = []
+    timeline_mensal: list[MesTrilhaResposta] = []
 
     try:
         with engine_cp.connect() as conn:
@@ -1140,6 +1226,81 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request) -> MeuDashboardRespo
                     minutos_previstos=int(row.minutos_previstos),
                     minutos_lancados=int(row.minutos_lancados),
                 ))
+
+            # ── 6. Timeline mensal acumulada ──────────────────────────────
+            # J: previsto, K: normal, P: normal + extra
+            sql_timeline_mensal = text("""
+                WITH data_inicio AS (
+                    SELECT LEAST(
+                        COALESCE(
+                            (SELECT MIN(ap.data)
+                             FROM capacidade.agenda_prevista_admin ap
+                             WHERE ap.usuario_id = :uid AND ap.em_uso = TRUE
+                               AND ap.bloco_id IS NOT NULL),
+                            date_trunc('month', CURRENT_DATE)::date
+                        ),
+                        COALESCE(
+                            (SELECT MIN(al.data_lancamento)
+                             FROM capacidade.agenda_lancamento al
+                             JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
+                             WHERE al.usuario_id = :uid AND al.em_uso = TRUE
+                               AND ta.codigo = 'BLOCO'),
+                            date_trunc('month', CURRENT_DATE)::date
+                        )
+                    ) AS inicio
+                ),
+                meses AS (
+                    SELECT generate_series(
+                        date_trunc('month', (SELECT inicio FROM data_inicio)),
+                        date_trunc('month', CURRENT_DATE),
+                        '1 month'::interval
+                    )::date AS mes
+                ),
+                previsto_mensal AS (
+                    SELECT date_trunc('month', ap.data)::date AS mes,
+                           SUM(ap.minutos_planejados_normais + ap.minutos_planejados_extras) AS min_prev
+                    FROM capacidade.agenda_prevista_admin ap
+                    WHERE ap.usuario_id = :uid AND ap.em_uso = TRUE AND ap.bloco_id IS NOT NULL
+                    GROUP BY 1
+                ),
+                lancado_normal_mensal AS (
+                    SELECT date_trunc('month', al.data_lancamento)::date AS mes,
+                           SUM(al.minutos) AS min_norm
+                    FROM capacidade.agenda_lancamento al
+                    JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
+                    WHERE al.usuario_id = :uid AND al.em_uso = TRUE AND ta.codigo = 'BLOCO'
+                      AND al.faixa_minuto::text = 'NORMAL'
+                    GROUP BY 1
+                ),
+                lancado_total_mensal AS (
+                    SELECT date_trunc('month', al.data_lancamento)::date AS mes,
+                           SUM(al.minutos) AS min_total
+                    FROM capacidade.agenda_lancamento al
+                    JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
+                    WHERE al.usuario_id = :uid AND al.em_uso = TRUE AND ta.codigo = 'BLOCO'
+                    GROUP BY 1
+                )
+                SELECT
+                    m.mes::text AS mes,
+                    SUM(COALESCE(p.min_prev,   0))
+                        OVER (ORDER BY m.mes ROWS UNBOUNDED PRECEDING) AS minutos_previstos_acum,
+                    SUM(COALESCE(ln.min_norm,  0))
+                        OVER (ORDER BY m.mes ROWS UNBOUNDED PRECEDING) AS minutos_lancados_normal_acum,
+                    SUM(COALESCE(lt.min_total, 0))
+                        OVER (ORDER BY m.mes ROWS UNBOUNDED PRECEDING) AS minutos_lancados_total_acum
+                FROM meses m
+                LEFT JOIN previsto_mensal       p  ON p.mes  = m.mes
+                LEFT JOIN lancado_normal_mensal ln ON ln.mes = m.mes
+                LEFT JOIN lancado_total_mensal  lt ON lt.mes = m.mes
+                ORDER BY m.mes
+            """)
+            for row in conn.execute(sql_timeline_mensal, {"uid": uid}):
+                timeline_mensal.append(MesTrilhaResposta(
+                    mes=str(row.mes),
+                    minutos_previstos_acum=int(row.minutos_previstos_acum),
+                    minutos_lancados_normal_acum=int(row.minutos_lancados_normal_acum),
+                    minutos_lancados_total_acum=int(row.minutos_lancados_total_acum),
+                ))
     except Exception:
         _logger.exception("Erro ao calcular meu-dashboard para usuario_id=%s", uid)
 
@@ -1157,4 +1318,5 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request) -> MeuDashboardRespo
         horas_lancadas_producao_min=horas_lancadas_prod,
         horas_lancadas_externas_min=horas_lancadas_ext,
         timeline=timeline,
+        timeline_mensal=timeline_mensal,
     )

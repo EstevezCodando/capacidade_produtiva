@@ -281,15 +281,23 @@
   fill: var(--tx-muted);
 }
 
+/* J — previsto (tracejado) */
 .linePrevista {
   stroke: var(--info);
   stroke-width: 1.5;
   stroke-opacity: 0.8;
 }
 
+/* K — lançado horário normal */
+.lineNormal {
+  stroke: var(--ok, #3dba6f);
+  stroke-width: 1.5;
+}
+
+/* P — lançado normal + extra */
 .lineLancada {
   stroke: var(--accent);
-  stroke-width: 2;
+  stroke-width: 2.5;
 }
 
 .hoverLine {
@@ -298,12 +306,21 @@
   stroke-dasharray: 3 2;
 }
 
+/* Ponto J */
 .dotPrev {
   fill: var(--info);
   stroke: var(--bg-surface);
   stroke-width: 1.5;
 }
 
+/* Ponto K */
+.dotNormal {
+  fill: var(--ok, #3dba6f);
+  stroke: var(--bg-surface);
+  stroke-width: 1.5;
+}
+
+/* Ponto P */
 .dotLanc {
   fill: var(--accent);
   stroke: var(--bg-surface);
@@ -331,37 +348,69 @@
   color: var(--tx-muted);
   font-weight: 600;
   text-transform: capitalize;
+  margin-bottom: 2px;
 }
 
-.tooltipPrev {
+/* J = previsto */
+.tooltipJ {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--info);
 }
 
-.tooltipLanc {
+/* K = normal */
+.tooltipK {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ok, #3dba6f);
+}
+
+/* P = total */
+.tooltipP {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--accent);
 }
+
+.tooltipPrev { font-family: var(--font-mono); font-size: 11px; color: var(--info); }
+.tooltipLanc { font-family: var(--font-mono); font-size: 11px; color: var(--accent); }
 
 .chartLegend {
   display: flex;
-  gap: 20px;
+  flex-wrap: wrap;
+  gap: 16px;
   justify-content: flex-end;
-  margin-top: 6px;
+  margin-top: 8px;
   padding-right: 4px;
   font-family: var(--font-mono);
   font-size: 10px;
+  letter-spacing: 0.3px;
 }
 
-.legendPrev {
+.legendJ {
   color: var(--info);
-  opacity: 0.8;
+  opacity: 0.85;
 }
 
-.legendLanc {
+.legendK {
+  color: var(--ok, #3dba6f);
+}
+
+.legendP {
   color: var(--accent);
+  font-weight: 600;
+}
+
+.legendPrev { color: var(--info); opacity: 0.8; }
+.legendLanc { color: var(--accent); }
+
+.chartCaption {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--tx-muted);
+  margin-top: 6px;
+  padding-left: 2px;
+  letter-spacing: 0.3px;
 }
 
 /* ── Blocos ───────────────────────────────────────────────── */
