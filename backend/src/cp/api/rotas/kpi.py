@@ -12,6 +12,7 @@ Politica de autorizacao:
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -21,6 +22,7 @@ from sqlalchemy import text
 from cp.api.deps import SomenteAdmin, UsuarioLogado
 
 router = APIRouter(prefix="/kpi", tags=["kpi"])
+_logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -969,6 +971,10 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request) -> MeuDashboardRespo
     try:
         with engine_cp.connect() as conn:
             # ── 1. Pontos por bloco/subfase por papel ─────────────────────
+            # kpi.distribuicao_pontos tem ut_id mas não subfase_id diretamente.
+            # kpi.estado_ut NÃO possui subfase_id — apenas subfase_nome (text).
+            # A forma correta é ir via sap_snapshot.macrocontrole_unidade_trabalho
+            # que possui subfase_id como FK, da mesma forma que _CTE_UT_BASE faz.
             sql_pontos = text("""
                 WITH user_pontos AS (
                     SELECT
@@ -986,12 +992,10 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request) -> MeuDashboardRespo
                         COALESCE(SUM(d.pontos_executor + d.pontos_revisor + d.pontos_corretor), 0)
                             AS pontos_total_subfase
                     FROM kpi.distribuicao_pontos d
-                    JOIN kpi.estado_ut e
-                        ON e.ut_id = d.ut_id
                     JOIN sap_snapshot.macrocontrole_unidade_trabalho ut
                         ON ut.id = d.ut_id
                     JOIN sap_snapshot.macrocontrole_subfase sf
-                        ON sf.id = e.subfase_id
+                        ON sf.id = ut.subfase_id
                     JOIN sap_snapshot.macrocontrole_bloco b
                         ON b.id = ut.bloco_id
                     JOIN sap_snapshot.macrocontrole_lote l
@@ -1137,7 +1141,7 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request) -> MeuDashboardRespo
                     minutos_lancados=int(row.minutos_lancados),
                 ))
     except Exception:
-        pass
+        _logger.exception("Erro ao calcular meu-dashboard para usuario_id=%s", uid)
 
     blocos_list = sorted(blocos_map.values(), key=lambda b: b.bloco_nome)
     pontos_total_geral   = sum(b.pontos_total_bloco   for b in blocos_list)
