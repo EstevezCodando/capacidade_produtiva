@@ -145,6 +145,11 @@ export interface ApontamentoResumo {
   bloco_id: number | null
   bloco_nome?: string | null
   tipo_atividade: CodigoAtividade
+  tipo_atividade_nome?: string | null
+  tipo_atividade_cor?: string | null
+  usuario_id?: number
+  usuario_nome?: string | null
+  descricao?: string | null
   minutos: number
   faixa: FaixaMinuto
 }
