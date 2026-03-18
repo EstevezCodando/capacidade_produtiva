@@ -7,6 +7,7 @@ Politica de autorizacao:
     GET /kpi/uts/{id}              — autenticado
     GET /kpi/inconsistencias       — admin
     GET /kpi/dashboard             — autenticado (novo - dashboard completo)
+    GET /kpi/meu-dashboard             — autenticado (dashboard do operador)
 """
 
 from __future__ import annotations
@@ -898,4 +899,258 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
         top_revisor=top_revisor,
         top_executores_subfase=top_executores_subfase,
         top_revisores_subfase=top_revisores_subfase,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Modelos — Dashboard do usuário (operador)
+# ---------------------------------------------------------------------------
+
+class PontosSubfaseResposta(BaseModel):
+    subfase_id: int
+    subfase_nome: str
+    pontos: float
+
+
+class BlocoDetalheUsuario(BaseModel):
+    bloco_id: int
+    bloco_nome: str
+    projeto_nome: str
+    pontos_total_bloco: float
+    pontos_usuario_bloco: float
+    como_executor: list[PontosSubfaseResposta]
+    como_revisor: list[PontosSubfaseResposta]
+    como_corretor: list[PontosSubfaseResposta]
+
+
+class DiaHorasResposta(BaseModel):
+    data: str
+    minutos_previstos: int
+    minutos_lancados: int
+
+
+class MeuDashboardResposta(BaseModel):
+    sap_snapshot_atualizado_em: str | None
+    kpi_calculado_em: str | None
+    blocos: list[BlocoDetalheUsuario]
+    pontos_total_geral: float
+    pontos_usuario_geral: float
+    horas_previstas_producao_min: int
+    horas_lancadas_producao_min: int
+    horas_lancadas_externas_min: int
+    timeline: list[DiaHorasResposta]
+
+
+# ---------------------------------------------------------------------------
+# Rota /kpi/meu-dashboard
+# ---------------------------------------------------------------------------
+
+
+@router.get("/meu-dashboard", summary="Dashboard do usuário autenticado")
+def meu_dashboard(usuario: UsuarioLogado, request: Request) -> MeuDashboardResposta:
+    """Retorna KPI personalizado para o usuário logado.
+
+    Inclui:
+    - Blocos vinculados ao usuário (como executor, revisor ou corretor)
+    - Pontos por bloco e subfase por cada papel
+    - Horas previstas e lançadas em produção e externamente
+    - Timeline diária dos últimos 45 dias (minutos previstos × realizados)
+    """
+    engine_cp = request.app.state.engine_cp
+    uid = usuario.usuario_id
+    snapshot_ts, kpi_ts = _get_sync_timestamps(engine_cp)
+
+    blocos_map: dict[int, BlocoDetalheUsuario] = {}
+    horas_previstas = 0
+    horas_lancadas_prod = 0
+    horas_lancadas_ext = 0
+    timeline: list[DiaHorasResposta] = []
+
+    try:
+        with engine_cp.connect() as conn:
+            # ── 1. Pontos por bloco/subfase por papel ─────────────────────
+            sql_pontos = text("""
+                WITH user_pontos AS (
+                    SELECT
+                        b.id                AS bloco_id,
+                        b.nome              AS bloco_nome,
+                        p.nome              AS projeto_nome,
+                        sf.id               AS subfase_id,
+                        sf.nome             AS subfase_nome,
+                        COALESCE(SUM(CASE WHEN d.executor_id = :uid AND d.pontos_executor > 0
+                                          THEN d.pontos_executor ELSE 0 END), 0) AS pontos_executor,
+                        COALESCE(SUM(CASE WHEN d.revisor_id  = :uid AND d.pontos_revisor  > 0
+                                          THEN d.pontos_revisor  ELSE 0 END), 0) AS pontos_revisor,
+                        COALESCE(SUM(CASE WHEN d.corretor_id = :uid AND d.pontos_corretor > 0
+                                          THEN d.pontos_corretor ELSE 0 END), 0) AS pontos_corretor,
+                        COALESCE(SUM(d.pontos_executor + d.pontos_revisor + d.pontos_corretor), 0)
+                            AS pontos_total_subfase
+                    FROM kpi.distribuicao_pontos d
+                    JOIN kpi.estado_ut e
+                        ON e.ut_id = d.ut_id
+                    JOIN sap_snapshot.macrocontrole_unidade_trabalho ut
+                        ON ut.id = d.ut_id
+                    JOIN sap_snapshot.macrocontrole_subfase sf
+                        ON sf.id = e.subfase_id
+                    JOIN sap_snapshot.macrocontrole_bloco b
+                        ON b.id = ut.bloco_id
+                    JOIN sap_snapshot.macrocontrole_lote l
+                        ON l.id = b.lote_id
+                    JOIN sap_snapshot.macrocontrole_projeto p
+                        ON p.id = l.projeto_id
+                    WHERE (d.executor_id = :uid OR d.revisor_id = :uid OR d.corretor_id = :uid)
+                    GROUP BY b.id, b.nome, p.nome, sf.id, sf.nome
+                )
+                SELECT *
+                FROM user_pontos
+                WHERE pontos_executor > 0 OR pontos_revisor > 0 OR pontos_corretor > 0
+                ORDER BY bloco_nome, subfase_nome
+            """)
+
+            for row in conn.execute(sql_pontos, {"uid": uid}):
+                bloco_id = row.bloco_id
+
+                if bloco_id not in blocos_map:
+                    # Busca o total de pontos do bloco (todos os usuários) na 1ª vez
+                    sql_total = text("""
+                        SELECT COALESCE(SUM(d.pontos_executor + d.pontos_revisor + d.pontos_corretor), 0)
+                        FROM kpi.distribuicao_pontos d
+                        JOIN sap_snapshot.macrocontrole_unidade_trabalho ut ON ut.id = d.ut_id
+                        WHERE ut.bloco_id = :bloco_id
+                    """)
+                    total_res = conn.execute(sql_total, {"bloco_id": bloco_id}).scalar() or 0.0
+
+                    blocos_map[bloco_id] = BlocoDetalheUsuario(
+                        bloco_id=bloco_id,
+                        bloco_nome=row.bloco_nome,
+                        projeto_nome=row.projeto_nome,
+                        pontos_total_bloco=float(total_res),
+                        pontos_usuario_bloco=0.0,
+                        como_executor=[],
+                        como_revisor=[],
+                        como_corretor=[],
+                    )
+
+                bloco = blocos_map[bloco_id]
+                pts_exec = float(row.pontos_executor)
+                pts_rev  = float(row.pontos_revisor)
+                pts_cor  = float(row.pontos_corretor)
+                subfase  = row.subfase_nome
+                sf_id    = row.subfase_id
+
+                bloco.pontos_usuario_bloco += pts_exec + pts_rev + pts_cor
+
+                if pts_exec > 0:
+                    bloco.como_executor.append(PontosSubfaseResposta(
+                        subfase_id=sf_id, subfase_nome=subfase, pontos=pts_exec,
+                    ))
+                if pts_rev > 0:
+                    bloco.como_revisor.append(PontosSubfaseResposta(
+                        subfase_id=sf_id, subfase_nome=subfase, pontos=pts_rev,
+                    ))
+                if pts_cor > 0:
+                    bloco.como_corretor.append(PontosSubfaseResposta(
+                        subfase_id=sf_id, subfase_nome=subfase, pontos=pts_cor,
+                    ))
+
+            # Sort subfases por pontos desc em cada papel
+            for bloco in blocos_map.values():
+                bloco.como_executor.sort(key=lambda x: x.pontos, reverse=True)
+                bloco.como_revisor.sort(key=lambda x: x.pontos, reverse=True)
+                bloco.como_corretor.sort(key=lambda x: x.pontos, reverse=True)
+
+            # ── 2. Horas previstas em produção (todos os tempos) ──────────
+            sql_prev = text("""
+                SELECT COALESCE(SUM(ap.minutos_planejados_normais + ap.minutos_planejados_extras), 0)
+                FROM capacidade.agenda_prevista_admin ap
+                WHERE ap.usuario_id = :uid
+                  AND ap.em_uso = TRUE
+                  AND ap.bloco_id IS NOT NULL
+            """)
+            horas_previstas = int(conn.execute(sql_prev, {"uid": uid}).scalar() or 0)
+
+            # ── 3. Horas lançadas em produção ─────────────────────────────
+            sql_lanc_prod = text("""
+                SELECT COALESCE(SUM(al.minutos), 0)
+                FROM capacidade.agenda_lancamento al
+                JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
+                WHERE al.usuario_id = :uid
+                  AND al.em_uso = TRUE
+                  AND ta.codigo = 'BLOCO'
+            """)
+            horas_lancadas_prod = int(conn.execute(sql_lanc_prod, {"uid": uid}).scalar() or 0)
+
+            # ── 4. Horas lançadas fora da produção ────────────────────────
+            sql_lanc_ext = text("""
+                SELECT COALESCE(SUM(al.minutos), 0)
+                FROM capacidade.agenda_lancamento al
+                JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
+                WHERE al.usuario_id = :uid
+                  AND al.em_uso = TRUE
+                  AND ta.codigo != 'BLOCO'
+            """)
+            horas_lancadas_ext = int(conn.execute(sql_lanc_ext, {"uid": uid}).scalar() or 0)
+
+            # ── 5. Timeline (últimos 45 dias) ─────────────────────────────
+            sql_timeline = text("""
+                WITH dias AS (
+                    SELECT generate_series(
+                        CURRENT_DATE - INTERVAL '44 days',
+                        CURRENT_DATE,
+                        '1 day'::interval
+                    )::date AS data
+                ),
+                previstos AS (
+                    SELECT ap.data,
+                           SUM(ap.minutos_planejados_normais + ap.minutos_planejados_extras) AS minutos
+                    FROM capacidade.agenda_prevista_admin ap
+                    WHERE ap.usuario_id = :uid
+                      AND ap.em_uso = TRUE
+                      AND ap.bloco_id IS NOT NULL
+                      AND ap.data >= CURRENT_DATE - INTERVAL '44 days'
+                    GROUP BY ap.data
+                ),
+                lancados AS (
+                    SELECT al.data_lancamento AS data,
+                           SUM(al.minutos) AS minutos
+                    FROM capacidade.agenda_lancamento al
+                    JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
+                    WHERE al.usuario_id = :uid
+                      AND al.em_uso = TRUE
+                      AND ta.codigo = 'BLOCO'
+                      AND al.data_lancamento >= CURRENT_DATE - INTERVAL '44 days'
+                    GROUP BY al.data_lancamento
+                )
+                SELECT
+                    d.data::text,
+                    COALESCE(p.minutos, 0) AS minutos_previstos,
+                    COALESCE(l.minutos, 0) AS minutos_lancados
+                FROM dias d
+                LEFT JOIN previstos p ON p.data = d.data
+                LEFT JOIN lancados  l ON l.data = d.data
+                ORDER BY d.data
+            """)
+            for row in conn.execute(sql_timeline, {"uid": uid}):
+                timeline.append(DiaHorasResposta(
+                    data=str(row.data),
+                    minutos_previstos=int(row.minutos_previstos),
+                    minutos_lancados=int(row.minutos_lancados),
+                ))
+    except Exception:
+        pass
+
+    blocos_list = sorted(blocos_map.values(), key=lambda b: b.bloco_nome)
+    pontos_total_geral   = sum(b.pontos_total_bloco   for b in blocos_list)
+    pontos_usuario_geral = sum(b.pontos_usuario_bloco for b in blocos_list)
+
+    return MeuDashboardResposta(
+        sap_snapshot_atualizado_em=snapshot_ts,
+        kpi_calculado_em=kpi_ts,
+        blocos=blocos_list,
+        pontos_total_geral=pontos_total_geral,
+        pontos_usuario_geral=pontos_usuario_geral,
+        horas_previstas_producao_min=horas_previstas,
+        horas_lancadas_producao_min=horas_lancadas_prod,
+        horas_lancadas_externas_min=horas_lancadas_ext,
+        timeline=timeline,
     )

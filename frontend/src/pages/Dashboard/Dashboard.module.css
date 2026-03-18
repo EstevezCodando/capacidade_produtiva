@@ -1,10 +1,15 @@
+/* ============================================================
+   Dashboard — Estilos
+   ============================================================ */
+
 .root {
   padding: 32px 40px;
-  max-width: 1100px;
+  max-width: 1140px;
   margin: 0 auto;
 }
 
-/* ── Header ────────────────────────────────────────────────── */
+/* ── Header ───────────────────────────────────────────────── */
+
 .pageHeader {
   margin-bottom: 28px;
   display: flex;
@@ -31,10 +36,36 @@
   color: var(--tx-muted);
 }
 
-/* ── Stats ─────────────────────────────────────────────────── */
+.syncButton {
+  border: 1px solid var(--bd-default);
+  background: var(--bg-surface);
+  color: var(--tx-primary);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+  white-space: nowrap;
+}
+
+.syncButton:hover:not(:disabled) {
+  border-color: var(--bd-strong);
+  transform: translateY(-1px);
+}
+
+.syncButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Stats row ────────────────────────────────────────────── */
+
 .statsRow {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 12px;
   margin-bottom: 32px;
 }
@@ -47,6 +78,16 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  transition: border-color 0.12s;
+}
+
+.statCard:hover {
+  border-color: var(--bd-default);
+}
+
+.statCardAccent {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
 }
 
 .statLabel {
@@ -66,28 +107,481 @@
   margin-top: 2px;
 }
 
+.statCardAccent .statValue {
+  color: var(--accent);
+}
+
 .statSub {
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--tx-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* ── Section ────────────────────────────────────────────────── */
+/* ── Section ──────────────────────────────────────────────── */
+
 .section {
   margin-bottom: 32px;
 }
 
 .sectionTitle {
-  font-family: var(--font-display);
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 2.5px;
+  letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--tx-muted);
   margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-/* ── Projeto rows ───────────────────────────────────────────── */
+.sectionCount {
+  background: var(--bg-raised);
+  border: 1px solid var(--bd-subtle);
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 10px;
+  color: var(--tx-secondary);
+  font-weight: 500;
+}
+
+/* ── Progresso duplo ──────────────────────────────────────── */
+
+.progressoCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--bd-subtle);
+  border-radius: var(--r-lg);
+  padding: 20px 24px;
+}
+
+.progressoDuplo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.progressoLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-secondary);
+}
+
+.progressoTrack {
+  height: 10px;
+  background: var(--bg-raised);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row-reverse; /* usuário sobrepõe à direita */
+  position: relative;
+}
+
+.progressoUsuario {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 6px;
+  transition: width 0.5s ease;
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+}
+
+.progressoOutros {
+  height: 100%;
+  background: var(--tx-muted);
+  opacity: 0.25;
+  border-radius: 6px;
+  transition: width 0.5s ease;
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+}
+
+.progressoLegenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.legUsuario {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.legDotUsuario {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.legOutros {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--tx-secondary);
+}
+
+.legDotOutros {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--tx-muted);
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+.legTotal {
+  color: var(--tx-muted);
+  margin-left: auto;
+}
+
+/* ── Chart ────────────────────────────────────────────────── */
+
+.chartCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--bd-subtle);
+  border-radius: var(--r-lg);
+  padding: 20px 20px 12px;
+  position: relative;
+}
+
+.chartWrap {
+  position: relative;
+}
+
+.chartSvg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.gridLine {
+  stroke: var(--bd-subtle);
+  stroke-width: 1;
+}
+
+.axisLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--tx-muted);
+}
+
+.linePrevista {
+  stroke: var(--info);
+  stroke-width: 1.5;
+  stroke-opacity: 0.8;
+}
+
+.lineLancada {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.hoverLine {
+  stroke: var(--bd-default);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+
+.dotPrev {
+  fill: var(--info);
+  stroke: var(--bg-surface);
+  stroke-width: 1.5;
+}
+
+.dotLanc {
+  fill: var(--accent);
+  stroke: var(--bg-surface);
+  stroke-width: 1.5;
+}
+
+.chartTooltip {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--bd-default);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.tooltipDate {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--tx-muted);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.tooltipPrev {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--info);
+}
+
+.tooltipLanc {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.chartLegend {
+  display: flex;
+  gap: 20px;
+  justify-content: flex-end;
+  margin-top: 6px;
+  padding-right: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.legendPrev {
+  color: var(--info);
+  opacity: 0.8;
+}
+
+.legendLanc {
+  color: var(--accent);
+}
+
+/* ── Blocos ───────────────────────────────────────────────── */
+
+.blocosList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.blocoCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--bd-subtle);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  transition: border-color 0.12s;
+}
+
+.blocoCard:hover,
+.blocoAberto {
+  border-color: var(--bd-default);
+}
+
+.blocoAberto {
+  border-color: var(--accent) !important;
+}
+
+.blocoHeader {
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-align: left;
+  color: inherit;
+}
+
+.blocoHeader:hover {
+  background: var(--bg-raised);
+}
+
+.blocoHeaderLeft {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.blocoNome {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tx-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.blocoProjeto {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--tx-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.blocoHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.blocoBarWrap {
+  width: 120px;
+}
+
+.blocoBarTrack {
+  height: 6px;
+  background: var(--bg-raised);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.blocoBarTotal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--tx-muted);
+  opacity: 0.2;
+  border-radius: 4px;
+}
+
+.blocoBarUser {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  z-index: 1;
+}
+
+.blocoStats {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-secondary);
+  white-space: nowrap;
+}
+
+.blocoUserPts {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.blocoTotalPts {
+  color: var(--tx-secondary);
+}
+
+.blocoContrib {
+  color: var(--tx-muted);
+}
+
+.blocoToggle {
+  font-size: 10px;
+  color: var(--tx-muted);
+  width: 16px;
+  text-align: center;
+}
+
+/* ── Corpo do bloco (expandido) ───────────────────────────── */
+
+.blocoBody {
+  padding: 0 20px 20px;
+  border-top: 1px solid var(--bd-subtle);
+}
+
+.blocoProgressSection {
+  padding-top: 16px;
+  margin-bottom: 20px;
+}
+
+.papelGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.papelBloco {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.papelTitulo {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 3px 0;
+  border-bottom: 2px solid currentColor;
+  margin-bottom: 4px;
+}
+
+.papelExecutor {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.papelRevisor {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.papelCorretor {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.subfaseTabela {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.subfaseRow {
+  border-bottom: 1px solid var(--bd-subtle);
+}
+
+.subfaseRow:last-child {
+  border-bottom: none;
+}
+
+.subfaseNome {
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--tx-primary);
+  padding: 5px 0;
+  padding-right: 8px;
+}
+
+.subfasePts {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-secondary);
+  text-align: right;
+  white-space: nowrap;
+  padding: 5px 0;
+}
+
+/* ── Projeto rows (admin) ─────────────────────────────────── */
+
 .projetoRow {
   background: var(--bg-surface);
   border: 1px solid var(--bd-subtle);
@@ -121,7 +615,8 @@
   color: var(--tx-secondary);
 }
 
-/* ── Progress ───────────────────────────────────────────────── */
+/* ── Progress bar simples ─────────────────────────────────── */
+
 .progressWrap {
   display: flex;
   align-items: center;
@@ -150,7 +645,8 @@
   text-align: right;
 }
 
-/* ── Loading skeleton ───────────────────────────────────────── */
+/* ── Loading / empty / error ──────────────────────────────── */
+
 .loadingRows {
   display: flex;
   flex-direction: column;
@@ -166,27 +662,21 @@
 }
 
 @keyframes pulse {
-  0%,
-  100% {
-    opacity: 0.5;
-  }
-  50% {
-    opacity: 1;
-  }
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
 }
 
-/* ── States ─────────────────────────────────────────────────── */
 .errorBox {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--error-bg);
-  border: 1px solid rgba(224, 82, 82, 0.3);
+  background: var(--error-bg, color-mix(in srgb, var(--error, #e05252) 8%, transparent));
+  border: 1px solid color-mix(in srgb, var(--error, #e05252) 30%, transparent);
   border-radius: var(--r-md);
   padding: 14px 18px;
   font-family: var(--font-display);
   font-size: 13px;
-  color: var(--error);
+  color: var(--error, #e05252);
 }
 
 .emptyState {
@@ -198,48 +688,4 @@
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--tx-muted);
-}
-
-/* ── Placeholder ────────────────────────────────────────────── */
-.placeholderBox {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--bg-surface);
-  border: 1px dashed var(--bd-subtle);
-  border-radius: var(--r-md);
-  padding: 28px 24px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--tx-muted);
-}
-
-.placeholderIcon {
-  font-size: 20px;
-  opacity: 0.5;
-}
-
-
-.syncButton {
-  border: 1px solid var(--bd-default);
-  background: var(--bg-surface);
-  color: var(--tx-primary);
-  border-radius: var(--r-md);
-  padding: 10px 14px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
-  cursor: pointer;
-  transition: border-color 0.12s ease, transform 0.12s ease;
-}
-
-.syncButton:hover:not(:disabled) {
-  border-color: var(--bd-strong);
-  transform: translateY(-1px);
-}
-
-.syncButton:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }

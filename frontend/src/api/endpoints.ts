@@ -5,6 +5,7 @@ import type {
     InconsistenciasResponse,
     KpiDashboardResponse,
     KpiProjetosResponse,
+    MeuDashboardResponse,
     SyncStatus,
     UsuarioMe,
 } from "@/types";
@@ -47,5 +48,10 @@ export async function getHealth(): Promise<{ status: string }> {
 
 export async function getKpiDashboard(): Promise<KpiDashboardResponse> {
   const res = await apiClient.get<KpiDashboardResponse>("/kpi/dashboard")
+  return res.data
+}
+
+export async function getMeuDashboard(): Promise<MeuDashboardResponse> {
+  const res = await apiClient.get<MeuDashboardResponse>("/kpi/meu-dashboard")
   return res.data
 }

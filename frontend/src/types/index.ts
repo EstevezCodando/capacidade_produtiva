@@ -104,3 +104,40 @@ export interface KpiDashboardResponse {
   top_executores_subfase: Array<Record<string, unknown>>
   top_revisores_subfase: Array<Record<string, unknown>>
 }
+
+// ── Dashboard do operador ─────────────────────────────────────
+
+export interface PontosSubfaseResposta {
+  subfase_id: number
+  subfase_nome: string
+  pontos: number
+}
+
+export interface BlocoDetalheUsuario {
+  bloco_id: number
+  bloco_nome: string
+  projeto_nome: string
+  pontos_total_bloco: number
+  pontos_usuario_bloco: number
+  como_executor: PontosSubfaseResposta[]
+  como_revisor: PontosSubfaseResposta[]
+  como_corretor: PontosSubfaseResposta[]
+}
+
+export interface DiaHorasResposta {
+  data: string
+  minutos_previstos: number
+  minutos_lancados: number
+}
+
+export interface MeuDashboardResponse {
+  sap_snapshot_atualizado_em: string | null
+  kpi_calculado_em: string | null
+  blocos: BlocoDetalheUsuario[]
+  pontos_total_geral: number
+  pontos_usuario_geral: number
+  horas_previstas_producao_min: number
+  horas_lancadas_producao_min: number
+  horas_lancadas_externas_min: number
+  timeline: DiaHorasResposta[]
+}
