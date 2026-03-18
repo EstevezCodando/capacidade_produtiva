@@ -245,6 +245,13 @@
   flex-shrink: 0;
 }
 
+.legDistribuido {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--tx-secondary);
+}
+
 .legTotal {
   color: var(--tx-muted);
   margin-left: auto;
@@ -623,10 +630,19 @@
 .subfasePts {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--tx-secondary);
   text-align: right;
   white-space: nowrap;
   padding: 5px 0;
+}
+
+.sfPtsUser {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sfPtsTotal {
+  color: var(--tx-muted);
+  font-weight: 400;
 }
 
 /* ── Projeto rows (admin) ─────────────────────────────────── */

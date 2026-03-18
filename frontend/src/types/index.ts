@@ -111,15 +111,17 @@ export interface KpiDashboardResponse {
 export interface PontosSubfaseResposta {
   subfase_id: number
   subfase_nome: string
-  pontos: number
+  pontos: number                   // pontos do usuário nesta subfase/papel
+  pontos_total_subfase: number     // total alocado na subfase/bloco (fluxo_ut)
 }
 
 export interface BlocoDetalheUsuario {
   bloco_id: number
   bloco_nome: string
   projeto_nome: string
-  pontos_total_bloco: number
-  pontos_usuario_bloco: number
+  pontos_total_bloco: number       // total distribuído a todos os usuários
+  pontos_usuario_bloco: number     // contribuição do usuário
+  pontos_alocados_bloco: number    // total alocado no bloco (fluxo_ut) — base 100%
   como_executor: PontosSubfaseResposta[]
   como_revisor: PontosSubfaseResposta[]
   como_corretor: PontosSubfaseResposta[]

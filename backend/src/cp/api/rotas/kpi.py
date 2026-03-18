@@ -996,15 +996,17 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
 class PontosSubfaseResposta(BaseModel):
     subfase_id: int
     subfase_nome: str
-    pontos: float
+    pontos: float                      # pontos do usuário nesta subfase/papel
+    pontos_total_subfase: float = 0.0  # total alocado na subfase/bloco (kpi.fluxo_ut)
 
 
 class BlocoDetalheUsuario(BaseModel):
     bloco_id: int
     bloco_nome: str
     projeto_nome: str
-    pontos_total_bloco: float
-    pontos_usuario_bloco: float
+    pontos_total_bloco: float          # total distribuído a todos os usuários (kpi.distribuicao_pontos)
+    pontos_usuario_bloco: float        # contribuição do usuário
+    pontos_alocados_bloco: float = 0.0 # total alocado no bloco (kpi.fluxo_ut) — base 100%
     como_executor: list[PontosSubfaseResposta]
     como_revisor: list[PontosSubfaseResposta]
     como_corretor: list[PontosSubfaseResposta]
@@ -1164,6 +1166,36 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request) -> MeuDashboardRespo
                 bloco.como_executor.sort(key=lambda x: x.pontos, reverse=True)
                 bloco.como_revisor.sort(key=lambda x: x.pontos, reverse=True)
                 bloco.como_corretor.sort(key=lambda x: x.pontos, reverse=True)
+
+            # ── 1b. Totais alocados por bloco/subfase (kpi.fluxo_ut) ──────
+            # Usa bloco_nome para JOIN pois fluxo_ut não expõe bloco_id diretamente.
+            if blocos_map:
+                _ids_str = ",".join(str(bid) for bid in blocos_map)
+                sql_sf_totais = text(f"""
+                    SELECT
+                        b.id                                        AS bloco_id,
+                        f.subfase_id,
+                        SUM(COALESCE(f.ut_dificuldade, 0))          AS pontos_alocados
+                    FROM kpi.fluxo_ut f
+                    JOIN sap_snapshot.macrocontrole_bloco b
+                        ON b.nome = f.bloco_nome
+                    WHERE b.id IN ({_ids_str})
+                    GROUP BY b.id, f.subfase_id
+                """)
+                sf_totais: dict[tuple[int, int], float] = {}
+                bloco_alocados: dict[int, float] = {}
+                for row in conn.execute(sql_sf_totais):
+                    bid = int(row.bloco_id)
+                    pts = float(row.pontos_alocados)
+                    sf_totais[(bid, int(row.subfase_id))] = pts
+                    bloco_alocados[bid] = bloco_alocados.get(bid, 0.0) + pts
+
+                for bid, bloco in blocos_map.items():
+                    bloco.pontos_alocados_bloco = bloco_alocados.get(bid, bloco.pontos_total_bloco)
+                    for sf in bloco.como_executor + bloco.como_revisor + bloco.como_corretor:
+                        sf.pontos_total_subfase = sf_totais.get(
+                            (bid, sf.subfase_id), sf.pontos
+                        )
 
             # ── 2. Horas previstas em produção (todos os tempos) ──────────
             sql_prev = text("""

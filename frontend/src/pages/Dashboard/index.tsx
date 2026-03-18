@@ -383,29 +383,46 @@ function GraficoPizza({
 }
 
 // ─────────────────────────────────────────────────────────────
-// Barra de progresso dupla (usuario em destaque)
+// Barra de contribuição do usuário em relação ao total alocado
+//   totalAlocado    = pontos_alocados_bloco (kpi.fluxo_ut)      = 100%
+//   totalDistribuido= pontos_total_bloco    (distribuicao_pontos)= K
+//   usuario         = pontos_usuario_bloco
 // ─────────────────────────────────────────────────────────────
 
-function ProgressoDuplo({ total, usuario, label }: { total: number; usuario: number; label?: string }) {
-  const pctU = pct(usuario, total)
-  const pctO = pct(Math.max(0, total - usuario), total)
+function ProgressoDuplo({
+  totalAlocado,
+  totalDistribuido,
+  usuario,
+  label,
+}: {
+  totalAlocado: number
+  totalDistribuido: number
+  usuario: number
+  label?: string
+}) {
+  const base       = Math.max(totalAlocado, totalDistribuido, 1)
+  const pctUsuario = pct(usuario, base)
+  const pctDistrib = pct(totalDistribuido, base)
+
   return (
     <div className={styles.progressoDuplo}>
       {label && <span className={styles.progressoLabel}>{label}</span>}
       <div className={styles.progressoTrack}>
-        <div className={styles.progressoUsuario} style={{ width: `${pctU}%` }} />
-        <div className={styles.progressoOutros} style={{ width: `${pctO}%` }} />
+        {/* Camada 1 — todos os pontos já distribuídos */}
+        <div className={styles.progressoOutros} style={{ width: `${pctDistrib}%` }} />
+        {/* Camada 2 — contribuição do usuário (sobrepõe) */}
+        <div className={styles.progressoUsuario} style={{ width: `${pctUsuario}%` }} />
       </div>
       <div className={styles.progressoLegenda}>
         <span className={styles.legUsuario}>
           <span className={styles.legDotUsuario} />
-          {` Sua contribuição: ${fmtPts(usuario)} pts (${pctU}%)`}
+          {` Sua contribuição: ${fmtPts(usuario)} pts (${pctUsuario}%)`}
         </span>
-        <span className={styles.legOutros}>
+        <span className={styles.legDistribuido}>
           <span className={styles.legDotOutros} />
-          {` Outros: ${fmtPts(Math.max(0, total - usuario))} pts`}
+          {` Pontos já distribuídos: ${fmtPts(totalDistribuido)} pts (${pctDistrib}%)`}
         </span>
-        <span className={styles.legTotal}>{`Total realizado: ${fmtPts(total)} pts`}</span>
+        <span className={styles.legTotal}>{`Total de pontos: ${fmtPts(base)} pts (100%)`}</span>
       </div>
     </div>
   )
@@ -425,7 +442,12 @@ function SubfaseTabela({ titulo, itens, corClass }: { titulo: string; itens: Pon
           {itens.map((sf) => (
             <tr key={sf.subfase_id} className={styles.subfaseRow}>
               <td className={styles.subfaseNome}>{sf.subfase_nome}</td>
-              <td className={styles.subfasePts}>{fmtPts(sf.pontos)} pts</td>
+              <td className={styles.subfasePts}>
+                <span className={styles.sfPtsUser}>{fmtPts(sf.pontos)}</span>
+                {sf.pontos_total_subfase > 0 && (
+                  <span className={styles.sfPtsTotal}>{` / ${fmtPts(sf.pontos_total_subfase)} pts`}</span>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -446,7 +468,10 @@ function BlocoCard({ bloco }: { bloco: BlocoDetalheUsuario }) {
     bloco.como_revisor.reduce((s, x) => s + x.pontos, 0) +
     bloco.como_corretor.reduce((s, x) => s + x.pontos, 0)
 
-  const pctContrib = pct(ptsUsuario, bloco.pontos_total_bloco)
+  // Base para o header = total alocado (fluxo_ut); fallback para total distribuído
+  const baseBloco  = Math.max(bloco.pontos_alocados_bloco, bloco.pontos_total_bloco, 1)
+  const pctContrib = pct(ptsUsuario, baseBloco)
+  const pctDistrib = pct(bloco.pontos_total_bloco, baseBloco)
 
   return (
     <div className={`${styles.blocoCard} ${aberto ? styles.blocoAberto : ""}`}>
@@ -458,14 +483,16 @@ function BlocoCard({ bloco }: { bloco: BlocoDetalheUsuario }) {
         <div className={styles.blocoHeaderRight}>
           <div className={styles.blocoBarWrap}>
             <div className={styles.blocoBarTrack}>
-              <div className={styles.blocoBarTotal} style={{ width: "100%" }} />
+              {/* distribuídos a todos */}
+              <div className={styles.blocoBarTotal} style={{ width: `${pctDistrib}%` }} />
+              {/* contribuição do usuário */}
               <div className={styles.blocoBarUser} style={{ width: `${pctContrib}%` }} />
             </div>
           </div>
           <span className={styles.blocoStats}>
             <span className={styles.blocoUserPts}>{fmtPts(ptsUsuario)} pts</span>
             {" / "}
-            <span className={styles.blocoTotalPts}>{fmtPts(bloco.pontos_total_bloco)} pts</span>
+            <span className={styles.blocoTotalPts}>{fmtPts(baseBloco)} pts</span>
             <span className={styles.blocoContrib}>{` (${pctContrib}%)`}</span>
           </span>
           <span className={styles.blocoToggle}>{aberto ? "▲" : "▼"}</span>
@@ -474,7 +501,11 @@ function BlocoCard({ bloco }: { bloco: BlocoDetalheUsuario }) {
       {aberto && (
         <div className={styles.blocoBody}>
           <div className={styles.blocoProgressSection}>
-            <ProgressoDuplo total={bloco.pontos_total_bloco} usuario={ptsUsuario} />
+            <ProgressoDuplo
+              totalAlocado={bloco.pontos_alocados_bloco}
+              totalDistribuido={bloco.pontos_total_bloco}
+              usuario={ptsUsuario}
+            />
           </div>
           <div className={styles.papelGrid}>
             <SubfaseTabela titulo="Como Executor" itens={bloco.como_executor} corClass={styles.papelExecutor} />
@@ -535,10 +566,12 @@ function OperadorDashboard() {
     ? formatDistanceToNow(parseISO(data.kpi_calculado_em), { addSuffix: true, locale: ptBR })
     : null
 
-  const totalBlocos     = data?.blocos.length ?? 0
-  const ptsTotalGeral   = data?.pontos_total_geral ?? 0
-  const ptsUsuarioGeral = data?.pontos_usuario_geral ?? 0
-  const pctGeral        = pct(ptsUsuarioGeral, ptsTotalGeral)
+  const totalBlocos      = data?.blocos.length ?? 0
+  const ptsTotalGeral    = data?.pontos_total_geral ?? 0   // total distribuído (K)
+  const ptsUsuarioGeral  = data?.pontos_usuario_geral ?? 0
+  const ptsAlocadoGeral  = data?.blocos.reduce((s, b) => s + b.pontos_alocados_bloco, 0) ?? 0  // total alocado (Y)
+  const baseGeral        = Math.max(ptsAlocadoGeral, ptsTotalGeral, 1)
+  const pctGeral         = pct(ptsUsuarioGeral, baseGeral)
 
   if (isLoading) {
     return (
@@ -576,7 +609,7 @@ function OperadorDashboard() {
         <StatCard
           label="Contribuição geral"
           value={`${pctGeral}%`}
-          sub={`${fmtPts(ptsUsuarioGeral)} / ${fmtPts(ptsTotalGeral)} pts`}
+          sub={`${fmtPts(ptsUsuarioGeral)} pts / ${fmtPts(baseGeral)} pts totais`}
           accent
         />
         <StatCard
@@ -592,12 +625,12 @@ function OperadorDashboard() {
       </div>
 
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>Progresso geral dos blocos vinculados</h2>
+        <h2 className={styles.sectionTitle}>Sua contribuição em relação ao total</h2>
         <div className={styles.progressoCard}>
           <ProgressoDuplo
-            total={ptsTotalGeral}
+            totalAlocado={ptsAlocadoGeral}
+            totalDistribuido={ptsTotalGeral}
             usuario={ptsUsuarioGeral}
-            label={`${fmtPts(ptsTotalGeral)} pts realizados nos blocos em que você participou`}
           />
         </div>
       </div>
