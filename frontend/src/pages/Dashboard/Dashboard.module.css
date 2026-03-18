@@ -925,3 +925,569 @@
   min-width: 52px;
   text-align: right;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   NOVOS COMPONENTES — controle gerencial admin
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── BlocoProgressoCard ────────────────────────────────────── */
+
+.blocoDestaqueGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+
+.blocoDestaqueCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--bd-subtle);
+  border-radius: var(--r-lg);
+  display: flex;
+  overflow: hidden;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.blocoDestaqueCard:hover {
+  border-color: var(--bd-default);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.blocoDestaqueStrip {
+  width: 4px;
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+
+.blocoDestaqueMain {
+  flex: 1;
+  padding: 14px 16px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.blocoDestaqueHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.blocoDestaqueNome {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tx-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.blocoDestaqueMeta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--tx-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.blocoDestaqueProg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.blocoDestaqueTrack {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-raised);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.blocoDestaqueFill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.blocoDestaquePct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 42px;
+  text-align: right;
+}
+
+.blocoDestaqueUts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.utConcluida  { color: #10B981; font-weight: 600; }
+.utAndamento  { color: #F59E0B; font-weight: 600; }
+.utPendente   { color: var(--tx-muted); }
+.utTotal      { color: var(--tx-muted); }
+
+.blocoDestaquePontos {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-secondary);
+}
+
+.ptsReal    { color: var(--accent); font-weight: 600; }
+.ptsSep     { color: var(--tx-muted); }
+.ptsTotal   { color: var(--tx-secondary); }
+.ptsFaltam  { color: var(--tx-muted); font-size: 10px; }
+
+.blocoDestaqueRanks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  border-top: 1px solid var(--bd-subtle);
+  padding-top: 8px;
+  margin-top: 2px;
+}
+
+.rankCol {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.rankColTitle {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--tx-muted);
+  margin-bottom: 3px;
+}
+
+.rankIcon    { color: #F59E0B; }
+.rankIconRev { color: #6366F1; }
+
+.rankRow {
+  display: grid;
+  grid-template-columns: 14px 1fr auto auto;
+  gap: 4px;
+  align-items: center;
+}
+
+.rankPos {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--tx-muted);
+  text-align: center;
+}
+
+.rankNome {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--tx-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rankPts {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rankPct {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--tx-muted);
+  min-width: 28px;
+  text-align: right;
+}
+
+/* ── RankingPanel — tabela global ──────────────────────────── */
+
+.rankingTable {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.rankingHead,
+.rankingRow {
+  display: grid;
+  grid-template-columns: 28px 1fr 60px 60px 60px 72px 120px;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--bd-subtle);
+}
+
+.rankingHead {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--tx-muted);
+  background: var(--bg-raised);
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+}
+
+.rankingRow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-secondary);
+  transition: background 0.1s;
+}
+
+.rankingRow:hover {
+  background: var(--bg-raised);
+}
+
+.rankingRow:last-of-type {
+  border-bottom: none;
+}
+
+.rankingCellPos {
+  text-align: center;
+  color: var(--tx-muted);
+  font-size: 10px;
+}
+
+.rankingCellNome {
+  color: var(--tx-primary);
+  font-family: var(--font-display);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rankingCellPts {
+  text-align: right;
+  color: var(--tx-secondary);
+}
+
+.rankingCellTotal {
+  text-align: right;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.rankingCellBar {
+  position: relative;
+  height: 8px;
+}
+
+.rankingBarTrack {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 8px;
+  background: var(--bg-raised);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.rankingBarExec {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px 0 0 4px;
+}
+
+.rankingBarRev {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: #6366F1;
+}
+
+.rankingLegend {
+  display: flex;
+  gap: 12px;
+  padding: 8px 10px 2px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: var(--tx-muted);
+}
+
+.rlExec { color: var(--accent); }
+.rlRev  { color: #6366F1; }
+.rlCor  { color: var(--tx-muted); }
+
+/* ── GraficoVelocidade ─────────────────────────────────────── */
+
+.velBar {
+  fill: #6366F1;
+  opacity: 0.7;
+  transition: opacity 0.1s;
+  cursor: default;
+}
+
+.velBarHov {
+  fill: #6366F1;
+  opacity: 1;
+  cursor: default;
+}
+
+.velBarLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--tx-secondary);
+}
+
+.velTooltip {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--bd-default);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-secondary);
+}
+
+/* ── DistribuicaoCiclos ────────────────────────────────────── */
+
+.ciclosWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.cicloRow {
+  display: grid;
+  grid-template-columns: 180px 1fr 40px 38px;
+  gap: 8px;
+  align-items: center;
+}
+
+.cicloLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-secondary);
+  white-space: nowrap;
+}
+
+.cicloTrack {
+  height: 10px;
+  background: var(--bg-raised);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cicloFill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.5s ease;
+}
+
+.cicloQtd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-secondary);
+  text-align: right;
+}
+
+.cicloPct {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--tx-muted);
+  text-align: right;
+}
+
+/* ── Ranking + Velocidade lado a lado ──────────────────────── */
+
+.rankVelRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 32px;
+  align-items: start;
+}
+
+.rankVelColRanking { }
+.rankVelColVel     { }
+
+/* ── Pizza + Ciclos lado a lado ──────────────────────────────  */
+
+.pizzaCiclosRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  margin-bottom: 32px;
+  align-items: start;
+}
+
+.pizzaCiclosColPizza   { min-width: 0; }
+.pizzaCiclosColCiclos  { min-width: 320px; }
+
+/* ── AlertasNotaTable ──────────────────────────────────────── */
+
+.alertasDesc {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--tx-muted);
+  margin-bottom: 10px;
+  letter-spacing: 0.2px;
+}
+
+.alertasWrap {
+  background: var(--bg-surface);
+  border: 1px solid color-mix(in srgb, var(--warn, #F59E0B) 35%, transparent);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.alertasScrollArea {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.alertasTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.alertasHead {
+  position: sticky;
+  top: 0;
+  background: color-mix(in srgb, var(--warn, #F59E0B) 8%, var(--bg-surface));
+  z-index: 2;
+}
+
+.alertaTh {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--tx-muted);
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--bd-subtle);
+  white-space: nowrap;
+}
+
+.alertaRow {
+  border-bottom: 1px solid var(--bd-subtle);
+  transition: background 0.1s;
+}
+
+.alertaRow:last-child {
+  border-bottom: none;
+}
+
+.alertaRow:hover {
+  background: var(--bg-raised);
+}
+
+.alertaTd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-secondary);
+  padding: 8px 12px;
+  vertical-align: top;
+}
+
+.alertaBlocoNome {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tx-primary);
+}
+
+.alertaLote {
+  display: block;
+  font-size: 10px;
+  color: var(--tx-muted);
+}
+
+.alertaId {
+  font-variant-numeric: tabular-nums;
+  color: var(--tx-muted);
+}
+
+.alertaBadgeAusente {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  background: color-mix(in srgb, #EF4444 12%, transparent);
+  color: #EF4444;
+  border: 1px solid color-mix(in srgb, #EF4444 30%, transparent);
+}
+
+.alertaBadgeInvalida {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  background: color-mix(in srgb, #F59E0B 12%, transparent);
+  color: #D97706;
+  border: 1px solid color-mix(in srgb, #F59E0B 30%, transparent);
+}
+
+/* ── Título de alertas ─────────────────────────────────────── */
+
+.alertasTitulo {
+  color: #D97706;
+}
+
+.sectionCountWarn {
+  background: color-mix(in srgb, #EF4444 12%, transparent);
+  border: 1px solid color-mix(in srgb, #EF4444 30%, transparent);
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 10px;
+  color: #EF4444;
+  font-weight: 600;
+}
+
+/* ── Responsividade dos novos layouts ──────────────────────── */
+
+@media (max-width: 900px) {
+  .rankVelRow {
+    grid-template-columns: 1fr;
+  }
+  .pizzaCiclosRow {
+    grid-template-columns: 1fr;
+  }
+  .pizzaCiclosColCiclos {
+    min-width: 0;
+  }
+  .blocoDestaqueGrid {
+    grid-template-columns: 1fr;
+  }
+  .cicloRow {
+    grid-template-columns: 130px 1fr 36px 34px;
+  }
+}

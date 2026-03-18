@@ -88,6 +88,69 @@ export interface LogAcesso {
 }
 
 
+// ── Dashboard Admin — novos tipos de controle gerencial ──────
+
+export interface ContribuidorBloco {
+  usuario_id: number
+  nome_guerra: string
+  pontos: number
+  percentual: number  // % dos pontos do bloco
+}
+
+export interface BlocoDestaque {
+  bloco_id: number
+  bloco_nome: string
+  projeto_nome: string
+  lote_nome: string
+  uts_total: number
+  uts_concluidas: number
+  uts_em_andamento: number
+  uts_sem_inicio: number
+  pontos_total: number
+  pontos_realizados: number
+  progresso: number | null
+  top_executores: ContribuidorBloco[]
+  top_revisores: ContribuidorBloco[]
+}
+
+export interface AlertaNotaAusente {
+  ut_id: number
+  bloco_nome: string
+  lote_nome: string
+  subfase_nome: string
+  executor_id: number | null
+  nome_executor: string | null
+  revisor_id: number | null
+  nome_revisor: string | null
+  cor_atividade_id: number | null  // ID da atividade de correção
+  ocorrencia: string               // NOTA_AUSENTE | NOTA_INVALIDA
+}
+
+export interface RankingOperador {
+  posicao: number
+  usuario_id: number
+  nome_guerra: string
+  pontos_executor: number
+  pontos_revisor: number
+  pontos_corretor: number
+  pontos_total: number
+  uts_executadas: number
+  uts_revisadas: number
+}
+
+export interface SemanaVelocidade {
+  semana_label: string   // "DD/MM"
+  semana_inicio: string  // "YYYY-MM-DD"
+  uts_concluidas: number
+  pontos_realizados: number
+}
+
+export interface DistribuicaoCiclo {
+  ciclo: string
+  quantidade: number
+  percentual: number
+}
+
 export interface KpiDashboardResponse {
   sap_snapshot_atualizado_em: string | null
   kpi_calculado_em: string | null
@@ -104,6 +167,11 @@ export interface KpiDashboardResponse {
   top_executores_subfase: Array<Record<string, unknown>>
   top_revisores_subfase: Array<Record<string, unknown>>
   timeline_mensal: MesTrilha[]
+  blocos_destaque: BlocoDestaque[]
+  alertas_nota: AlertaNotaAusente[]
+  ranking_operadores: RankingOperador[]
+  velocidade_semanal: SemanaVelocidade[]
+  distribuicao_ciclos: DistribuicaoCiclo[]
 }
 
 // ── Dashboard do operador ─────────────────────────────────────

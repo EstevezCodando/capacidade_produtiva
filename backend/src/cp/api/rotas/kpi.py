@@ -219,6 +219,73 @@ class ProjetoHierarquia(BaseModel):
     lotes: list[LoteHierarquia]
 
 
+class ContribuidorBloco(BaseModel):
+    """Top performer em um bloco (executor ou revisor)."""
+    usuario_id: int
+    nome_guerra: str
+    pontos: float
+    percentual: float  # % dos pontos totais do bloco
+
+
+class BlocoDestaque(BaseModel):
+    """Resumo de progresso e top performers de um bloco."""
+    bloco_id: int
+    bloco_nome: str
+    projeto_nome: str
+    lote_nome: str
+    uts_total: int
+    uts_concluidas: int
+    uts_em_andamento: int
+    uts_sem_inicio: int
+    pontos_total: float
+    pontos_realizados: float
+    progresso: float | None
+    top_executores: list[ContribuidorBloco]
+    top_revisores: list[ContribuidorBloco]
+
+
+class AlertaNotaAusente(BaseModel):
+    """UT concluída com nota ausente ou inválida."""
+    ut_id: int
+    bloco_nome: str
+    lote_nome: str
+    subfase_nome: str
+    executor_id: int | None
+    nome_executor: str | None
+    revisor_id: int | None
+    nome_revisor: str | None
+    cor_atividade_id: int | None  # ID da atividade de correção (kpi.fluxo_ut)
+    ocorrencia: str  # NOTA_AUSENTE | NOTA_INVALIDA
+
+
+class RankingOperador(BaseModel):
+    """Posição no ranking global de produção."""
+    posicao: int
+    usuario_id: int
+    nome_guerra: str
+    pontos_executor: float
+    pontos_revisor: float
+    pontos_corretor: float
+    pontos_total: float
+    uts_executadas: int
+    uts_revisadas: int
+
+
+class SemanaVelocidade(BaseModel):
+    """UTs concluídas e pontos realizados em uma semana."""
+    semana_label: str   # "DD/MM"
+    semana_inicio: str  # "YYYY-MM-DD"
+    uts_concluidas: int
+    pontos_realizados: float
+
+
+class DistribuicaoCiclo(BaseModel):
+    """Distribuição de UTs por modelo de ciclo."""
+    ciclo: str
+    quantidade: int
+    percentual: float
+
+
 class DashboardResponse(BaseModel):
     sap_snapshot_atualizado_em: str | None
     kpi_calculado_em: str | None
@@ -235,6 +302,12 @@ class DashboardResponse(BaseModel):
     top_executores_subfase: list[dict[str, Any]]
     top_revisores_subfase: list[dict[str, Any]]
     timeline_mensal: list[MesTrilhaResposta] = []
+    # ── Novos campos de controle gerencial ────────────────────
+    blocos_destaque: list[BlocoDestaque] = []
+    alertas_nota: list[AlertaNotaAusente] = []
+    ranking_operadores: list[RankingOperador] = []
+    velocidade_semanal: list[SemanaVelocidade] = []
+    distribuicao_ciclos: list[DistribuicaoCiclo] = []
 
 
 # ---------------------------------------------------------------------------
@@ -638,6 +711,11 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
     top_executores_subfase: list[dict[str, Any]] = []
     top_revisores_subfase: list[dict[str, Any]] = []
     timeline_mensal: list[MesTrilhaResposta] = []
+    blocos_destaque: list[BlocoDestaque] = []
+    alertas_nota: list[AlertaNotaAusente] = []
+    ranking_operadores: list[RankingOperador] = []
+    velocidade_semanal: list[SemanaVelocidade] = []
+    distribuicao_ciclos: list[DistribuicaoCiclo] = []
 
     try:
         with engine_cp.connect() as conn:
@@ -949,6 +1027,289 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                     minutos_lancados_normal_acum=int(row.minutos_lancados_normal_acum),
                     minutos_lancados_total_acum=int(row.minutos_lancados_total_acum),
                 ))
+
+            # 9. Blocos destaque — progresso + top performers por bloco
+            sql_blocos_destaque = text("""
+                WITH bloco_stats AS (
+                    SELECT
+                        b.id AS bloco_id,
+                        b.nome AS bloco_nome,
+                        p.nome AS projeto_nome,
+                        l.nome AS lote_nome,
+                        COUNT(ut.id) AS uts_total,
+                        COUNT(ut.id) FILTER (WHERE e.concluida = TRUE) AS uts_concluidas,
+                        COUNT(ut.id) FILTER (
+                            WHERE e.concluida = FALSE AND e.data_inicio_fluxo IS NOT NULL
+                        ) AS uts_em_andamento,
+                        COUNT(ut.id) FILTER (WHERE e.data_inicio_fluxo IS NULL) AS uts_sem_inicio,
+                        COALESCE(SUM(e.ut_dificuldade), 0) AS pontos_total,
+                        COALESCE(SUM(
+                            COALESCE(d.pontos_executor, 0) +
+                            COALESCE(d.pontos_revisor,  0) +
+                            COALESCE(d.pontos_corretor, 0)
+                        ), 0) AS pontos_realizados
+                    FROM sap_snapshot.macrocontrole_bloco b
+                    JOIN sap_snapshot.macrocontrole_lote l ON l.id = b.lote_id
+                    JOIN sap_snapshot.macrocontrole_projeto p ON p.id = l.projeto_id
+                    JOIN sap_snapshot.macrocontrole_unidade_trabalho ut ON ut.bloco_id = b.id
+                    LEFT JOIN kpi.estado_ut e ON e.ut_id = ut.id
+                    LEFT JOIN kpi.distribuicao_pontos d ON d.ut_id = ut.id
+                    WHERE p.status_id = 1
+                    GROUP BY b.id, b.nome, p.nome, l.nome
+                ),
+                exec_rank AS (
+                    SELECT ut2.bloco_id,
+                           d2.executor_id AS usuario_id,
+                           COALESCE(u2.nome_guerra, u2.nome) AS nome_guerra,
+                           SUM(d2.pontos_executor) AS pontos,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY ut2.bloco_id
+                               ORDER BY SUM(d2.pontos_executor) DESC
+                           ) AS rn
+                    FROM kpi.distribuicao_pontos d2
+                    JOIN sap_snapshot.macrocontrole_unidade_trabalho ut2 ON ut2.id = d2.ut_id
+                    JOIN sap_snapshot.dgeo_usuario u2 ON u2.id = d2.executor_id
+                    WHERE d2.pontos_executor > 0
+                    GROUP BY ut2.bloco_id, d2.executor_id, u2.nome, u2.nome_guerra
+                ),
+                rev_rank AS (
+                    SELECT ut3.bloco_id,
+                           d3.revisor_id AS usuario_id,
+                           COALESCE(u3.nome_guerra, u3.nome) AS nome_guerra,
+                           SUM(d3.pontos_revisor) AS pontos,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY ut3.bloco_id
+                               ORDER BY SUM(d3.pontos_revisor) DESC
+                           ) AS rn
+                    FROM kpi.distribuicao_pontos d3
+                    JOIN sap_snapshot.macrocontrole_unidade_trabalho ut3 ON ut3.id = d3.ut_id
+                    JOIN sap_snapshot.dgeo_usuario u3 ON u3.id = d3.revisor_id
+                    WHERE d3.pontos_revisor > 0
+                    GROUP BY ut3.bloco_id, d3.revisor_id, u3.nome, u3.nome_guerra
+                ),
+                exec_agg AS (
+                    SELECT bloco_id,
+                           json_agg(
+                               json_build_object(
+                                   'usuario_id', usuario_id,
+                                   'nome_guerra', nome_guerra,
+                                   'pontos', pontos
+                               ) ORDER BY pontos DESC
+                           ) AS top_exec
+                    FROM exec_rank WHERE rn <= 3
+                    GROUP BY bloco_id
+                ),
+                rev_agg AS (
+                    SELECT bloco_id,
+                           json_agg(
+                               json_build_object(
+                                   'usuario_id', usuario_id,
+                                   'nome_guerra', nome_guerra,
+                                   'pontos', pontos
+                               ) ORDER BY pontos DESC
+                           ) AS top_rev
+                    FROM rev_rank WHERE rn <= 3
+                    GROUP BY bloco_id
+                )
+                SELECT
+                    bs.*,
+                    COALESCE(ea.top_exec, '[]'::json) AS top_executores,
+                    COALESCE(ra.top_rev,  '[]'::json) AS top_revisores
+                FROM bloco_stats bs
+                LEFT JOIN exec_agg ea ON ea.bloco_id = bs.bloco_id
+                LEFT JOIN rev_agg  ra ON ra.bloco_id = bs.bloco_id
+                ORDER BY bs.bloco_nome
+            """)
+
+            import json as _json
+            for row in conn.execute(sql_blocos_destaque):
+                pt = float(row.pontos_total or 0)
+                pr = float(row.pontos_realizados or 0)
+                prog = round(pr / pt * 100, 2) if pt > 0 else None
+
+                raw_exec = row.top_executores
+                raw_rev  = row.top_revisores
+                if isinstance(raw_exec, str):
+                    raw_exec = _json.loads(raw_exec)
+                if isinstance(raw_rev, str):
+                    raw_rev = _json.loads(raw_rev)
+
+                def _to_contrib(items: list, total: float) -> list[ContribuidorBloco]:
+                    out = []
+                    for it in (items or []):
+                        pts = float(it.get("pontos") or 0)
+                        out.append(ContribuidorBloco(
+                            usuario_id=int(it.get("usuario_id") or 0),
+                            nome_guerra=str(it.get("nome_guerra") or ""),
+                            pontos=pts,
+                            percentual=round(pts / total * 100, 1) if total > 0 else 0.0,
+                        ))
+                    return out
+
+                blocos_destaque.append(BlocoDestaque(
+                    bloco_id=row.bloco_id,
+                    bloco_nome=row.bloco_nome,
+                    projeto_nome=row.projeto_nome,
+                    lote_nome=row.lote_nome,
+                    uts_total=int(row.uts_total or 0),
+                    uts_concluidas=int(row.uts_concluidas or 0),
+                    uts_em_andamento=int(row.uts_em_andamento or 0),
+                    uts_sem_inicio=int(row.uts_sem_inicio or 0),
+                    pontos_total=pt,
+                    pontos_realizados=pr,
+                    progresso=prog,
+                    top_executores=_to_contrib(raw_exec, pt),
+                    top_revisores=_to_contrib(raw_rev, pt),
+                ))
+
+            # 10. Alertas — UTs concluídas sem nota ou com nota inválida
+            sql_alertas = text("""
+                SELECT
+                    e.ut_id,
+                    b.nome  AS bloco_nome,
+                    l.nome  AS lote_nome,
+                    e.subfase_nome,
+                    e.executor_id,
+                    e.nome_executor,
+                    e.revisor_id,
+                    e.nome_revisor,
+                    f.cor_atividade_id,
+                    e.ocorrencia
+                FROM kpi.estado_ut e
+                JOIN sap_snapshot.macrocontrole_unidade_trabalho ut
+                    ON ut.id = e.ut_id
+                JOIN sap_snapshot.macrocontrole_bloco b ON b.id = ut.bloco_id
+                JOIN sap_snapshot.macrocontrole_lote  l ON l.id = b.lote_id
+                LEFT JOIN kpi.fluxo_ut f ON f.ut_id = e.ut_id
+                WHERE e.concluida = TRUE
+                  AND e.ocorrencia IN ('NOTA_AUSENTE', 'NOTA_INVALIDA')
+                ORDER BY b.nome, e.subfase_nome, e.ut_id
+                LIMIT 500
+            """)
+            for row in conn.execute(sql_alertas):
+                alertas_nota.append(AlertaNotaAusente(
+                    ut_id=int(row.ut_id),
+                    bloco_nome=str(row.bloco_nome or ""),
+                    lote_nome=str(row.lote_nome or ""),
+                    subfase_nome=str(row.subfase_nome or ""),
+                    executor_id=row.executor_id,
+                    nome_executor=row.nome_executor,
+                    revisor_id=row.revisor_id,
+                    nome_revisor=row.nome_revisor,
+                    cor_atividade_id=row.cor_atividade_id,
+                    ocorrencia=str(row.ocorrencia or ""),
+                ))
+
+            # 11. Ranking global de operadores
+            sql_ranking = text("""
+                SELECT
+                    ROW_NUMBER() OVER (
+                        ORDER BY
+                            COALESCE(SUM(d.pontos_executor), 0) +
+                            COALESCE(SUM(d.pontos_revisor),  0) +
+                            COALESCE(SUM(d.pontos_corretor), 0) DESC
+                    ) AS posicao,
+                    u.id AS usuario_id,
+                    COALESCE(u.nome_guerra, u.nome) AS nome_guerra,
+                    COALESCE(SUM(d.pontos_executor), 0)  AS pontos_executor,
+                    COALESCE(SUM(d.pontos_revisor),  0)  AS pontos_revisor,
+                    COALESCE(SUM(d.pontos_corretor), 0)  AS pontos_corretor,
+                    COALESCE(SUM(d.pontos_executor), 0) +
+                    COALESCE(SUM(d.pontos_revisor),  0) +
+                    COALESCE(SUM(d.pontos_corretor), 0)  AS pontos_total,
+                    COUNT(DISTINCT CASE
+                        WHEN d.executor_id = u.id AND d.pontos_executor > 0 THEN d.ut_id
+                    END) AS uts_executadas,
+                    COUNT(DISTINCT CASE
+                        WHEN d.revisor_id  = u.id AND d.pontos_revisor  > 0 THEN d.ut_id
+                    END) AS uts_revisadas
+                FROM sap_snapshot.dgeo_usuario u
+                JOIN kpi.distribuicao_pontos d
+                    ON d.executor_id = u.id
+                    OR d.revisor_id  = u.id
+                    OR d.corretor_id = u.id
+                GROUP BY u.id, u.nome, u.nome_guerra
+                HAVING
+                    COALESCE(SUM(d.pontos_executor), 0) +
+                    COALESCE(SUM(d.pontos_revisor),  0) +
+                    COALESCE(SUM(d.pontos_corretor), 0) > 0
+                ORDER BY pontos_total DESC
+                LIMIT 20
+            """)
+            for row in conn.execute(sql_ranking):
+                ranking_operadores.append(RankingOperador(
+                    posicao=int(row.posicao),
+                    usuario_id=int(row.usuario_id),
+                    nome_guerra=str(row.nome_guerra or ""),
+                    pontos_executor=float(row.pontos_executor or 0),
+                    pontos_revisor=float(row.pontos_revisor or 0),
+                    pontos_corretor=float(row.pontos_corretor or 0),
+                    pontos_total=float(row.pontos_total or 0),
+                    uts_executadas=int(row.uts_executadas or 0),
+                    uts_revisadas=int(row.uts_revisadas or 0),
+                ))
+
+            # 12. Velocidade semanal — UTs concluídas nas últimas 8 semanas
+            sql_velocidade = text("""
+                WITH semanas AS (
+                    SELECT generate_series(
+                        date_trunc('week', CURRENT_DATE) - INTERVAL '7 weeks',
+                        date_trunc('week', CURRENT_DATE),
+                        '1 week'::interval
+                    )::date AS semana_inicio
+                ),
+                uts_sem AS (
+                    SELECT
+                        date_trunc('week', e.data_fim_fluxo)::date AS semana,
+                        COUNT(*) AS uts_concluidas,
+                        COALESCE(SUM(
+                            COALESCE(d.pontos_executor, 0) +
+                            COALESCE(d.pontos_revisor,  0) +
+                            COALESCE(d.pontos_corretor, 0)
+                        ), 0) AS pontos
+                    FROM kpi.estado_ut e
+                    LEFT JOIN kpi.distribuicao_pontos d ON d.ut_id = e.ut_id
+                    WHERE e.concluida = TRUE
+                      AND e.data_fim_fluxo IS NOT NULL
+                      AND e.data_fim_fluxo >=
+                          date_trunc('week', CURRENT_DATE) - INTERVAL '7 weeks'
+                    GROUP BY 1
+                )
+                SELECT
+                    to_char(s.semana_inicio, 'DD/MM')  AS semana_label,
+                    s.semana_inicio::text              AS semana_inicio,
+                    COALESCE(u.uts_concluidas, 0)      AS uts_concluidas,
+                    COALESCE(u.pontos, 0)              AS pontos_realizados
+                FROM semanas s
+                LEFT JOIN uts_sem u ON u.semana = s.semana_inicio
+                ORDER BY s.semana_inicio
+            """)
+            for row in conn.execute(sql_velocidade):
+                velocidade_semanal.append(SemanaVelocidade(
+                    semana_label=str(row.semana_label),
+                    semana_inicio=str(row.semana_inicio),
+                    uts_concluidas=int(row.uts_concluidas or 0),
+                    pontos_realizados=float(row.pontos_realizados or 0),
+                ))
+
+            # 13. Distribuição por ciclo
+            sql_ciclos = text("""
+                WITH totais AS (SELECT COUNT(*) AS total FROM kpi.estado_ut)
+                SELECT
+                    COALESCE(ciclo_modelo, 'DESCONHECIDO') AS ciclo,
+                    COUNT(*) AS quantidade,
+                    ROUND(COUNT(*) * 100.0 / NULLIF(t.total, 0), 1) AS percentual
+                FROM kpi.estado_ut, totais t
+                GROUP BY ciclo_modelo, t.total
+                ORDER BY quantidade DESC
+            """)
+            for row in conn.execute(sql_ciclos):
+                distribuicao_ciclos.append(DistribuicaoCiclo(
+                    ciclo=str(row.ciclo or ""),
+                    quantidade=int(row.quantidade or 0),
+                    percentual=float(row.percentual or 0),
+                ))
+
     except Exception:
         _logger.exception("Erro ao calcular kpi_dashboard")
 
@@ -970,6 +1331,11 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
         top_executores_subfase=top_executores_subfase,
         top_revisores_subfase=top_revisores_subfase,
         timeline_mensal=timeline_mensal,
+        blocos_destaque=blocos_destaque,
+        alertas_nota=alertas_nota,
+        ranking_operadores=ranking_operadores,
+        velocidade_semanal=velocidade_semanal,
+        distribuicao_ciclos=distribuicao_ciclos,
     )
 
 

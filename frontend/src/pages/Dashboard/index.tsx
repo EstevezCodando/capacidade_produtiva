@@ -8,7 +8,11 @@ import {
   getMinhaPizzaMensal, getPizzaMensal, getUsuarios,
 } from "@/api/endpoints"
 import { useAuth } from "@/context/AuthContext"
-import type { BlocoDetalheUsuario, DiaHorasResposta, MesTrilha, PizzaFatia, PontosSubfaseResposta } from "@/types"
+import type {
+  AlertaNotaAusente, BlocoDetalheUsuario, BlocoDestaque, DiaHorasResposta,
+  DistribuicaoCiclo, MesTrilha, PizzaFatia, PontosSubfaseResposta,
+  RankingOperador, SemanaVelocidade,
+} from "@/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format, formatDistanceToNow, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -537,6 +541,346 @@ function BlocoCard({ bloco }: { bloco: BlocoDetalheUsuario }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// BlocoProgressoCard — card por bloco com UTs, pontos e top performers
+// ─────────────────────────────────────────────────────────────
+
+function BlocoProgressoCard({ bloco }: { bloco: BlocoDestaque }) {
+  const prog = bloco.progresso ?? 0
+  const progColor = prog >= 70 ? "#10B981" : prog >= 35 ? "#F59E0B" : "#EF4444"
+  const ptsFaltam = bloco.pontos_total - bloco.pontos_realizados
+
+  return (
+    <div className={styles.blocoDestaqueCard}>
+      {/* strip de cor à esquerda indicando progresso */}
+      <div className={styles.blocoDestaqueStrip} style={{ background: progColor }} />
+
+      <div className={styles.blocoDestaqueMain}>
+        {/* Cabeçalho */}
+        <div className={styles.blocoDestaqueHeader}>
+          <div className={styles.blocoDestaqueNome}>{bloco.bloco_nome}</div>
+          <div className={styles.blocoDestaqueMeta}>{bloco.projeto_nome} · {bloco.lote_nome}</div>
+        </div>
+
+        {/* Barra de progresso */}
+        <div className={styles.blocoDestaqueProg}>
+          <div className={styles.blocoDestaqueTrack}>
+            <div
+              className={styles.blocoDestaqueFill}
+              style={{ width: `${Math.min(100, prog)}%`, background: progColor }}
+            />
+          </div>
+          <span className={styles.blocoDestaquePct} style={{ color: progColor }}>
+            {prog.toFixed(1)}%
+          </span>
+        </div>
+
+        {/* Contagem de UTs */}
+        <div className={styles.blocoDestaqueUts}>
+          <span className={styles.utConcluida}>{bloco.uts_concluidas} concluídas</span>
+          {bloco.uts_em_andamento > 0 && (
+            <span className={styles.utAndamento}>{bloco.uts_em_andamento} em andamento</span>
+          )}
+          {bloco.uts_sem_inicio > 0 && (
+            <span className={styles.utPendente}>{bloco.uts_sem_inicio} não iniciadas</span>
+          )}
+          <span className={styles.utTotal}>/{bloco.uts_total} total</span>
+        </div>
+
+        {/* Pontos */}
+        <div className={styles.blocoDestaquePontos}>
+          <span className={styles.ptsReal}>{fmtPts(bloco.pontos_realizados)} pts</span>
+          <span className={styles.ptsSep}> / </span>
+          <span className={styles.ptsTotal}>{fmtPts(bloco.pontos_total)} pts</span>
+          {ptsFaltam > 0.01 && (
+            <span className={styles.ptsFaltam}> · {fmtPts(ptsFaltam)} restam</span>
+          )}
+        </div>
+
+        {/* Top performers */}
+        {(bloco.top_executores.length > 0 || bloco.top_revisores.length > 0) && (
+          <div className={styles.blocoDestaqueRanks}>
+            {bloco.top_executores.length > 0 && (
+              <div className={styles.rankCol}>
+                <div className={styles.rankColTitle}>
+                  <span className={styles.rankIcon}>★</span> Execução
+                </div>
+                {bloco.top_executores.map((c, i) => (
+                  <div key={c.usuario_id} className={styles.rankRow}>
+                    <span className={styles.rankPos}>{i + 1}</span>
+                    <span className={styles.rankNome}>{c.nome_guerra}</span>
+                    <span className={styles.rankPts}>{fmtPts(c.pontos)}</span>
+                    <span className={styles.rankPct}>{c.percentual.toFixed(0)}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {bloco.top_revisores.length > 0 && (
+              <div className={styles.rankCol}>
+                <div className={styles.rankColTitle}>
+                  <span className={styles.rankIconRev}>✦</span> Revisão
+                </div>
+                {bloco.top_revisores.map((c, i) => (
+                  <div key={c.usuario_id} className={styles.rankRow}>
+                    <span className={styles.rankPos}>{i + 1}</span>
+                    <span className={styles.rankNome}>{c.nome_guerra}</span>
+                    <span className={styles.rankPts}>{fmtPts(c.pontos)}</span>
+                    <span className={styles.rankPct}>{c.percentual.toFixed(0)}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// RankingPanel — tabela global de operadores com mini-bar
+// ─────────────────────────────────────────────────────────────
+
+function RankingPanel({ operadores }: { operadores: RankingOperador[] }) {
+  if (operadores.length === 0) return null
+  const maxTotal = Math.max(...operadores.map((o) => o.pontos_total), 1)
+
+  return (
+    <div className={styles.rankingTable}>
+      <div className={styles.rankingHead}>
+        <span className={styles.rankingCellPos}>#</span>
+        <span className={styles.rankingCellNome}>Operador</span>
+        <span className={styles.rankingCellPts} title="Pontos como executor">Exec.</span>
+        <span className={styles.rankingCellPts} title="Pontos como revisor">Rev.</span>
+        <span className={styles.rankingCellPts} title="Pontos como corretor">Cor.</span>
+        <span className={styles.rankingCellTotal}>Total</span>
+        <span className={styles.rankingCellBar} />
+      </div>
+      {operadores.map((op) => {
+        const barW = Math.round((op.pontos_total / maxTotal) * 100)
+        const barExec = Math.round((op.pontos_executor / op.pontos_total) * 100)
+        const barRev  = Math.round((op.pontos_revisor  / op.pontos_total) * 100)
+        return (
+          <div key={op.usuario_id} className={styles.rankingRow}>
+            <span className={styles.rankingCellPos}>{op.posicao}</span>
+            <span className={styles.rankingCellNome}>{op.nome_guerra}</span>
+            <span className={styles.rankingCellPts}>{fmtPts(op.pontos_executor)}</span>
+            <span className={styles.rankingCellPts}>{fmtPts(op.pontos_revisor)}</span>
+            <span className={styles.rankingCellPts}>{fmtPts(op.pontos_corretor)}</span>
+            <span className={styles.rankingCellTotal}>{fmtPts(op.pontos_total)}</span>
+            <span className={styles.rankingCellBar}>
+              <span className={styles.rankingBarTrack} style={{ width: `${barW}%` }}>
+                <span className={styles.rankingBarExec} style={{ width: `${barExec}%` }} />
+                <span className={styles.rankingBarRev}  style={{ width: `${barRev}%`, left: `${barExec}%` }} />
+              </span>
+            </span>
+          </div>
+        )
+      })}
+      <div className={styles.rankingLegend}>
+        <span className={styles.rlExec}>■ Execução</span>
+        <span className={styles.rlRev}>■ Revisão</span>
+        <span className={styles.rlCor}>■ Correção</span>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// GraficoVelocidade — barras semanais de UTs concluídas
+// ─────────────────────────────────────────────────────────────
+
+const VEL_W = 560
+const VEL_H = 160
+const VEL_PAD = { top: 14, right: 16, bottom: 36, left: 40 }
+const VEL_IW = VEL_W - VEL_PAD.left - VEL_PAD.right
+const VEL_IH = VEL_H - VEL_PAD.top - VEL_PAD.bottom
+
+function GraficoVelocidade({ dados }: { dados: SemanaVelocidade[] }) {
+  const [hovIdx, setHovIdx] = useState<number | null>(null)
+  const n = dados.length
+  if (n === 0) return <div className={styles.emptyState}>Sem dados de velocidade.</div>
+
+  const maxUts = Math.max(...dados.map((d) => d.uts_concluidas), 1)
+  const barW   = Math.floor(VEL_IW / n) - 4
+  const barX   = (i: number) => VEL_PAD.left + i * (VEL_IW / n) + (VEL_IW / n - barW) / 2
+  const barH   = (v: number) => Math.max(0, (v / maxUts) * VEL_IH)
+  const barY   = (v: number) => VEL_PAD.top + VEL_IH - barH(v)
+
+  const yTicks = Array.from({ length: Math.min(maxUts + 1, 6) }, (_, k) =>
+    Math.round((k * maxUts) / Math.min(maxUts, 5))
+  )
+
+  return (
+    <div className={styles.chartWrap} style={{ position: "relative" }}>
+      <svg viewBox={`0 0 ${VEL_W} ${VEL_H}`} className={styles.chartSvg}
+        onMouseLeave={() => setHovIdx(null)}>
+
+        {/* Grade Y */}
+        {yTicks.map((v) => (
+          <g key={v}>
+            <line
+              x1={VEL_PAD.left} y1={barY(v)}
+              x2={VEL_PAD.left + VEL_IW} y2={barY(v)}
+              className={styles.gridLine}
+            />
+            <text x={VEL_PAD.left - 6} y={barY(v) + 4} className={styles.axisLabel} textAnchor="end">{v}</text>
+          </g>
+        ))}
+
+        {/* Barras */}
+        {dados.map((d, i) => (
+          <g key={d.semana_inicio}>
+            <rect
+              x={barX(i)} y={barY(d.uts_concluidas)}
+              width={barW} height={barH(d.uts_concluidas)}
+              className={hovIdx === i ? styles.velBarHov : styles.velBar}
+              rx={2}
+              onMouseEnter={() => setHovIdx(i)}
+            />
+            {/* Rótulo X */}
+            <text
+              x={barX(i) + barW / 2}
+              y={VEL_H - 6}
+              className={styles.axisLabel}
+              textAnchor="middle"
+            >
+              {d.semana_label}
+            </text>
+          </g>
+        ))}
+
+        {/* Valores acima das barras */}
+        {dados.map((d, i) => d.uts_concluidas > 0 && (
+          <text
+            key={`v-${d.semana_inicio}`}
+            x={barX(i) + barW / 2}
+            y={barY(d.uts_concluidas) - 3}
+            className={styles.velBarLabel}
+            textAnchor="middle"
+          >
+            {d.uts_concluidas}
+          </text>
+        ))}
+      </svg>
+
+      {/* Tooltip */}
+      {hovIdx !== null && (
+        <div className={styles.velTooltip}>
+          <span className={styles.tooltipDate}>{dados[hovIdx].semana_label}</span>
+          <span>{dados[hovIdx].uts_concluidas} UTs concluídas</span>
+          <span className={styles.tooltipK}>{fmtPts(dados[hovIdx].pontos_realizados)} pts</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// DistribuicaoCiclos — barras horizontais por ciclo
+// ─────────────────────────────────────────────────────────────
+
+const CICLO_LABELS: Record<string, string> = {
+  CICLO_1_PADRAO:             "Ciclo 1 — Padrão",
+  CICLO_2_REVISAO_CORRECAO:   "Ciclo 2 — Rev+Cor",
+  CICLO_3_SEM_CORRECAO:       "Ciclo 3 — Sem Cor.",
+  CICLO_4_REVISAO_FINAL:      "Ciclo 4 — Rev Final",
+  INCONSISTENTE_CICLO:        "Inconsistente",
+  DESCONHECIDO:               "Desconhecido",
+}
+const CICLO_COLORS: Record<string, string> = {
+  CICLO_1_PADRAO:           "#10B981",
+  CICLO_2_REVISAO_CORRECAO: "#6366F1",
+  CICLO_3_SEM_CORRECAO:     "#F59E0B",
+  CICLO_4_REVISAO_FINAL:    "#14B8A6",
+  INCONSISTENTE_CICLO:      "#EF4444",
+  DESCONHECIDO:             "#94A3B8",
+}
+
+function DistribuicaoCiclos({ dados }: { dados: DistribuicaoCiclo[] }) {
+  if (dados.length === 0) return null
+  return (
+    <div className={styles.ciclosWrap}>
+      {dados.map((c) => (
+        <div key={c.ciclo} className={styles.cicloRow}>
+          <div className={styles.cicloLabel}>
+            {CICLO_LABELS[c.ciclo] ?? c.ciclo}
+          </div>
+          <div className={styles.cicloTrack}>
+            <div
+              className={styles.cicloFill}
+              style={{
+                width: `${Math.min(100, c.percentual)}%`,
+                background: CICLO_COLORS[c.ciclo] ?? "#94A3B8",
+              }}
+            />
+          </div>
+          <span className={styles.cicloQtd}>{c.quantidade}</span>
+          <span className={styles.cicloPct}>{c.percentual.toFixed(0)}%</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// AlertasNotaTable — planilha de UTs concluídas sem nota
+// ─────────────────────────────────────────────────────────────
+
+const OCORRENCIA_LABEL: Record<string, string> = {
+  NOTA_AUSENTE:  "Nota ausente",
+  NOTA_INVALIDA: "Nota inválida",
+}
+
+function AlertasNotaTable({ alertas }: { alertas: AlertaNotaAusente[] }) {
+  if (alertas.length === 0) return null
+  return (
+    <div className={styles.alertasWrap}>
+      <div className={styles.alertasScrollArea}>
+        <table className={styles.alertasTable}>
+          <thead>
+            <tr className={styles.alertasHead}>
+              <th className={styles.alertaTh}>Bloco</th>
+              <th className={styles.alertaTh}>Subfase</th>
+              <th className={styles.alertaTh}>UT</th>
+              <th className={styles.alertaTh}>Executor</th>
+              <th className={styles.alertaTh}>Revisor</th>
+              <th className={styles.alertaTh}>Ativ. Correção</th>
+              <th className={styles.alertaTh}>Problema</th>
+            </tr>
+          </thead>
+          <tbody>
+            {alertas.map((a) => (
+              <tr key={a.ut_id} className={styles.alertaRow}>
+                <td className={styles.alertaTd}>
+                  <span className={styles.alertaBlocoNome}>{a.bloco_nome}</span>
+                  <span className={styles.alertaLote}>{a.lote_nome}</span>
+                </td>
+                <td className={styles.alertaTd}>{a.subfase_nome}</td>
+                <td className={`${styles.alertaTd} ${styles.alertaId}`}>{a.ut_id}</td>
+                <td className={styles.alertaTd}>{a.nome_executor ?? "—"}</td>
+                <td className={styles.alertaTd}>{a.nome_revisor ?? "—"}</td>
+                <td className={`${styles.alertaTd} ${styles.alertaId}`}>
+                  {a.cor_atividade_id ?? "—"}
+                </td>
+                <td className={styles.alertaTd}>
+                  <span className={
+                    a.ocorrencia === "NOTA_AUSENTE"
+                      ? styles.alertaBadgeAusente
+                      : styles.alertaBadgeInvalida
+                  }>
+                    {OCORRENCIA_LABEL[a.ocorrencia] ?? a.ocorrencia}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
 // StatCard
 // ─────────────────────────────────────────────────────────────
 
@@ -818,6 +1162,22 @@ function AdminDashboard() {
         )}
       </div>
 
+      {/* ── Blocos em destaque ── */}
+      {(dashboard?.blocos_destaque ?? []).length > 0 && (
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>
+            Situação dos blocos
+            <span className={styles.sectionCount}>{dashboard!.blocos_destaque.length}</span>
+          </h2>
+          <div className={styles.blocoDestaqueGrid}>
+            {dashboard!.blocos_destaque.map((b) => (
+              <BlocoProgressoCard key={b.bloco_id} bloco={b} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Timeline acumulada ── */}
       {dashboard && (
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Evolução acumulada de horas em produção — todos os operadores</h2>
@@ -830,43 +1190,95 @@ function AdminDashboard() {
         </div>
       )}
 
-      <div className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>
-            Distribuição de horas —{" "}
-            {format(parseISO(`${mesPizza}-01`), "MMMM yyyy", { locale: ptBR })}
-          </h2>
-          <div className={styles.pizzaControls}>
-            <input
-              type="month"
-              value={mesPizza}
-              onChange={(e) => setMesPizza(e.target.value)}
-              className={styles.mesInput}
-            />
-            <select
-              value={usuarioPizza}
-              onChange={(e) => setUsuarioPizza(Number(e.target.value))}
-              className={styles.usuarioSelect}
-            >
-              <option value={0}>Todos os operadores</option>
-              {(usuarios ?? []).map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.nome_guerra ?? u.nome}
-                </option>
-              ))}
-            </select>
+      {/* ── Ranking global de operadores + Velocidade semanal ── */}
+      <div className={styles.rankVelRow}>
+        {(dashboard?.ranking_operadores ?? []).length > 0 && (
+          <div className={`${styles.section} ${styles.rankVelColRanking}`}>
+            <h2 className={styles.sectionTitle}>
+              Ranking de produção
+              <span className={styles.sectionCount}>{dashboard!.ranking_operadores.length}</span>
+            </h2>
+            <div className={styles.chartCard}>
+              <RankingPanel operadores={dashboard!.ranking_operadores} />
+            </div>
           </div>
-        </div>
-        {pizzaData && pizzaData.total_capacidade_min > 0 ? (
-          <GraficoPizza
-            fatias={pizzaData.fatias}
-            totalCapacidadeMin={pizzaData.total_capacidade_min}
-            naoAlocadoMin={pizzaData.nao_alocado_min}
-          />
-        ) : (
-          <div className={styles.emptyState}>Nenhum lançamento registrado neste mês.</div>
+        )}
+        {(dashboard?.velocidade_semanal ?? []).length > 0 && (
+          <div className={`${styles.section} ${styles.rankVelColVel}`}>
+            <h2 className={styles.sectionTitle}>Velocidade — últimas 8 semanas (UTs/sem)</h2>
+            <div className={styles.chartCard}>
+              <GraficoVelocidade dados={dashboard!.velocidade_semanal} />
+            </div>
+          </div>
         )}
       </div>
+
+      {/* ── Pizza + distribuição por ciclo ── */}
+      <div className={styles.pizzaCiclosRow}>
+        <div className={styles.pizzaCiclosColPizza}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>
+              Distribuição de horas —{" "}
+              {format(parseISO(`${mesPizza}-01`), "MMMM yyyy", { locale: ptBR })}
+            </h2>
+            <div className={styles.pizzaControls}>
+              <input
+                type="month"
+                value={mesPizza}
+                onChange={(e) => setMesPizza(e.target.value)}
+                className={styles.mesInput}
+              />
+              <select
+                value={usuarioPizza}
+                onChange={(e) => setUsuarioPizza(Number(e.target.value))}
+                className={styles.usuarioSelect}
+              >
+                <option value={0}>Todos os operadores</option>
+                {(usuarios ?? []).map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nome_guerra ?? u.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {pizzaData && pizzaData.total_capacidade_min > 0 ? (
+            <GraficoPizza
+              fatias={pizzaData.fatias}
+              totalCapacidadeMin={pizzaData.total_capacidade_min}
+              naoAlocadoMin={pizzaData.nao_alocado_min}
+            />
+          ) : (
+            <div className={styles.emptyState}>Nenhum lançamento registrado neste mês.</div>
+          )}
+        </div>
+
+        {(dashboard?.distribuicao_ciclos ?? []).length > 0 && (
+          <div className={styles.pizzaCiclosColCiclos}>
+            <h2 className={styles.sectionTitle} style={{ marginBottom: 12 }}>
+              Distribuição por ciclo
+            </h2>
+            <div className={styles.chartCard}>
+              <DistribuicaoCiclos dados={dashboard!.distribuicao_ciclos} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Alertas de qualidade ── */}
+      {(dashboard?.alertas_nota ?? []).length > 0 && (
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>
+            <span className={styles.alertasTitulo}>⚠ Alertas de nota</span>
+            <span className={styles.sectionCountWarn}>{dashboard!.alertas_nota.length}</span>
+          </h2>
+          <p className={styles.alertasDesc}>
+            UTs concluídas sem nota de qualidade ou com nota inválida.
+            Verifique o revisor responsável e, se aplicável, a atividade de correção.
+          </p>
+          <AlertasNotaTable alertas={dashboard!.alertas_nota} />
+        </div>
+      )}
 
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>Projetos</h2>
