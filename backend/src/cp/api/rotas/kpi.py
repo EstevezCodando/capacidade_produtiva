@@ -895,28 +895,12 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                 )
 
             # 8. Timeline mensal acumulada — J (previsto), K (normal), P (total)
+            # Sempre gera exatamente 12 meses para garantir que o gráfico seja exibido.
             sql_timeline_mensal = text("""
-                WITH data_inicio AS (
-                    SELECT LEAST(
-                        COALESCE(
-                            (SELECT MIN(ap.data)
-                             FROM capacidade.agenda_prevista_admin ap
-                             WHERE ap.em_uso = TRUE AND ap.bloco_id IS NOT NULL),
-                            date_trunc('month', CURRENT_DATE)::date
-                        ),
-                        COALESCE(
-                            (SELECT MIN(al.data_lancamento)
-                             FROM capacidade.agenda_lancamento al
-                             JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
-                             WHERE al.em_uso = TRUE AND ta.codigo = 'BLOCO'),
-                            date_trunc('month', CURRENT_DATE)::date
-                        )
-                    ) AS inicio
-                ),
-                meses AS (
+                WITH meses AS (
                     SELECT generate_series(
-                        date_trunc('month', (SELECT inicio FROM data_inicio)),
-                        date_trunc('month', CURRENT_DATE),
+                        date_trunc('month', CURRENT_DATE - INTERVAL '11 months')::date,
+                        date_trunc('month', CURRENT_DATE)::date,
                         '1 month'::interval
                     )::date AS mes
                 ),
@@ -1409,6 +1393,7 @@ def _pizza_query(
         FROM capacidade.agenda_lancamento al
         JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
         WHERE al.em_uso = TRUE
+          AND al.faixa_minuto::text = 'NORMAL'
           AND date_trunc('month', al.data_lancamento)::date = :mes_inicio
           {uid_filter}
         GROUP BY ta.nome, ta.cor

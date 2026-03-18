@@ -288,22 +288,22 @@
   fill: var(--tx-muted);
 }
 
-/* J — previsto (tracejado) */
+/* J — previsto (tracejado) — âmbar */
 .linePrevista {
-  stroke: var(--info);
+  stroke: #F59E0B;
   stroke-width: 1.5;
-  stroke-opacity: 0.8;
+  stroke-opacity: 0.9;
 }
 
-/* K — lançado horário normal */
+/* K — lançado horário normal — esmeralda */
 .lineNormal {
-  stroke: var(--ok, #3dba6f);
-  stroke-width: 1.5;
+  stroke: #10B981;
+  stroke-width: 2;
 }
 
-/* P — lançado normal + extra */
+/* P — lançado normal + extra — índigo */
 .lineLancada {
-  stroke: var(--accent);
+  stroke: #6366F1;
   stroke-width: 2.5;
 }
 
@@ -313,23 +313,23 @@
   stroke-dasharray: 3 2;
 }
 
-/* Ponto J */
+/* Ponto J — âmbar */
 .dotPrev {
-  fill: var(--info);
+  fill: #F59E0B;
   stroke: var(--bg-surface);
   stroke-width: 1.5;
 }
 
-/* Ponto K */
+/* Ponto K — esmeralda */
 .dotNormal {
-  fill: var(--ok, #3dba6f);
+  fill: #10B981;
   stroke: var(--bg-surface);
   stroke-width: 1.5;
 }
 
-/* Ponto P */
+/* Ponto P — índigo */
 .dotLanc {
-  fill: var(--accent);
+  fill: #6366F1;
   stroke: var(--bg-surface);
   stroke-width: 1.5;
 }
@@ -358,25 +358,25 @@
   margin-bottom: 2px;
 }
 
-/* J = previsto */
+/* J = previsto — âmbar */
 .tooltipJ {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--info);
+  color: #F59E0B;
 }
 
-/* K = normal */
+/* K = normal — esmeralda */
 .tooltipK {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--ok, #3dba6f);
+  color: #10B981;
 }
 
-/* P = total */
+/* P = total — índigo */
 .tooltipP {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--accent);
+  color: #6366F1;
 }
 
 .tooltipPrev { font-family: var(--font-mono); font-size: 11px; color: var(--info); }
@@ -394,17 +394,21 @@
   letter-spacing: 0.3px;
 }
 
+/* J — âmbar */
 .legendJ {
-  color: var(--info);
-  opacity: 0.85;
+  color: #F59E0B;
+  opacity: 0.92;
 }
 
+/* K — esmeralda */
 .legendK {
-  color: var(--ok, #3dba6f);
+  color: #10B981;
+  font-weight: 600;
 }
 
+/* P — índigo */
 .legendP {
-  color: var(--accent);
+  color: #6366F1;
   font-weight: 600;
 }
 

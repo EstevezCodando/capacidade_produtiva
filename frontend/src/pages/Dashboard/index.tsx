@@ -201,6 +201,8 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
   const maxH = Math.ceil((maxMin * 1.1) / 60)
 
   const n = dados.length
+  if (n === 0) return <div className={styles.emptyState}>Sem dados de timeline disponíveis.</div>
+
   const xOf = (i: number) => PAD.left + (n > 1 ? (i / (n - 1)) * INNER_W : INNER_W / 2)
   const yOf = (min: number) => PAD.top + INNER_H - (min / (maxH * 60)) * INNER_H
 
@@ -211,6 +213,9 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
   const yStep = Math.max(1, Math.ceil(maxH / 6))
   const yTicks = Array.from({ length: Math.floor(maxH / yStep) + 1 }, (_, k) => k * yStep)
 
+  // Mostra no máximo ~8 labels no eixo X para evitar sobreposição
+  const xLabelStep = Math.max(1, Math.ceil(n / 8))
+
   return (
     <div className={styles.chartWrap}>
       <svg
@@ -218,20 +223,27 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
         className={styles.chartSvg}
         onMouseLeave={() => setHovIdx(null)}
       >
+        {/* Grade Y */}
         {yTicks.map((h) => (
           <g key={h}>
             <line x1={PAD.left} y1={yOf(h * 60)} x2={PAD.left + INNER_W} y2={yOf(h * 60)} className={styles.gridLine} />
             <text x={PAD.left - 8} y={yOf(h * 60) + 4} className={styles.axisLabel} textAnchor="end">{h}h</text>
           </g>
         ))}
-        {dados.map((d, i) => (
+
+        {/* Rótulos X — um por ~2 meses para não sobrecarregar */}
+        {dados.map((d, i) => i % xLabelStep === 0 && (
           <text key={d.mes} x={xOf(i)} y={CHART_H - 6} className={styles.axisLabel} textAnchor="middle">
             {format(parseISO(d.mes), "MMM/yy", { locale: ptBR })}
           </text>
         ))}
-        {n > 1 && <polyline points={polyJ} fill="none" className={styles.linePrevista} strokeDasharray="6 3" />}
-        {n > 1 && <polyline points={polyK} fill="none" className={styles.lineNormal} />}
-        {n > 1 && <polyline points={polyP} fill="none" className={styles.lineLancada} />}
+
+        {/* Retas */}
+        <polyline points={polyJ} fill="none" className={styles.linePrevista} strokeDasharray="6 3" />
+        <polyline points={polyK} fill="none" className={styles.lineNormal} />
+        <polyline points={polyP} fill="none" className={styles.lineLancada} />
+
+        {/* Áreas de hover */}
         {dados.map((_, i) => {
           const w = n > 1 ? INNER_W / (n - 1) : INNER_W
           return (
@@ -239,6 +251,8 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
               onMouseEnter={() => setHovIdx(i)} />
           )
         })}
+
+        {/* Linha de hover + pontos */}
         {hovIdx !== null && (
           <>
             <line x1={xOf(hovIdx)} y1={PAD.top} x2={xOf(hovIdx)} y2={PAD.top + INNER_H} className={styles.hoverLine} />
@@ -248,6 +262,8 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
           </>
         )}
       </svg>
+
+      {/* Tooltip */}
       {hovIdx !== null && (
         <div className={styles.chartTooltip}>
           <span className={styles.tooltipDate}>{format(parseISO(dados[hovIdx].mes), "MMMM yyyy", { locale: ptBR })}</span>
@@ -256,6 +272,8 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
           <span className={styles.tooltipP}>P Total: {fmtMin(dados[hovIdx].minutos_lancados_total_acum)}</span>
         </div>
       )}
+
+      {/* Legenda */}
       <div className={styles.chartLegend}>
         <span className={styles.legendJ}>- - J Previsto acum.</span>
         <span className={styles.legendK}>── K Normal acum.</span>
@@ -800,7 +818,7 @@ function AdminDashboard() {
         )}
       </div>
 
-      {dashboard && (dashboard.timeline_mensal ?? []).length > 0 && (
+      {dashboard && (
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Evolução acumulada de horas em produção — todos os operadores</h2>
           <div className={styles.chartCard}>

@@ -35,13 +35,15 @@ class GrupoAtividade(str, Enum):
 class CodigoAtividade(str, Enum):
     """Códigos de atividade disponíveis no sistema.
 
-    BLOCO: tempo dedicado a bloco produtivo
-    EXTERNA: atividade externa ao bloco (reuniões, treinamentos)
-    AJUSTE: ajuste administrativo
+    BLOCO: tempo dedicado a bloco produtivo (um por bloco SAP)
+    EXTERNA: produção diversa
+    AJUSTE: atividade administrativa
     FERIAS: férias do colaborador
-    LICENCA: licença médica ou outras
+    LICENCA: dispensa médica
     CURSO: capacitação ou treinamento
-    AFASTAMENTO: outros afastamentos
+    AFASTAMENTO: dispensa como recompensa
+    CAMPO: trabalho de campo
+    MILITAR: atividade militar
     """
 
     BLOCO = "BLOCO"
@@ -51,6 +53,8 @@ class CodigoAtividade(str, Enum):
     LICENCA = "LICENCA"
     CURSO = "CURSO"
     AFASTAMENTO = "AFASTAMENTO"
+    CAMPO = "CAMPO"
+    MILITAR = "MILITAR"
 
 
 class StatusDia(str, Enum):
