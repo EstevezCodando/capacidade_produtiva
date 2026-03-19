@@ -1226,13 +1226,13 @@ def kpi_dashboard(
             sql_alertas = text(f"""
                 SELECT
                     e.ut_id,
-                    b.nome  AS bloco_nome,
-                    l.nome  AS lote_nome,
+                    b.nome                       AS bloco_nome,
+                    l.nome                       AS lote_nome,
                     e.subfase_nome,
-                    e.executor_id,
-                    e.nome_executor,
-                    e.revisor_id,
-                    e.nome_revisor,
+                    f.exec_usuario_id            AS executor_id,
+                    e.usuario_executor_nome      AS nome_executor,
+                    f.rev_usuario_id             AS revisor_id,
+                    e.usuario_revisor_nome       AS nome_revisor,
                     f.cor_atividade_id,
                     e.ocorrencia
                 FROM kpi.estado_ut e
