@@ -154,6 +154,8 @@ export interface DistribuicaoCiclo {
 export interface SubfaseDisponivel {
   subfase_id: number
   subfase_nome: string
+  bloco_id?: number | null
+  bloco_nome?: string | null
 }
 
 export interface KpiDashboardResponse {

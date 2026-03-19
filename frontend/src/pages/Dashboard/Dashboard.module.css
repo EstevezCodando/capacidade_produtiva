@@ -398,19 +398,43 @@
   stroke-width: 1.5;
 }
 
-.chartTooltip {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--bd-default);
-  border-radius: var(--r-md);
-  padding: 8px 12px;
+/* ── Tooltip abaixo do SVG (não mais absolute) ─────────────── */
+
+.chartDataBar {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  pointer-events: none;
-  z-index: 10;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 10px;
+  margin-top: 4px;
+  background: var(--bg-raised);
+  border: 1px solid var(--bd-subtle);
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.chartDataBarDate {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--tx-muted);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.chartDataBarHint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--tx-muted);
+  font-style: italic;
+}
+
+/* Legacy — mantido para não quebrar referências externas, mas não deve aparecer */
+.chartTooltip {
+  display: none;
 }
 
 .tooltipDate {
@@ -457,36 +481,34 @@
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
-  justify-content: flex-end;
-  margin-top: 8px;
-  padding-right: 4px;
+  justify-content: flex-start;
+  margin-top: 6px;
+  margin-bottom: 2px;
+  padding: 0 2px;
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
 }
 
 /* J — âmbar */
 .legendJ {
   color: #F59E0B;
-  opacity: 0.92;
 }
 
 /* K — esmeralda */
 .legendK {
   color: #10B981;
-  font-weight: 600;
 }
 
 /* P — índigo */
 .legendP {
   color: #6366F1;
-  font-weight: 600;
 }
 
 /* D — vermelho (divergência de bloco) */
 .legendD {
   color: #EF4444;
-  font-weight: 600;
 }
 
 .legendPrev { color: var(--info); opacity: 0.8; }
@@ -1499,22 +1521,8 @@
   fill: var(--tx-secondary);
 }
 
-.velTooltip {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--bd-default);
-  border-radius: var(--r-md);
-  padding: 8px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  pointer-events: none;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--tx-secondary);
-}
+/* velTooltip substituído por chartDataBar (abaixo do SVG) */
+.velTooltip { display: none; }
 
 /* ── DistribuicaoCiclos ────────────────────────────────────── */
 

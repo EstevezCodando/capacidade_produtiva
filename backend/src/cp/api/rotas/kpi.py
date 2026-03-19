@@ -1271,19 +1271,22 @@ def kpi_dashboard(
                 ))
 
             # 10.5 Lista de subfases disponíveis para selector do ranking
-            # Usa kpi.estado_ut (subfase_id sempre presente) em vez de distribuicao_pontos
+            # Inclui bloco_id/bloco_nome para contextualizar quando nenhum bloco está filtrado
             _bloco_sf_cond = "AND e.bloco_id = :bloco_id" if bloco_id else ""
             sql_subfases = text(f"""
-                SELECT DISTINCT e.subfase_id, e.subfase_nome
+                SELECT DISTINCT e.subfase_id, e.subfase_nome,
+                                e.bloco_id,   e.bloco_nome
                 FROM kpi.estado_ut e
                 WHERE e.subfase_id IS NOT NULL
                   {_bloco_sf_cond}
-                ORDER BY e.subfase_nome
+                ORDER BY e.bloco_nome, e.subfase_nome
             """)
             for row in conn.execute(sql_subfases, bp):
                 subfases_disponiveis.append({
                     "subfase_id": int(row.subfase_id),
                     "subfase_nome": str(row.subfase_nome or ""),
+                    "bloco_id":    int(row.bloco_id) if row.bloco_id else None,
+                    "bloco_nome":  str(row.bloco_nome or "") if row.bloco_nome else None,
                 })
                 if subfase_id and int(row.subfase_id) == subfase_id:
                     subfase_filtro_nome = str(row.subfase_nome or "")

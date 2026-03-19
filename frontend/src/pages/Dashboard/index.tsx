@@ -51,8 +51,8 @@ function fmtDataHora(iso: string | null | undefined): string {
 // ─────────────────────────────────────────────────────────────
 
 const CHART_W = 800
-const CHART_H = 200
-const PAD = { top: 14, right: 20, bottom: 40, left: 50 }
+const CHART_H = 160
+const PAD = { top: 10, right: 20, bottom: 34, left: 50 }
 const INNER_W = CHART_W - PAD.left - PAD.right
 const INNER_H = CHART_H - PAD.top - PAD.bottom
 
@@ -101,84 +101,53 @@ function GraficoDiario({ dados }: { dados: DiaHorasResposta[] }) {
         className={styles.chartSvg}
         onMouseLeave={() => setHovIdx(null)}
       >
-        {/* Grade Y */}
         {yTicks.map((h) => (
           <g key={h}>
-            <line
-              x1={PAD.left} y1={yOf(h * 60)}
-              x2={PAD.left + INNER_W} y2={yOf(h * 60)}
-              className={styles.gridLine}
-            />
-            <text x={PAD.left - 8} y={yOf(h * 60) + 4} className={styles.axisLabel} textAnchor="end">
-              {h}h
-            </text>
+            <line x1={PAD.left} y1={yOf(h * 60)} x2={PAD.left + INNER_W} y2={yOf(h * 60)} className={styles.gridLine} />
+            <text x={PAD.left - 8} y={yOf(h * 60) + 4} className={styles.axisLabel} textAnchor="end">{h}h</text>
           </g>
         ))}
-
-        {/* Rótulos X — datas (a cada ~7 dias) */}
         {dados.map((d, i) => i % xLabelStep === 0 && (
-          <text key={d.data} x={xOf(i)} y={CHART_H - 6} className={styles.axisLabel} textAnchor="middle">
+          <text key={d.data} x={xOf(i)} y={CHART_H - 4} className={styles.axisLabel} textAnchor="middle">
             {format(parseISO(d.data), "dd/MM")}
           </text>
         ))}
-
-        {/* Reta J — Previsto acumulado (tracejada) */}
         {n > 1 && <polyline points={polyJ} fill="none" className={styles.linePrevista} strokeDasharray="6 3" />}
-
-        {/* Reta K — Normal lançado acumulado */}
         {n > 1 && <polyline points={polyK} fill="none" className={styles.lineNormal} />}
-
-        {/* Reta P — Total lançado acumulado (normal + extra) */}
         {n > 1 && <polyline points={polyP} fill="none" className={styles.lineLancada} />}
-
-        {/* Áreas de hover */}
         {dados.map((_, i) => {
           const w = n > 1 ? INNER_W / (n - 1) : INNER_W
-          return (
-            <rect
-              key={i}
-              x={xOf(i) - w / 2}
-              y={PAD.top}
-              width={w}
-              height={INNER_H}
-              fill="transparent"
-              onMouseEnter={() => setHovIdx(i)}
-            />
-          )
+          return <rect key={i} x={xOf(i) - w / 2} y={PAD.top} width={w} height={INNER_H} fill="transparent" onMouseEnter={() => setHovIdx(i)} />
         })}
-
-        {/* Linha de hover + pontos */}
         {hovIdx !== null && (
           <>
-            <line
-              x1={xOf(hovIdx)} y1={PAD.top}
-              x2={xOf(hovIdx)} y2={PAD.top + INNER_H}
-              className={styles.hoverLine}
-            />
-            <circle cx={xOf(hovIdx)} cy={yOf(acum[hovIdx].j)} r={4} className={styles.dotPrev} />
-            <circle cx={xOf(hovIdx)} cy={yOf(acum[hovIdx].k)} r={4} className={styles.dotNormal} />
-            <circle cx={xOf(hovIdx)} cy={yOf(acum[hovIdx].p)} r={4} className={styles.dotLanc} />
+            <line x1={xOf(hovIdx)} y1={PAD.top} x2={xOf(hovIdx)} y2={PAD.top + INNER_H} className={styles.hoverLine} />
+            <circle cx={xOf(hovIdx)} cy={yOf(acum[hovIdx].j)} r={3.5} className={styles.dotPrev} />
+            <circle cx={xOf(hovIdx)} cy={yOf(acum[hovIdx].k)} r={3.5} className={styles.dotNormal} />
+            <circle cx={xOf(hovIdx)} cy={yOf(acum[hovIdx].p)} r={3.5} className={styles.dotLanc} />
           </>
         )}
       </svg>
 
-      {/* Tooltip */}
-      {hovIdx !== null && (
-        <div className={styles.chartTooltip}>
-          <span className={styles.tooltipDate}>
-            {format(parseISO(dados[hovIdx].data), "dd/MM/yyyy", { locale: ptBR })}
-          </span>
-          <span className={styles.tooltipJ}>J Previsto: {fmtMin(acum[hovIdx].j)}</span>
-          <span className={styles.tooltipK}>K Normal: {fmtMin(acum[hovIdx].k)}</span>
-          <span className={styles.tooltipP}>P Total: {fmtMin(acum[hovIdx].p)}</span>
-        </div>
-      )}
-
-      {/* Legenda */}
+      {/* Legenda estática — sempre visível */}
       <div className={styles.chartLegend}>
         <span className={styles.legendJ}>- - J Previsto acum.</span>
         <span className={styles.legendK}>── K Normal acum.</span>
         <span className={styles.legendP}>── P Total acum. (normal + extra)</span>
+      </div>
+
+      {/* Barra de dados — abaixo do SVG, fora das linhas */}
+      <div className={styles.chartDataBar}>
+        {hovIdx !== null ? (
+          <>
+            <span className={styles.chartDataBarDate}>{format(parseISO(dados[hovIdx].data), "dd/MM/yyyy", { locale: ptBR })}</span>
+            <span className={styles.tooltipJ}>J {fmtMin(acum[hovIdx].j)}</span>
+            <span className={styles.tooltipK}>K {fmtMin(acum[hovIdx].k)}</span>
+            <span className={styles.tooltipP}>P {fmtMin(acum[hovIdx].p)}</span>
+          </>
+        ) : (
+          <span className={styles.chartDataBarHint}>↔ passe o cursor sobre o gráfico</span>
+        )}
       </div>
     </div>
   )
@@ -237,74 +206,56 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
         className={styles.chartSvg}
         onMouseLeave={() => setHovIdx(null)}
       >
-        {/* Grade Y */}
         {yTicks.map((h) => (
           <g key={h}>
             <line x1={PAD.left} y1={yOf(h * 60)} x2={PAD.left + INNER_W} y2={yOf(h * 60)} className={styles.gridLine} />
             <text x={PAD.left - 8} y={yOf(h * 60) + 4} className={styles.axisLabel} textAnchor="end">{h}h</text>
           </g>
         ))}
-
-        {/* Rótulos X — um por ~2 meses para não sobrecarregar */}
         {dados.map((d, i) => i % xLabelStep === 0 && (
-          <text key={d.mes} x={xOf(i)} y={CHART_H - 6} className={styles.axisLabel} textAnchor="middle">
+          <text key={d.mes} x={xOf(i)} y={CHART_H - 4} className={styles.axisLabel} textAnchor="middle">
             {format(parseISO(d.mes), "MMM/yy", { locale: ptBR })}
           </text>
         ))}
-
-        {/* Retas J / K / P */}
         <polyline points={polyJ} fill="none" className={styles.linePrevista} strokeDasharray="6 3" />
         <polyline points={polyK} fill="none" className={styles.lineNormal} />
         <polyline points={polyP} fill="none" className={styles.lineLancada} />
-
-        {/* Reta D — divergência (só com filtro de bloco ativo) */}
-        {showD && (
-          <polyline points={polyD} fill="none" className={styles.lineDivergente} strokeDasharray="4 4" />
-        )}
-
-        {/* Áreas de hover */}
+        {showD && <polyline points={polyD} fill="none" className={styles.lineDivergente} strokeDasharray="4 4" />}
         {dados.map((_, i) => {
           const w = n > 1 ? INNER_W / (n - 1) : INNER_W
-          return (
-            <rect key={i} x={xOf(i) - w / 2} y={PAD.top} width={w} height={INNER_H} fill="transparent"
-              onMouseEnter={() => setHovIdx(i)} />
-          )
+          return <rect key={i} x={xOf(i) - w / 2} y={PAD.top} width={w} height={INNER_H} fill="transparent" onMouseEnter={() => setHovIdx(i)} />
         })}
-
-        {/* Linha de hover + pontos */}
         {hovIdx !== null && (
           <>
             <line x1={xOf(hovIdx)} y1={PAD.top} x2={xOf(hovIdx)} y2={PAD.top + INNER_H} className={styles.hoverLine} />
-            <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_previstos_acum)} r={4} className={styles.dotPrev} />
-            <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_lancados_normal_acum)} r={4} className={styles.dotNormal} />
-            <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_lancados_total_acum)} r={4} className={styles.dotLanc} />
-            {showD && (
-              <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_divergente_acum ?? 0)} r={4} className={styles.dotDiv} />
-            )}
+            <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_previstos_acum)} r={3.5} className={styles.dotPrev} />
+            <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_lancados_normal_acum)} r={3.5} className={styles.dotNormal} />
+            <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_lancados_total_acum)} r={3.5} className={styles.dotLanc} />
+            {showD && <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_divergente_acum ?? 0)} r={3.5} className={styles.dotDiv} />}
           </>
         )}
       </svg>
 
-      {/* Tooltip */}
-      {hovIdx !== null && (
-        <div className={styles.chartTooltip}>
-          <span className={styles.tooltipDate}>{format(parseISO(dados[hovIdx].mes), "MMMM yyyy", { locale: ptBR })}</span>
-          <span className={styles.tooltipJ}>J Previsto: {fmtMin(dados[hovIdx].minutos_previstos_acum)}</span>
-          <span className={styles.tooltipK}>K Normal: {fmtMin(dados[hovIdx].minutos_lancados_normal_acum)}</span>
-          <span className={styles.tooltipP}>P Total: {fmtMin(dados[hovIdx].minutos_lancados_total_acum)}</span>
-          {showD && (
-            <span className={styles.tooltipD}>D Divergente: {fmtMin(dados[hovIdx].minutos_divergente_acum ?? 0)}</span>
-          )}
-        </div>
-      )}
-
-      {/* Legenda */}
+      {/* Legenda estática — sempre visível */}
       <div className={styles.chartLegend}>
         <span className={styles.legendJ}>- - J Previsto acum.</span>
         <span className={styles.legendK}>── K Normal acum.</span>
         <span className={styles.legendP}>── P Total acum. (normal + extra)</span>
-        {showD && (
-          <span className={styles.legendD}>- - D Fora do bloco planejado acum.</span>
+        {showD && <span className={styles.legendD}>- - D Fora do bloco planejado acum.</span>}
+      </div>
+
+      {/* Barra de dados — abaixo do SVG, fora das linhas */}
+      <div className={styles.chartDataBar}>
+        {hovIdx !== null ? (
+          <>
+            <span className={styles.chartDataBarDate}>{format(parseISO(dados[hovIdx].mes), "MMMM yyyy", { locale: ptBR })}</span>
+            <span className={styles.tooltipJ}>J {fmtMin(dados[hovIdx].minutos_previstos_acum)}</span>
+            <span className={styles.tooltipK}>K {fmtMin(dados[hovIdx].minutos_lancados_normal_acum)}</span>
+            <span className={styles.tooltipP}>P {fmtMin(dados[hovIdx].minutos_lancados_total_acum)}</span>
+            {showD && <span className={styles.tooltipD}>D {fmtMin(dados[hovIdx].minutos_divergente_acum ?? 0)}</span>}
+          </>
+        ) : (
+          <span className={styles.chartDataBarHint}>↔ passe o cursor sobre o gráfico</span>
         )}
       </div>
     </div>
@@ -685,10 +636,11 @@ interface RankingPanelProps {
   operadores: RankingOperador[]
   subfases: SubfaseDisponivel[]
   subfaseFiltro: number | null
-  onSubfaseFiltro: (id: number | null) => void
+  blocoFiltro: number | null
+  onSubfaseFiltro: (subfaseId: number | null, blocoId?: number | null) => void
 }
 
-function RankingPanel({ operadores, subfases, subfaseFiltro, onSubfaseFiltro }: RankingPanelProps) {
+function RankingPanel({ operadores, subfases, subfaseFiltro, blocoFiltro, onSubfaseFiltro }: RankingPanelProps) {
   const [funcao, setFuncao] = useState<FuncaoFiltro>("todos")
   const [sortCol, setSortCol] = useState<SortCol>("total")
   const [sortAsc, setSortAsc] = useState(false)
@@ -727,23 +679,52 @@ function RankingPanel({ operadores, subfases, subfaseFiltro, onSubfaseFiltro }: 
     return <span className={styles.sortIconActive}>{sortAsc ? "↑" : "↓"}</span>
   }
 
-  if (operadores.length === 0)
-    return <div className={styles.emptyState}>Nenhum operador com produção registrada.</div>
+  // Quando não há bloco selecionado, usa chave composta "blocoId_subfaseId" para
+  // auto-selecionar o bloco junto com a subfase. Quando bloco já está filtrado, usa só subfase_id.
+  function subfaseOptionValue(sf: SubfaseDisponivel): string {
+    if (blocoFiltro) return String(sf.subfase_id)
+    return sf.bloco_id ? `${sf.bloco_id}_${sf.subfase_id}` : String(sf.subfase_id)
+  }
+
+  function subfaseOptionLabel(sf: SubfaseDisponivel): string {
+    if (blocoFiltro || !sf.bloco_nome) return sf.subfase_nome
+    return `${sf.bloco_nome} — ${sf.subfase_nome}`
+  }
+
+  function handleSubfaseChange(val: string) {
+    if (!val) { onSubfaseFiltro(null, null); return }
+    if (val.includes("_")) {
+      const [bId, sfId] = val.split("_")
+      onSubfaseFiltro(Number(sfId), Number(bId))
+    } else {
+      onSubfaseFiltro(Number(val))
+    }
+  }
+
+  // Valor atual do select — constrói a chave composta se não há bloco ativo
+  const subfaseSelectValue = (() => {
+    if (!subfaseFiltro) return ""
+    if (blocoFiltro) return String(subfaseFiltro)
+    const sf = subfases.find((s) => s.subfase_id === subfaseFiltro)
+    return sf ? subfaseOptionValue(sf) : String(subfaseFiltro)
+  })()
 
   return (
     <div className={styles.rankingWrap}>
-      {/* Barra de filtros */}
+      {/* Barra de filtros — sempre visível mesmo sem resultados */}
       <div className={styles.rankingFilters}>
         <div className={styles.rankingFilterGroup}>
           <label className={styles.rankingFilterLabel}>Subfase</label>
           <select
             className={styles.rankingFilterSelect}
-            value={subfaseFiltro ?? ""}
-            onChange={(e) => onSubfaseFiltro(e.target.value ? Number(e.target.value) : null)}
+            value={subfaseSelectValue}
+            onChange={(e) => handleSubfaseChange(e.target.value)}
           >
             <option value="">Todas as subfases</option>
             {subfases.map((sf) => (
-              <option key={sf.subfase_id} value={sf.subfase_id}>{sf.subfase_nome}</option>
+              <option key={subfaseOptionValue(sf)} value={subfaseOptionValue(sf)}>
+                {subfaseOptionLabel(sf)}
+              </option>
             ))}
           </select>
         </div>
@@ -764,8 +745,13 @@ function RankingPanel({ operadores, subfases, subfaseFiltro, onSubfaseFiltro }: 
         </div>
       </div>
 
+      {/* Sem resultados — abaixo dos filtros para que o usuário possa alterar a seleção */}
+      {operadores.length === 0 && (
+        <div className={styles.emptyState}>Nenhum operador com produção registrada para este contexto.</div>
+      )}
+
       {/* Tabela */}
-      <div className={styles.rankingTable}>
+      {operadores.length > 0 && <div className={styles.rankingTable}>
         <div className={styles.rankingHead}>
           <span className={styles.rankingCellPos}>#</span>
           <button type="button" className={`${styles.rankingCellNome} ${styles.rankingSortBtn}`} onClick={() => handleSort("nome")}>
@@ -847,7 +833,7 @@ function RankingPanel({ operadores, subfases, subfaseFiltro, onSubfaseFiltro }: 
           <span className={styles.rlRev}>■ Revisão</span>
           <span className={styles.rlCor}>■ Correção</span>
         </div>
-      </div>
+      </div>}
     </div>
   )
 }
@@ -856,9 +842,9 @@ function RankingPanel({ operadores, subfases, subfaseFiltro, onSubfaseFiltro }: 
 // GraficoVelocidade — barras semanais de UTs concluídas
 // ─────────────────────────────────────────────────────────────
 
-const VEL_W = 560
-const VEL_H = 160
-const VEL_PAD = { top: 14, right: 16, bottom: 36, left: 40 }
+const VEL_W = 800
+const VEL_H = 130
+const VEL_PAD = { top: 10, right: 16, bottom: 30, left: 36 }
 const VEL_IW = VEL_W - VEL_PAD.left - VEL_PAD.right
 const VEL_IH = VEL_H - VEL_PAD.top - VEL_PAD.bottom
 
@@ -878,23 +864,15 @@ function GraficoVelocidade({ dados }: { dados: SemanaVelocidade[] }) {
   )
 
   return (
-    <div className={styles.chartWrap} style={{ position: "relative" }}>
+    <div className={styles.chartWrap}>
       <svg viewBox={`0 0 ${VEL_W} ${VEL_H}`} className={styles.chartSvg}
         onMouseLeave={() => setHovIdx(null)}>
-
-        {/* Grade Y */}
         {yTicks.map((v) => (
           <g key={v}>
-            <line
-              x1={VEL_PAD.left} y1={barY(v)}
-              x2={VEL_PAD.left + VEL_IW} y2={barY(v)}
-              className={styles.gridLine}
-            />
-            <text x={VEL_PAD.left - 6} y={barY(v) + 4} className={styles.axisLabel} textAnchor="end">{v}</text>
+            <line x1={VEL_PAD.left} y1={barY(v)} x2={VEL_PAD.left + VEL_IW} y2={barY(v)} className={styles.gridLine} />
+            <text x={VEL_PAD.left - 4} y={barY(v) + 3} className={styles.axisLabel} textAnchor="end">{v}</text>
           </g>
         ))}
-
-        {/* Barras */}
         {dados.map((d, i) => (
           <g key={d.semana_inicio}>
             <rect
@@ -904,40 +882,30 @@ function GraficoVelocidade({ dados }: { dados: SemanaVelocidade[] }) {
               rx={2}
               onMouseEnter={() => setHovIdx(i)}
             />
-            {/* Rótulo X */}
-            <text
-              x={barX(i) + barW / 2}
-              y={VEL_H - 6}
-              className={styles.axisLabel}
-              textAnchor="middle"
-            >
+            <text x={barX(i) + barW / 2} y={VEL_H - 3} className={styles.axisLabel} textAnchor="middle">
               {d.semana_label}
             </text>
+            {d.uts_concluidas > 0 && (
+              <text x={barX(i) + barW / 2} y={barY(d.uts_concluidas) - 3} className={styles.velBarLabel} textAnchor="middle">
+                {d.uts_concluidas}
+              </text>
+            )}
           </g>
-        ))}
-
-        {/* Valores acima das barras */}
-        {dados.map((d, i) => d.uts_concluidas > 0 && (
-          <text
-            key={`v-${d.semana_inicio}`}
-            x={barX(i) + barW / 2}
-            y={barY(d.uts_concluidas) - 3}
-            className={styles.velBarLabel}
-            textAnchor="middle"
-          >
-            {d.uts_concluidas}
-          </text>
         ))}
       </svg>
 
-      {/* Tooltip */}
-      {hovIdx !== null && (
-        <div className={styles.velTooltip}>
-          <span className={styles.tooltipDate}>{dados[hovIdx].semana_label}</span>
-          <span>{dados[hovIdx].uts_concluidas} UTs concluídas</span>
-          <span className={styles.tooltipK}>{fmtPts(dados[hovIdx].pontos_realizados)} pts</span>
-        </div>
-      )}
+      {/* Barra de dados — abaixo do SVG, fora das barras */}
+      <div className={styles.chartDataBar}>
+        {hovIdx !== null ? (
+          <>
+            <span className={styles.chartDataBarDate}>semana {dados[hovIdx].semana_label}</span>
+            <span className={styles.tooltipK}>{dados[hovIdx].uts_concluidas} UTs concluídas</span>
+            <span className={styles.tooltipP}>{fmtPts(dados[hovIdx].pontos_realizados)} pts</span>
+          </>
+        ) : (
+          <span className={styles.chartDataBarHint}>↔ passe o cursor sobre uma barra</span>
+        )}
+      </div>
     </div>
   )
 }
@@ -1410,7 +1378,11 @@ function AdminDashboard() {
           operadores={dashboard?.ranking_operadores ?? []}
           subfases={dashboard?.subfases_disponiveis ?? []}
           subfaseFiltro={subfaseFiltro}
-          onSubfaseFiltro={(id) => setSubfaseFiltro(id)}
+          blocoFiltro={blocoFiltro}
+          onSubfaseFiltro={(sfId, bId) => {
+            setSubfaseFiltro(sfId)
+            if (bId !== undefined) setBlocoFiltro(bId)
+          }}
         />
       </div>
 
