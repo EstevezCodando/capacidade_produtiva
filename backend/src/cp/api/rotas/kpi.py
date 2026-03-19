@@ -741,8 +741,7 @@ def kpi_dashboard(
     bloco_cond_e = "AND e.bloco_id = :bloco_id" if bloco_id else ""
     bloco_cond_d = "AND d.bloco_id = :bloco_id" if bloco_id else ""
     bp = {"bloco_id": bloco_id} if bloco_id else {}
-    # Subfase filter — somente para o ranking
-    _subfase_rank_cond = "AND d.subfase_id = :subfase_id" if subfase_id else ""
+    # Subfase filter — somente para o ranking (via JOIN com estado_ut)
     bp_rank = {**bp, "subfase_id": subfase_id} if subfase_id else bp
 
     try:
@@ -1272,13 +1271,14 @@ def kpi_dashboard(
                 ))
 
             # 10.5 Lista de subfases disponíveis para selector do ranking
-            _bloco_sf_cond = "AND d.bloco_id = :bloco_id" if bloco_id else ""
+            # Usa kpi.estado_ut (subfase_id sempre presente) em vez de distribuicao_pontos
+            _bloco_sf_cond = "AND e.bloco_id = :bloco_id" if bloco_id else ""
             sql_subfases = text(f"""
-                SELECT DISTINCT d.subfase_id, d.subfase_nome
-                FROM kpi.distribuicao_pontos d
-                WHERE d.subfase_id IS NOT NULL
+                SELECT DISTINCT e.subfase_id, e.subfase_nome
+                FROM kpi.estado_ut e
+                WHERE e.subfase_id IS NOT NULL
                   {_bloco_sf_cond}
-                ORDER BY d.subfase_nome
+                ORDER BY e.subfase_nome
             """)
             for row in conn.execute(sql_subfases, bp):
                 subfases_disponiveis.append({
@@ -1289,7 +1289,12 @@ def kpi_dashboard(
                     subfase_filtro_nome = str(row.subfase_nome or "")
 
             # 11. Ranking global de operadores
+            # Filtro de subfase via JOIN em estado_ut (independente de distribuicao_pontos.subfase_id)
             _bloco_rank_cond = "AND d.bloco_id = :bloco_id" if bloco_id else ""
+            _subfase_rank_join = (
+                "JOIN kpi.estado_ut esf ON esf.ut_id = d.ut_id AND esf.subfase_id = :subfase_id"
+                if subfase_id else ""
+            )
             sql_ranking = text(f"""
                 SELECT
                     ROW_NUMBER() OVER (
@@ -1318,7 +1323,7 @@ def kpi_dashboard(
                     OR  d.revisor_id  = u.id
                     OR  d.corretor_id = u.id)
                     {_bloco_rank_cond}
-                    {_subfase_rank_cond}
+                {_subfase_rank_join}
                 GROUP BY u.id, u.nome, u.nome_guerra
                 HAVING
                     COALESCE(SUM(d.pontos_executor), 0) +
