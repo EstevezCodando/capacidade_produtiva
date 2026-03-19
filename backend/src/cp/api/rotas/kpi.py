@@ -309,9 +309,13 @@ class DashboardResponse(BaseModel):
     ranking_operadores: list[RankingOperador] = []
     velocidade_semanal: list[SemanaVelocidade] = []
     distribuicao_ciclos: list[DistribuicaoCiclo] = []
-    # ── Filtro de bloco ativo ──────────────────────────────────
+    # ── Filtros ativos ────────────────────────────────────────
     bloco_filtro_id: int | None = None
     bloco_filtro_nome: str | None = None
+    subfase_filtro_id: int | None = None
+    subfase_filtro_nome: str | None = None
+    # Lista de subfases disponíveis (para selector no frontend)
+    subfases_disponiveis: list[dict[str, Any]] = []
 
 
 # ---------------------------------------------------------------------------
@@ -702,6 +706,7 @@ def kpi_dashboard(
     _: UsuarioLogado,
     request: Request,
     bloco_id: int | None = Query(None, description="Filtrar dashboard por bloco específico"),
+    subfase_id: int | None = Query(None, description="Filtrar ranking por subfase"),
 ) -> DashboardResponse:
     """Dashboard consolidado com progresso geral, hierarquia de projetos e top performers.
 
@@ -729,11 +734,16 @@ def kpi_dashboard(
     velocidade_semanal: list[SemanaVelocidade] = []
     distribuicao_ciclos: list[DistribuicaoCiclo] = []
     bloco_filtro_nome: str | None = None
+    subfase_filtro_nome: str | None = None
+    subfases_disponiveis: list[dict[str, Any]] = []
 
     # Helpers de filtro — injetados nos SQLs quando bloco_id está ativo
     bloco_cond_e = "AND e.bloco_id = :bloco_id" if bloco_id else ""
     bloco_cond_d = "AND d.bloco_id = :bloco_id" if bloco_id else ""
     bp = {"bloco_id": bloco_id} if bloco_id else {}
+    # Subfase filter — somente para o ranking
+    _subfase_rank_cond = "AND d.subfase_id = :subfase_id" if subfase_id else ""
+    bp_rank = {**bp, "subfase_id": subfase_id} if subfase_id else bp
 
     try:
         with engine_cp.connect() as conn:
@@ -1261,6 +1271,23 @@ def kpi_dashboard(
                     ocorrencia=str(row.ocorrencia or ""),
                 ))
 
+            # 10.5 Lista de subfases disponíveis para selector do ranking
+            _bloco_sf_cond = "AND d.bloco_id = :bloco_id" if bloco_id else ""
+            sql_subfases = text(f"""
+                SELECT DISTINCT d.subfase_id, d.subfase_nome
+                FROM kpi.distribuicao_pontos d
+                WHERE d.subfase_id IS NOT NULL
+                  {_bloco_sf_cond}
+                ORDER BY d.subfase_nome
+            """)
+            for row in conn.execute(sql_subfases, bp):
+                subfases_disponiveis.append({
+                    "subfase_id": int(row.subfase_id),
+                    "subfase_nome": str(row.subfase_nome or ""),
+                })
+                if subfase_id and int(row.subfase_id) == subfase_id:
+                    subfase_filtro_nome = str(row.subfase_nome or "")
+
             # 11. Ranking global de operadores
             _bloco_rank_cond = "AND d.bloco_id = :bloco_id" if bloco_id else ""
             sql_ranking = text(f"""
@@ -1291,15 +1318,16 @@ def kpi_dashboard(
                     OR  d.revisor_id  = u.id
                     OR  d.corretor_id = u.id)
                     {_bloco_rank_cond}
+                    {_subfase_rank_cond}
                 GROUP BY u.id, u.nome, u.nome_guerra
                 HAVING
                     COALESCE(SUM(d.pontos_executor), 0) +
                     COALESCE(SUM(d.pontos_revisor),  0) +
                     COALESCE(SUM(d.pontos_corretor), 0) > 0
                 ORDER BY pontos_total DESC
-                LIMIT 20
+                LIMIT 50
             """)
-            for row in conn.execute(sql_ranking, bp):
+            for row in conn.execute(sql_ranking, bp_rank):
                 ranking_operadores.append(RankingOperador(
                     posicao=int(row.posicao),
                     usuario_id=int(row.usuario_id),
@@ -1409,6 +1437,9 @@ def kpi_dashboard(
         distribuicao_ciclos=distribuicao_ciclos,
         bloco_filtro_id=bloco_id,
         bloco_filtro_nome=bloco_filtro_nome,
+        subfase_filtro_id=subfase_id,
+        subfase_filtro_nome=subfase_filtro_nome,
+        subfases_disponiveis=subfases_disponiveis,
     )
 
 

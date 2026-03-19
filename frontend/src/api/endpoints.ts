@@ -48,9 +48,13 @@ export async function getHealth(): Promise<{ status: string }> {
   return res.data;
 }
 
-export async function getKpiDashboard(blocoId?: number): Promise<KpiDashboardResponse> {
-  const params = blocoId ? { bloco_id: blocoId } : undefined
-  const res = await apiClient.get<KpiDashboardResponse>("/kpi/dashboard", { params })
+export async function getKpiDashboard(blocoId?: number, subfaseId?: number): Promise<KpiDashboardResponse> {
+  const params: Record<string, number> = {}
+  if (blocoId)   params.bloco_id   = blocoId
+  if (subfaseId) params.subfase_id = subfaseId
+  const res = await apiClient.get<KpiDashboardResponse>("/kpi/dashboard", {
+    params: Object.keys(params).length ? params : undefined,
+  })
   return res.data
 }
 

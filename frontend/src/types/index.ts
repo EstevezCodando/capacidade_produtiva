@@ -151,6 +151,11 @@ export interface DistribuicaoCiclo {
   percentual: number
 }
 
+export interface SubfaseDisponivel {
+  subfase_id: number
+  subfase_nome: string
+}
+
 export interface KpiDashboardResponse {
   sap_snapshot_atualizado_em: string | null
   kpi_calculado_em: string | null
@@ -174,6 +179,9 @@ export interface KpiDashboardResponse {
   distribuicao_ciclos: DistribuicaoCiclo[]
   bloco_filtro_id?: number | null
   bloco_filtro_nome?: string | null
+  subfase_filtro_id?: number | null
+  subfase_filtro_nome?: string | null
+  subfases_disponiveis?: SubfaseDisponivel[]
 }
 
 // ── Dashboard do operador ─────────────────────────────────────

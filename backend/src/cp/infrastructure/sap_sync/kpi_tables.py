@@ -1127,6 +1127,7 @@ LEFT JOIN corretor co ON co.ut_id = f.ut_id
 DDL_DISTRIBUICAO_PONTOS = f"""
 CREATE TABLE IF NOT EXISTS {_K}.distribuicao_pontos (
     projeto_nome        text,
+    subfase_id          integer,
     subfase_nome        text,
     bloco_id            integer,
     ut_id               integer     NOT NULL,
@@ -1168,6 +1169,7 @@ corretor AS (
 )
 SELECT
     f.projeto_nome,
+    f.subfase_id,
     f.subfase_nome,
     f.bloco_id,
     f.ut_id,

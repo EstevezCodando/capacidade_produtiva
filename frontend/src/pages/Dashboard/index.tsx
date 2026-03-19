@@ -11,7 +11,7 @@ import { useAuth } from "@/context/AuthContext"
 import type {
   AlertaNotaAusente, BlocoDetalheUsuario, BlocoDestaque, DiaHorasResposta,
   DistribuicaoCiclo, MesTrilha, PizzaFatia, PontosSubfaseResposta,
-  RankingOperador, SemanaVelocidade,
+  RankingOperador, SemanaVelocidade, SubfaseDisponivel,
 } from "@/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format, formatDistanceToNow, parseISO } from "date-fns"
@@ -675,49 +675,178 @@ function BlocoProgressoCard({ bloco }: { bloco: BlocoDestaque }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// RankingPanel — tabela global de operadores com mini-bar
+// RankingPanel — tabela global de operadores com mini-bar, filtros e ordenação
 // ─────────────────────────────────────────────────────────────
 
-function RankingPanel({ operadores }: { operadores: RankingOperador[] }) {
-  if (operadores.length === 0) return <div className={styles.emptyState}>Nenhum operador com produção registrada.</div>
-  const maxTotal = Math.max(...operadores.map((o) => o.pontos_total), 1)
+type FuncaoFiltro = "todos" | "executor" | "revisor" | "corretor"
+type SortCol = "nome" | "executor" | "revisor" | "corretor" | "total"
+
+interface RankingPanelProps {
+  operadores: RankingOperador[]
+  subfases: SubfaseDisponivel[]
+  subfaseFiltro: number | null
+  onSubfaseFiltro: (id: number | null) => void
+}
+
+function RankingPanel({ operadores, subfases, subfaseFiltro, onSubfaseFiltro }: RankingPanelProps) {
+  const [funcao, setFuncao] = useState<FuncaoFiltro>("todos")
+  const [sortCol, setSortCol] = useState<SortCol>("total")
+  const [sortAsc, setSortAsc] = useState(false)
+
+  const pontosFuncao = (op: RankingOperador): number => {
+    if (funcao === "executor") return op.pontos_executor
+    if (funcao === "revisor")  return op.pontos_revisor
+    if (funcao === "corretor") return op.pontos_corretor
+    return op.pontos_total
+  }
+
+  const sorted = useMemo(() => {
+    const arr = [...operadores]
+    const dir = sortAsc ? 1 : -1
+    arr.sort((a, b) => {
+      if (sortCol === "nome")     return dir * a.nome_guerra.localeCompare(b.nome_guerra)
+      if (sortCol === "executor") return dir * (a.pontos_executor - b.pontos_executor)
+      if (sortCol === "revisor")  return dir * (a.pontos_revisor  - b.pontos_revisor)
+      if (sortCol === "corretor") return dir * (a.pontos_corretor - b.pontos_corretor)
+      // total (default): ordena pela função ativa
+      return dir * (pontosFuncao(a) - pontosFuncao(b))
+    })
+    return arr
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operadores, sortCol, sortAsc, funcao])
+
+  const maxPts = Math.max(...sorted.map(pontosFuncao), 1)
+
+  function handleSort(col: SortCol) {
+    if (sortCol === col) setSortAsc((v) => !v)
+    else { setSortCol(col); setSortAsc(false) }
+  }
+
+  function SortIcon({ col }: { col: SortCol }) {
+    if (sortCol !== col) return <span className={styles.sortIconInactive}>↕</span>
+    return <span className={styles.sortIconActive}>{sortAsc ? "↑" : "↓"}</span>
+  }
+
+  if (operadores.length === 0)
+    return <div className={styles.emptyState}>Nenhum operador com produção registrada.</div>
 
   return (
-    <div className={styles.rankingTable}>
-      <div className={styles.rankingHead}>
-        <span className={styles.rankingCellPos}>#</span>
-        <span className={styles.rankingCellNome}>Operador</span>
-        <span className={styles.rankingCellPts} title="Pontos como executor">Exec.</span>
-        <span className={styles.rankingCellPts} title="Pontos como revisor">Rev.</span>
-        <span className={styles.rankingCellPts} title="Pontos como corretor">Cor.</span>
-        <span className={styles.rankingCellTotal}>Total</span>
-        <span className={styles.rankingCellBar} />
-      </div>
-      {operadores.map((op) => {
-        const barW = Math.round((op.pontos_total / maxTotal) * 100)
-        const barExec = Math.round((op.pontos_executor / op.pontos_total) * 100)
-        const barRev  = Math.round((op.pontos_revisor  / op.pontos_total) * 100)
-        return (
-          <div key={op.usuario_id} className={styles.rankingRow}>
-            <span className={styles.rankingCellPos}>{op.posicao}</span>
-            <span className={styles.rankingCellNome}>{op.nome_guerra}</span>
-            <span className={styles.rankingCellPts}>{fmtPts(op.pontos_executor)}</span>
-            <span className={styles.rankingCellPts}>{fmtPts(op.pontos_revisor)}</span>
-            <span className={styles.rankingCellPts}>{fmtPts(op.pontos_corretor)}</span>
-            <span className={styles.rankingCellTotal}>{fmtPts(op.pontos_total)}</span>
-            <span className={styles.rankingCellBar}>
-              <span className={styles.rankingBarTrack} style={{ width: `${barW}%` }}>
-                <span className={styles.rankingBarExec} style={{ width: `${barExec}%` }} />
-                <span className={styles.rankingBarRev}  style={{ width: `${barRev}%`, left: `${barExec}%` }} />
-              </span>
-            </span>
+    <div className={styles.rankingWrap}>
+      {/* Barra de filtros */}
+      <div className={styles.rankingFilters}>
+        <div className={styles.rankingFilterGroup}>
+          <label className={styles.rankingFilterLabel}>Subfase</label>
+          <select
+            className={styles.rankingFilterSelect}
+            value={subfaseFiltro ?? ""}
+            onChange={(e) => onSubfaseFiltro(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">Todas as subfases</option>
+            {subfases.map((sf) => (
+              <option key={sf.subfase_id} value={sf.subfase_id}>{sf.subfase_nome}</option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.rankingFilterGroup}>
+          <label className={styles.rankingFilterLabel}>Função</label>
+          <div className={styles.rankingFuncaoBtns}>
+            {(["todos", "executor", "revisor", "corretor"] as FuncaoFiltro[]).map((f) => (
+              <button
+                key={f}
+                type="button"
+                className={`${styles.rankingFuncaoBtn} ${funcao === f ? styles.rankingFuncaoBtnActive : ""}`}
+                onClick={() => setFuncao(f)}
+              >
+                {f === "todos" ? "Todos" : f === "executor" ? "Exec." : f === "revisor" ? "Rev." : "Cor."}
+              </button>
+            ))}
           </div>
-        )
-      })}
-      <div className={styles.rankingLegend}>
-        <span className={styles.rlExec}>■ Execução</span>
-        <span className={styles.rlRev}>■ Revisão</span>
-        <span className={styles.rlCor}>■ Correção</span>
+        </div>
+      </div>
+
+      {/* Tabela */}
+      <div className={styles.rankingTable}>
+        <div className={styles.rankingHead}>
+          <span className={styles.rankingCellPos}>#</span>
+          <button type="button" className={`${styles.rankingCellNome} ${styles.rankingSortBtn}`} onClick={() => handleSort("nome")}>
+            Operador <SortIcon col="nome" />
+          </button>
+          {(funcao === "todos" || funcao === "executor") && (
+            <button type="button" className={`${styles.rankingCellPts} ${styles.rankingSortBtn}`} onClick={() => handleSort("executor")} title="Pontos como executor">
+              Exec. <SortIcon col="executor" />
+            </button>
+          )}
+          {(funcao === "todos" || funcao === "revisor") && (
+            <button type="button" className={`${styles.rankingCellPts} ${styles.rankingSortBtn}`} onClick={() => handleSort("revisor")} title="Pontos como revisor">
+              Rev. <SortIcon col="revisor" />
+            </button>
+          )}
+          {(funcao === "todos" || funcao === "corretor") && (
+            <button type="button" className={`${styles.rankingCellPts} ${styles.rankingSortBtn}`} onClick={() => handleSort("corretor")} title="Pontos como corretor">
+              Cor. <SortIcon col="corretor" />
+            </button>
+          )}
+          <button type="button" className={`${styles.rankingCellTotal} ${styles.rankingSortBtn}`} onClick={() => handleSort("total")}>
+            {funcao === "todos" ? "Total" : funcao === "executor" ? "Pontos Exec." : funcao === "revisor" ? "Pontos Rev." : "Pontos Cor."}
+            {" "}<SortIcon col="total" />
+          </button>
+          <span className={styles.rankingCellBar} />
+        </div>
+
+        {sorted.map((op, idx) => {
+          const pts = pontosFuncao(op)
+          const barW    = Math.round((pts / maxPts) * 100)
+          const safeTot = op.pontos_total || 1
+          const barExec = Math.round((op.pontos_executor / safeTot) * 100)
+          const barRev  = Math.round((op.pontos_revisor  / safeTot) * 100)
+          return (
+            <div key={op.usuario_id} className={styles.rankingRow}>
+              <span className={styles.rankingCellPos}>{idx + 1}</span>
+              <span className={styles.rankingCellNome}>{op.nome_guerra}</span>
+              {(funcao === "todos" || funcao === "executor") && (
+                <span className={`${styles.rankingCellPts} ${funcao === "executor" ? styles.rankingCellPtsActive : ""}`}>
+                  {fmtPts(op.pontos_executor)}
+                </span>
+              )}
+              {(funcao === "todos" || funcao === "revisor") && (
+                <span className={`${styles.rankingCellPts} ${funcao === "revisor" ? styles.rankingCellPtsActive : ""}`}>
+                  {fmtPts(op.pontos_revisor)}
+                </span>
+              )}
+              {(funcao === "todos" || funcao === "corretor") && (
+                <span className={`${styles.rankingCellPts} ${funcao === "corretor" ? styles.rankingCellPtsActive : ""}`}>
+                  {fmtPts(op.pontos_corretor)}
+                </span>
+              )}
+              <span className={styles.rankingCellTotal}>{fmtPts(pts)}</span>
+              <span className={styles.rankingCellBar}>
+                <span className={styles.rankingBarTrack} style={{ width: `${barW}%` }}>
+                  {funcao === "todos" ? (
+                    <>
+                      <span className={styles.rankingBarExec} style={{ width: `${barExec}%` }} />
+                      <span className={styles.rankingBarRev}  style={{ width: `${barRev}%`, left: `${barExec}%` }} />
+                    </>
+                  ) : (
+                    <span
+                      className={
+                        funcao === "executor" ? styles.rankingBarExec
+                        : funcao === "revisor"  ? styles.rankingBarRev
+                        : styles.rankingBarCor
+                      }
+                      style={{ width: "100%" }}
+                    />
+                  )}
+                </span>
+              </span>
+            </div>
+          )
+        })}
+
+        <div className={styles.rankingLegend}>
+          <span className={styles.rlExec}>■ Execução</span>
+          <span className={styles.rlRev}>■ Revisão</span>
+          <span className={styles.rlCor}>■ Correção</span>
+        </div>
       </div>
     </div>
   )
@@ -1103,6 +1232,7 @@ function OperadorDashboard() {
 function AdminDashboard() {
   const queryClient = useQueryClient()
   const [blocoFiltro, setBlocoFiltro] = useState<number | null>(null)
+  const [subfaseFiltro, setSubfaseFiltro] = useState<number | null>(null)
 
   const { data: kpiProjetos, isLoading: kpiLoading, error: kpiError } = useQuery({
     queryKey: ["kpiProjetos"],
@@ -1111,8 +1241,8 @@ function AdminDashboard() {
   })
 
   const { data: dashboard } = useQuery({
-    queryKey: ["kpiDashboard", blocoFiltro],
-    queryFn: () => getKpiDashboard(blocoFiltro ?? undefined),
+    queryKey: ["kpiDashboard", blocoFiltro, subfaseFiltro],
+    queryFn: () => getKpiDashboard(blocoFiltro ?? undefined, subfaseFiltro ?? undefined),
     refetchInterval: 60_000,
   })
 
@@ -1265,24 +1395,30 @@ function AdminDashboard() {
         </div>
       )}
 
-      {/* ── Ranking global de operadores + Velocidade semanal ── */}
-      <div className={styles.rankVelRow}>
-        <div className={`${styles.section} ${styles.rankVelColRanking}`}>
-          <h2 className={styles.sectionTitle}>
-            Ranking de produção
-            {(dashboard?.ranking_operadores ?? []).length > 0 && (
-              <span className={styles.sectionCount}>{dashboard!.ranking_operadores.length}</span>
-            )}
-          </h2>
-          <div className={styles.chartCard}>
-            <RankingPanel operadores={dashboard?.ranking_operadores ?? []} />
-          </div>
-        </div>
-        <div className={`${styles.section} ${styles.rankVelColVel}`}>
-          <h2 className={styles.sectionTitle}>Velocidade — últimas 8 semanas (UTs/sem)</h2>
-          <div className={styles.chartCard}>
-            <GraficoVelocidade dados={dashboard?.velocidade_semanal ?? []} />
-          </div>
+      {/* ── Ranking global de operadores (full-width) ── */}
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>
+          Ranking de produção
+          {(dashboard?.ranking_operadores ?? []).length > 0 && (
+            <span className={styles.sectionCount}>{dashboard!.ranking_operadores.length}</span>
+          )}
+          {dashboard?.subfase_filtro_nome && (
+            <span className={styles.rankingContextBadge}>{dashboard.subfase_filtro_nome}</span>
+          )}
+        </h2>
+        <RankingPanel
+          operadores={dashboard?.ranking_operadores ?? []}
+          subfases={dashboard?.subfases_disponiveis ?? []}
+          subfaseFiltro={subfaseFiltro}
+          onSubfaseFiltro={(id) => setSubfaseFiltro(id)}
+        />
+      </div>
+
+      {/* ── Velocidade semanal (abaixo do ranking) ── */}
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>Velocidade — últimas 8 semanas (UTs/sem)</h2>
+        <div className={styles.chartCard}>
+          <GraficoVelocidade dados={dashboard?.velocidade_semanal ?? []} />
         </div>
       </div>
 
