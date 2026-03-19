@@ -204,6 +204,36 @@ class LancamentoUpdateInput(BaseModel):
     descricao: str | None = Field(None, max_length=500, description="Descrição do lançamento")
 
 
+class LancamentoLoteInput(BaseModel):
+    """Entrada para criação em lote de lançamentos (operador — várias datas, mesmo usuário)."""
+
+    datas: list[date] = Field(..., min_length=1, description="Datas dos lançamentos")
+    bloco_id: int | None = Field(None, description="ID do bloco (obrigatório para BLOCO)")
+    tipo_atividade: CodigoAtividade = Field(..., description="Código do tipo de atividade")
+    faixa: FaixaMinuto = Field(..., description="Faixa do minuto (NORMAL ou EXTRA)")
+    minutos: int = Field(..., gt=0, description="Quantidade de minutos por dia")
+    descricao: str | None = Field(None, max_length=500, description="Descrição do lançamento")
+
+    @model_validator(mode="after")
+    def validar_bloco_obrigatorio(self) -> "LancamentoLoteInput":
+        if self.tipo_atividade == CodigoAtividade.BLOCO and self.bloco_id is None:
+            raise ValueError("bloco_id é obrigatório para atividade do tipo BLOCO")
+        return self
+
+
+class LancamentoAdminLoteInput(LancamentoLoteInput):
+    """Entrada para criação em lote de lançamentos (admin — múltiplos usuários × múltiplas datas)."""
+
+    usuario_ids: list[int] = Field(..., min_length=1, description="IDs dos usuários alvo")
+
+
+class LancamentoLoteResponse(BaseModel):
+    """Resposta do lançamento em lote."""
+
+    criados: int = Field(..., description="Número de lançamentos criados com sucesso")
+    erros: list[str] = Field(default_factory=list, description="Erros por data/usuário")
+
+
 class LancamentoResponse(BaseSchema):
     """Resposta com dados de lançamento."""
 

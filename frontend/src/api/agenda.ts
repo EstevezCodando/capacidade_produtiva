@@ -15,7 +15,10 @@ import type {
   IndisponibilidadeInput,
   Lancamento,
   LancamentoAdminInput,
+  LancamentoAdminLoteInput,
   LancamentoInput,
+  LancamentoLoteInput,
+  LancamentoLoteResult,
   LancamentoUpdateInput,
   Planejamento,
   PlanejamentoInput,
@@ -100,6 +103,16 @@ export async function editarLancamentoAdmin(id: number, input: LancamentoUpdateI
 
 export async function removerLancamentoAdmin(id: number): Promise<RemovidoResponse> {
   const res = await apiClient.delete<RemovidoResponse>(`/agenda/lancamento-admin/${id}`)
+  return res.data
+}
+
+export async function criarLancamentoLote(input: LancamentoLoteInput): Promise<LancamentoLoteResult> {
+  const res = await apiClient.post<LancamentoLoteResult>('/agenda/lancamento/lote', input)
+  return res.data
+}
+
+export async function criarLancamentoAdminLote(input: LancamentoAdminLoteInput): Promise<LancamentoLoteResult> {
+  const res = await apiClient.post<LancamentoLoteResult>('/agenda/lancamento-admin/lote', input)
   return res.data
 }
 

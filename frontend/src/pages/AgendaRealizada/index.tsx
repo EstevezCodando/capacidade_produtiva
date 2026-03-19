@@ -9,12 +9,14 @@ import {
     editarLancamento,
     editarLancamentoAdmin,
     getConfigTeto,
+    getFeriados,
     getTiposAtividade,
     getUsuarios,
     removerLancamento,
     removerLancamentoAdmin,
 } from "@/api/agenda";
 import ConsolidacaoModal from "@/components/agenda/ConsolidacaoModal";
+import LancamentoLoteModal from "@/components/agenda/LancamentoLoteModal";
 import CalendarGrid from "@/components/calendar/CalendarGrid";
 import CalendarHeader from "@/components/calendar/CalendarHeader";
 import {
@@ -199,6 +201,7 @@ export default function AgendaRealizada() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     const [lancamentoOpen, setLancamentoOpen] = useState(false);
+    const [loteOpen, setLoteOpen] = useState(false);
     const [consolidacaoOpen, setConsolidacaoOpen] = useState(false);
     const [diaDetalheSelecionado, setDiaDetalheSelecionado] =
         useState<Date | null>(null);
@@ -234,6 +237,12 @@ export default function AgendaRealizada() {
         queryKey: ["config-teto"],
         queryFn: getConfigTeto,
         staleTime: 60_000,
+    });
+
+    const { data: feriadosData } = useQuery({
+        queryKey: ["feriados"],
+        queryFn: getFeriados,
+        staleTime: 300_000,
     });
 
     const tiposAtividade: TipoAtividade[] = useMemo(() => {
@@ -272,6 +281,21 @@ export default function AgendaRealizada() {
 
     const capacidadePadraoMinutos = configTeto?.teto_normal_min ?? 360;
     const resumoPeriodo = capacidade?.resumo;
+
+    const feriadosDatas = useMemo(
+        () => feriadosData?.feriados.map((f) => f.data) ?? [],
+        [feriadosData],
+    );
+
+    const diasComLancamento = useMemo(() => {
+        const set = new Set<string>();
+        if (agenda?.dias) {
+            for (const d of agenda.dias) {
+                if (d.lancamentos.length > 0) set.add(d.data);
+            }
+        }
+        return set;
+    }, [agenda]);
 
     // ── Derivações ────────────────────────────────────────────
 
@@ -1058,17 +1082,27 @@ export default function AgendaRealizada() {
                                 Consolidar período
                             </Button>
                         )}
-                        <Button
-                            variant="primary"
-                            onClick={abrirNovoLancamento}
-                            disabled={
-                                !diaDetalheSelecionado ||
-                                !podeLancarNoDiaSelecionado ||
-                                (ehAdmin && !usuarioIdParaCarregar)
-                            }
-                        >
-                            Novo lançamento
-                        </Button>
+                        {calendar.selectedDates.length > 1 ? (
+                            <Button
+                                variant="primary"
+                                onClick={() => setLoteOpen(true)}
+                                disabled={ehAdmin && !usuarioIdParaCarregar}
+                            >
+                                Lançar em lote ({calendar.selectedDates.length} dias)
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="primary"
+                                onClick={abrirNovoLancamento}
+                                disabled={
+                                    !diaDetalheSelecionado ||
+                                    !podeLancarNoDiaSelecionado ||
+                                    (ehAdmin && !usuarioIdParaCarregar)
+                                }
+                            >
+                                Novo lançamento
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -1110,6 +1144,48 @@ export default function AgendaRealizada() {
                     loading={isLoading}
                 />
 
+                {/* Barra de seleção rápida */}
+                <div className={styles.quickSelectBar}>
+                    <button
+                        type="button"
+                        className={styles.quickSelectBtn}
+                        onClick={() => calendar.selectDiasUteisDoMes(feriadosDatas)}
+                        title="Selecionar todos os dias úteis do mês"
+                    >
+                        Mês inteiro
+                    </button>
+                    <button
+                        type="button"
+                        className={styles.quickSelectBtn}
+                        onClick={() => calendar.selectSemanaAtual(feriadosDatas)}
+                        title="Selecionar dias úteis da semana atual"
+                    >
+                        Semana atual
+                    </button>
+                    <button
+                        type="button"
+                        className={styles.quickSelectBtn}
+                        onClick={() => calendar.selectDiasUteisNaoLancados(feriadosDatas, diasComLancamento)}
+                        title="Selecionar dias úteis ainda sem lançamento"
+                    >
+                        Sem lançamento
+                    </button>
+                    {calendar.selectedDates.length > 0 && (
+                        <>
+                            <span className={styles.quickSelectCount}>
+                                {calendar.selectedDates.length} dia{calendar.selectedDates.length !== 1 ? "s" : ""} selecionado{calendar.selectedDates.length !== 1 ? "s" : ""}
+                            </span>
+                            <button
+                                type="button"
+                                className={`${styles.quickSelectBtn} ${styles.quickSelectClear}`}
+                                onClick={calendar.clearSelection}
+                            >
+                                Limpar
+                            </button>
+                        </>
+                    )}
+                </div>
+
                 <div className={styles.calendarWorkspace}>
                     <div className={styles.calendarContainer}>
                         {isError ? (
@@ -1136,11 +1212,14 @@ export default function AgendaRealizada() {
                                 }}
                                 selectedDates={calendar.selectedDates}
                                 onSelectDate={calendar.selectDate}
-                                onSelectRange={calendar.selectRange}
+                                onSelectRange={(start, end) =>
+                                    calendar.selectRangeDiasUteis(start, end, feriadosDatas)
+                                }
                                 onDayClick={(date) => {
                                     calendar.selectDate(date);
                                     setDiaDetalheSelecionado(date);
                                 }}
+                                feriados={feriadosDatas}
                                 isAdmin={ehAdmin}
                                 loading={isLoading}
                                 exibirIndicadorOcioso={true}
@@ -1786,6 +1865,25 @@ export default function AgendaRealizada() {
                     </form>
                 )}
             </Modal>
+
+            {/* ══ MODAL: LANÇAMENTO EM LOTE ════════════════════════ */}
+            <LancamentoLoteModal
+                open={loteOpen}
+                onClose={() => setLoteOpen(false)}
+                selectedDates={calendar.selectedDates}
+                feriados={feriadosDatas}
+                usuarioIdAtual={usuario?.usuario_id}
+                usuariosDisponiveis={usuarios}
+                tiposAtividade={tiposAtividade}
+                isAdmin={ehAdmin}
+                onSuccess={() => {
+                    setLoteOpen(false);
+                    calendar.clearSelection();
+                    void queryClient.invalidateQueries({ queryKey: ["agenda"] });
+                    void queryClient.invalidateQueries({ queryKey: ["capacidade"] });
+                    invalidate();
+                }}
+            />
 
             {/* ══ MODAL: CONSOLIDAÇÃO ══════════════════════════════ */}
             <ConsolidacaoModal

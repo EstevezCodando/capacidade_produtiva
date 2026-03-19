@@ -34,7 +34,10 @@ from cp.domain.capacidade.schemas import (
     IndisponibilidadeInput,
     IndisponibilidadeResponse,
     LancamentoAdminInput,
+    LancamentoAdminLoteInput,
     LancamentoInput,
+    LancamentoLoteInput,
+    LancamentoLoteResponse,
     LancamentoResponse,
     LancamentoUpdateInput,
     PlanejamentoInput,
@@ -181,6 +184,39 @@ def criar_lancamento(
         )
     except Exception as exc:
         handle_domain_exception(exc)
+
+
+@router.post("/lancamento/lote", summary="Criar lançamentos em lote (operador)", status_code=201)
+def criar_lancamento_lote(
+    request: Request,
+    body: LancamentoLoteInput,
+    usuario: UsuarioLogado,
+) -> LancamentoLoteResponse:
+    """Operador registra o mesmo lançamento em múltiplas datas de uma vez."""
+    service = _get_agenda_service(request)
+
+    criados = 0
+    erros: list[str] = []
+
+    for data in body.datas:
+        try:
+            service.criar_lancamento(
+                usuario_id=usuario.usuario_id,
+                data=data,
+                bloco_id=body.bloco_id,
+                tipo_atividade=body.tipo_atividade,
+                faixa=body.faixa,
+                minutos=body.minutos,
+                descricao=body.descricao,
+                criado_por=usuario.usuario_id,
+                eh_admin=False,
+                data_atual=date.today(),
+            )
+            criados += 1
+        except Exception as exc:  # noqa: BLE001
+            erros.append(f"{data}: {exc}")
+
+    return LancamentoLoteResponse(criados=criados, erros=erros)
 
 
 @router.put("/lancamento/{lancamento_id}", summary="Editar lançamento próprio")
@@ -486,6 +522,40 @@ def criar_lancamento_admin(
         )
     except Exception as exc:
         handle_domain_exception(exc)
+
+
+@router.post("/lancamento-admin/lote", summary="Criar lançamentos em lote para múltiplos usuários (admin)", status_code=201)
+def criar_lancamento_admin_lote(
+    request: Request,
+    body: LancamentoAdminLoteInput,
+    admin: SomenteAdmin,
+) -> LancamentoLoteResponse:
+    """Admin registra o mesmo lançamento para múltiplos usuários e datas."""
+    service = _get_agenda_service(request)
+
+    criados = 0
+    erros: list[str] = []
+
+    for usuario_id in body.usuario_ids:
+        for data in body.datas:
+            try:
+                service.criar_lancamento(
+                    usuario_id=usuario_id,
+                    data=data,
+                    bloco_id=body.bloco_id,
+                    tipo_atividade=body.tipo_atividade,
+                    faixa=body.faixa,
+                    minutos=body.minutos,
+                    descricao=body.descricao,
+                    criado_por=admin.usuario_id,
+                    eh_admin=True,
+                    data_atual=date.today(),
+                )
+                criados += 1
+            except Exception as exc:  # noqa: BLE001
+                erros.append(f"usuário {usuario_id} / {data}: {exc}")
+
+    return LancamentoLoteResponse(criados=criados, erros=erros)
 
 
 @router.put("/lancamento-admin/{lancamento_id}", summary="Editar lançamento de usuário (admin)")

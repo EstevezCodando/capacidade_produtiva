@@ -974,3 +974,67 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   QUICK-SELECT BAR — Barra de seleção rápida de dias úteis
+   ══════════════════════════════════════════════════════════════ */
+
+.quickSelectBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--bd-faint);
+  flex-wrap: wrap;
+  min-height: 40px;
+}
+
+.quickSelectBtn {
+  padding: 4px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--bd-faint);
+  background: transparent;
+  font-size: 11px;
+  color: var(--tx-secondary);
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.quickSelectBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.quickSelectBtnActive {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.quickSelectCount {
+  font-size: 11px;
+  color: var(--tx-muted);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.quickSelectClear {
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--bd-faint);
+  background: transparent;
+  font-size: 11px;
+  color: var(--tx-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.quickSelectClear:hover {
+  border-color: var(--error);
+  color: var(--error);
+}
+

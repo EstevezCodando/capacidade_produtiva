@@ -261,6 +261,10 @@ class ConsolidacaoService:
                 usuario_id, data_inicio, data_fim
             )
             total_dias += dias
+            # Sincronizar flag consolidado nos lançamentos do período
+            self._lancamento_repo.marcar_consolidado_periodo(
+                usuario_id, data_inicio, data_fim, consolidado=True
+            )
 
         # Auditar
         self._audit.registrar_consolidacao(
@@ -321,6 +325,10 @@ class ConsolidacaoService:
         for usuario_id in usuarios_ids:
             total_dias += self._capacidade_repo.desconsolidar_periodo(
                 usuario_id, data_inicio, data_fim
+            )
+            # Reverter flag consolidado nos lançamentos do período
+            self._lancamento_repo.marcar_consolidado_periodo(
+                usuario_id, data_inicio, data_fim, consolidado=False
             )
 
         self._audit.registrar_desconsolidacao(

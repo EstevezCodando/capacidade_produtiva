@@ -4,6 +4,7 @@ import {
     editarPlanejamento,
     getAgendaUsuario,
     getConfigTeto,
+    getFeriados,
     getTiposAtividade,
     getUsuarios,
     removerPlanejamento,
@@ -236,6 +237,12 @@ export default function AgendaPrevista() {
     staleTime: 60_000,
   });
 
+  const { data: feriadosData } = useQuery({
+    queryKey: ["feriados"],
+    queryFn: getFeriados,
+    staleTime: 300_000,
+  });
+
   const tiposAtividade: TipoAtividade[] = useMemo(() => {
     if (Array.isArray(tiposAtividadeResposta))
       return tiposAtividadeResposta as TipoAtividade[];
@@ -327,6 +334,21 @@ export default function AgendaPrevista() {
   const resumoPeriodo = capacidade?.resumo;
   const capacidadePadraoMinutos = configTeto?.teto_normal_min ?? 360;
   const diasSelecionados = calendar.selectedDates.length;
+
+  const feriadosDatas = useMemo(
+    () => feriadosData?.feriados.map((f) => f.data) ?? [],
+    [feriadosData],
+  );
+
+  const diasComPlanejamento = useMemo(() => {
+    const set = new Set<string>();
+    if (agenda?.dias) {
+      for (const d of agenda.dias) {
+        if (d.planejamento.length > 0) set.add(d.data);
+      }
+    }
+    return set;
+  }, [agenda]);
 
   const intervaloSelecionado = useMemo(() => {
     if (calendar.selectedRange) return calendar.selectedRange;
@@ -1245,6 +1267,48 @@ export default function AgendaPrevista() {
           loading={isLoading}
         />
 
+        {/* Barra de seleção rápida */}
+        <div className={styles.quickSelectBar}>
+          <button
+            type="button"
+            className={styles.quickSelectBtn}
+            onClick={() => calendar.selectDiasUteisDoMes(feriadosDatas)}
+            title="Selecionar todos os dias úteis do mês"
+          >
+            Mês inteiro
+          </button>
+          <button
+            type="button"
+            className={styles.quickSelectBtn}
+            onClick={() => calendar.selectSemanaAtual(feriadosDatas)}
+            title="Selecionar dias úteis da semana atual"
+          >
+            Semana atual
+          </button>
+          <button
+            type="button"
+            className={styles.quickSelectBtn}
+            onClick={() => calendar.selectDiasUteisNaoLancados(feriadosDatas, diasComPlanejamento)}
+            title="Selecionar dias úteis ainda sem planejamento"
+          >
+            Sem planejamento
+          </button>
+          {calendar.selectedDates.length > 0 && (
+            <>
+              <span className={styles.quickSelectCount}>
+                {calendar.selectedDates.length} dia{calendar.selectedDates.length !== 1 ? "s" : ""} selecionado{calendar.selectedDates.length !== 1 ? "s" : ""}
+              </span>
+              <button
+                type="button"
+                className={`${styles.quickSelectBtn} ${styles.quickSelectClear}`}
+                onClick={calendar.clearSelection}
+              >
+                Limpar
+              </button>
+            </>
+          )}
+        </div>
+
         <div className={styles.calendarWorkspace}>
           <div className={styles.calendarContainer}>
             {isError ? (
@@ -1263,11 +1327,14 @@ export default function AgendaPrevista() {
                 }
                 selectedDates={calendar.selectedDates}
                 onSelectDate={calendar.selectDate}
-                onSelectRange={calendar.selectRange}
+                onSelectRange={(start, end) =>
+                  calendar.selectRangeDiasUteis(start, end, feriadosDatas)
+                }
                 onDayClick={(date) => {
                   calendar.selectDate(date);
                   setDiaDetalheSelecionado(date);
                 }}
+                feriados={feriadosDatas}
                 isAdmin={ehAdmin}
                 loading={isLoading || agendasMultiplosUsuariosQuery.isLoading}
                 exibirIndicadorOcioso={

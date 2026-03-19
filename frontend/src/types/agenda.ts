@@ -138,6 +138,24 @@ export interface LancamentoUpdateInput {
   descricao?: string | null
 }
 
+export interface LancamentoLoteInput {
+  datas: string[]
+  bloco_id: number | null
+  tipo_atividade: CodigoAtividade
+  faixa: FaixaMinuto
+  minutos: number
+  descricao?: string | null
+}
+
+export interface LancamentoAdminLoteInput extends LancamentoLoteInput {
+  usuario_ids: number[]
+}
+
+export interface LancamentoLoteResult {
+  criados: number
+  erros: string[]
+}
+
 // ── Apontamento (resumo para visualização) ───────────────────
 
 export interface ApontamentoResumo {

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Sequence
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -161,6 +161,33 @@ class AgendaLancamentoRepository:
             lancamento.em_uso = False
             session.commit()
             return True
+
+    def marcar_consolidado_periodo(
+        self,
+        usuario_id: int,
+        data_inicio: date,
+        data_fim: date,
+        consolidado: bool,
+    ) -> int:
+        """Atualiza o campo consolidado dos lançamentos do período.
+
+        Retorna a quantidade de registros atualizados.
+        """
+        with Session(self._engine) as session:
+            result = session.execute(
+                update(AgendaLancamento)
+                .where(
+                    and_(
+                        AgendaLancamento.usuario_id == usuario_id,
+                        AgendaLancamento.data_lancamento >= data_inicio,
+                        AgendaLancamento.data_lancamento <= data_fim,
+                        AgendaLancamento.em_uso.is_(True),
+                    )
+                )
+                .values(consolidado=consolidado)
+            )
+            session.commit()
+            return result.rowcount  # type: ignore[attr-defined, no-any-return]
 
     def listar_por_dia(
         self, usuario_id: int, data: date

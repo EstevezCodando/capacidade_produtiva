@@ -1749,7 +1749,7 @@ def _pizza_query(
 
     A base de cálculo é sempre a capacidade normal disponível nos dias úteis.
     Quando nenhum lançamento existe, exibe 100% como "Não alocado".
-    Quando usuario_id é None (todos), considera apenas usuários ativos (dgeo.usuarios.ativo).
+    Quando usuario_id é None (todos), considera apenas usuários ativos (sap_snapshot.dgeo_usuario.ativo).
     """
     mes_str = mes_inicio.strftime("%Y-%m-%d")
 
@@ -1761,9 +1761,9 @@ def _pizza_query(
         cap_user_filter   = "AND cd.usuario_id = :uid"
     else:
         # Todos os usuários ativos
-        fatia_user_join   = "JOIN dgeo.usuarios u ON u.id = al.usuario_id AND u.ativo = TRUE"
+        fatia_user_join   = "JOIN sap_snapshot.dgeo_usuario u ON u.id = al.usuario_id AND u.ativo = TRUE"
         fatia_user_filter = ""
-        cap_user_join     = "JOIN dgeo.usuarios u ON u.id = cd.usuario_id AND u.ativo = TRUE"
+        cap_user_join     = "JOIN sap_snapshot.dgeo_usuario u ON u.id = cd.usuario_id AND u.ativo = TRUE"
         cap_user_filter   = ""
 
     sql_fatias = text(f"""
