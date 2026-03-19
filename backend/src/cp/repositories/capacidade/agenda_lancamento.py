@@ -112,6 +112,7 @@ class AgendaLancamentoRepository:
                 minutos=minutos,
                 descricao=descricao,
                 em_uso=True,
+                consolidado=False,
                 criado_por=criado_por,
             )
             session.add(lancamento)
@@ -142,6 +143,7 @@ class AgendaLancamentoRepository:
                 minutos=minutos if minutos is not None else lancamento.minutos,
                 descricao=descricao if descricao is not None else lancamento.descricao,
                 em_uso=True,
+                consolidado=False,
                 criado_por=lancamento.criado_por,
                 atualizado_por=atualizado_por,
             )

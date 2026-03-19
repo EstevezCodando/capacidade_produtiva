@@ -199,6 +199,7 @@ class AgendaPrevistaAdmin(Base):
         Index("ix_agenda_prevista_usuario_data", "usuario_id", "data"),
         Index("ix_agenda_prevista_data", "data"),
         Index("ix_agenda_prevista_em_uso", "em_uso"),
+        Index("ix_agenda_prevista_consolidado", "consolidado"),
         {"schema": "capacidade"},
     )
 
@@ -210,6 +211,7 @@ class AgendaPrevistaAdmin(Base):
     minutos_planejados_extras: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
     em_uso: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    consolidado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     criado_por: Mapped[int] = mapped_column(Integer, nullable=False)
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -239,6 +241,7 @@ class AgendaLancamento(Base):
         Index("ix_agenda_lancamento_data", "data_lancamento"),
         Index("ix_agenda_lancamento_bloco", "bloco_id"),
         Index("ix_agenda_lancamento_em_uso", "em_uso"),
+        Index("ix_agenda_lancamento_consolidado", "consolidado"),
         {"schema": "capacidade"},
     )
 
@@ -256,6 +259,7 @@ class AgendaLancamento(Base):
     minutos: Mapped[int] = mapped_column(Integer, nullable=False)
     descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
     em_uso: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    consolidado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     criado_por: Mapped[int] = mapped_column(Integer, nullable=False)
     atualizado_por: Mapped[int | None] = mapped_column(Integer, nullable=True)
     criado_em: Mapped[datetime] = mapped_column(
