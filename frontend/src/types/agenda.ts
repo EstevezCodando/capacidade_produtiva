@@ -109,6 +109,7 @@ export interface Lancamento {
   tipo_atividade_id: number
   tipo_atividade_codigo: CodigoAtividade
   tipo_atividade_nome: string
+  tipo_atividade_cor: string
   faixa_minuto: FaixaMinuto
   minutos: number
   descricao: string | null
@@ -145,6 +146,9 @@ export interface ApontamentoResumo {
   bloco_id: number | null
   bloco_nome?: string | null
   tipo_atividade: CodigoAtividade
+  tipo_atividade_id: number
+  tipo_atividade_nome: string
+  tipo_atividade_cor: string
   minutos: number
   faixa: FaixaMinuto
 }

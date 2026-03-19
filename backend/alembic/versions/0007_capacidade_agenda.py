@@ -25,11 +25,19 @@ def upgrade() -> None:
     op.execute("CREATE SCHEMA IF NOT EXISTS capacidade")
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Criar tipos ENUM
+    # Criar tipos ENUM já no estado final
     # ─────────────────────────────────────────────────────────────────────────
     op.execute("""
         CREATE TYPE capacidade.codigo_atividade AS ENUM (
-            'BLOCO', 'EXTERNA', 'AJUSTE', 'FERIAS', 'LICENCA', 'CURSO', 'AFASTAMENTO'
+            'BLOCO',
+            'EXTERNA',
+            'AJUSTE',
+            'FERIAS',
+            'LICENCA',
+            'CURSO',
+            'AFASTAMENTO',
+            'CAMPO',
+            'MILITAR'
         )
     """)
 
@@ -61,6 +69,9 @@ def upgrade() -> None:
 
     # ─────────────────────────────────────────────────────────────────────────
     # Tabela: tipo_atividade
+    # Observação:
+    #   - tipos estáticos usam bloco_id IS NULL
+    #   - tipos sincronizados de macrocontrole_bloco usam bloco_id IS NOT NULL
     # ─────────────────────────────────────────────────────────────────────────
     op.create_table(
         "tipo_atividade",
@@ -68,38 +79,62 @@ def upgrade() -> None:
         sa.Column(
             "codigo",
             postgresql.ENUM(
-                "BLOCO", "EXTERNA", "AJUSTE", "FERIAS", "LICENCA", "CURSO", "AFASTAMENTO",
+                "BLOCO",
+                "EXTERNA",
+                "AJUSTE",
+                "FERIAS",
+                "LICENCA",
+                "CURSO",
+                "AFASTAMENTO",
+                "CAMPO",
+                "MILITAR",
                 name="codigo_atividade",
                 schema="capacidade",
                 create_type=False,
             ),
             nullable=False,
         ),
-        sa.Column("nome", sa.String(100), nullable=False),
+        sa.Column("nome", sa.String(length=100), nullable=False),
         sa.Column(
             "grupo",
             postgresql.ENUM(
-                "PRODUCAO", "INDISPONIBILIDADE", "AJUSTE",
+                "PRODUCAO",
+                "INDISPONIBILIDADE",
+                "AJUSTE",
                 name="grupo_atividade",
                 schema="capacidade",
                 create_type=False,
             ),
             nullable=False,
         ),
-        sa.UniqueConstraint("codigo", name="uq_tipo_atividade_codigo"),
+        sa.Column("bloco_id", sa.Integer(), nullable=True),
+        sa.Column("cor", sa.String(length=7), nullable=False, server_default="#5B8DEE"),
         schema="capacidade",
     )
 
-    # Inserir tipos de atividade padrão
     op.execute("""
-        INSERT INTO capacidade.tipo_atividade (codigo, nome, grupo) VALUES
-        ('BLOCO', 'Trabalho em Bloco', 'PRODUCAO'),
-        ('EXTERNA', 'Atividade Externa', 'PRODUCAO'),
-        ('AJUSTE', 'Ajuste Administrativo', 'AJUSTE'),
-        ('FERIAS', 'Férias', 'INDISPONIBILIDADE'),
-        ('LICENCA', 'Licença', 'INDISPONIBILIDADE'),
-        ('CURSO', 'Curso/Capacitação', 'INDISPONIBILIDADE'),
-        ('AFASTAMENTO', 'Afastamento', 'INDISPONIBILIDADE')
+        CREATE UNIQUE INDEX ux_tipo_atividade_codigo_sem_bloco
+        ON capacidade.tipo_atividade (codigo)
+        WHERE bloco_id IS NULL
+    """)
+
+    op.execute("""
+        CREATE UNIQUE INDEX ux_tipo_atividade_bloco_id
+        ON capacidade.tipo_atividade (bloco_id)
+        WHERE bloco_id IS NOT NULL
+    """)
+
+    op.execute("""
+        INSERT INTO capacidade.tipo_atividade (codigo, nome, grupo, bloco_id, cor) VALUES
+        ('BLOCO', 'Trabalho em Bloco', 'PRODUCAO', NULL, '#5B8DEE'),
+        ('EXTERNA', 'Produção Diversos', 'PRODUCAO', NULL, '#14B8A6'),
+        ('AJUSTE', 'Atividade Administrativa', 'AJUSTE', NULL, '#F59E0B'),
+        ('FERIAS', 'Férias', 'INDISPONIBILIDADE', NULL, '#8B5CF6'),
+        ('LICENCA', 'Dispensa Médica', 'INDISPONIBILIDADE', NULL, '#EF4444'),
+        ('CURSO', 'Curso/Capacitação', 'INDISPONIBILIDADE', NULL, '#10B981'),
+        ('AFASTAMENTO', 'Dispensa como recompensa', 'INDISPONIBILIDADE', NULL, '#64748B'),
+        ('CAMPO', 'Trabalho de Campo', 'PRODUCAO', NULL, '#14B8A6'),
+        ('MILITAR', 'Atividade Militar', 'AJUSTE', NULL, '#94A3B8')
     """)
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -130,9 +165,8 @@ def upgrade() -> None:
         schema="capacidade",
     )
 
-    # Inserir parâmetro padrão inicial
     op.execute("""
-        INSERT INTO capacidade.parametro_capacidade 
+        INSERT INTO capacidade.parametro_capacidade
         (minutos_dia_util_default, minutos_extra_maximo_default, data_inicio_vigencia, criado_por)
         VALUES (360, 240, '2026-01-01', 1)
     """)
@@ -205,7 +239,10 @@ def upgrade() -> None:
         sa.Column(
             "tipo_indisponibilidade",
             postgresql.ENUM(
-                "FERIAS", "LICENCA", "CURSO", "AFASTAMENTO",
+                "FERIAS",
+                "LICENCA",
+                "CURSO",
+                "AFASTAMENTO",
                 name="tipo_indisponibilidade_enum",
                 schema="capacidade",
                 create_type=False,
@@ -215,7 +252,8 @@ def upgrade() -> None:
         sa.Column(
             "status_dia",
             postgresql.ENUM(
-                "ABERTO", "CONSOLIDADO",
+                "ABERTO",
+                "CONSOLIDADO",
                 name="status_dia_enum",
                 schema="capacidade",
                 create_type=False,
@@ -315,7 +353,8 @@ def upgrade() -> None:
         sa.Column(
             "faixa_minuto",
             postgresql.ENUM(
-                "NORMAL", "EXTRA",
+                "NORMAL",
+                "EXTRA",
                 name="faixa_minuto_enum",
                 schema="capacidade",
                 create_type=False,
@@ -364,7 +403,10 @@ def upgrade() -> None:
         sa.Column(
             "acao",
             postgresql.ENUM(
-                "CREATE", "UPDATE", "DELETE", "CONSOLIDATE",
+                "CREATE",
+                "UPDATE",
+                "DELETE",
+                "CONSOLIDATE",
                 name="acao_auditoria_enum",
                 schema="capacidade",
                 create_type=False,
@@ -412,21 +454,18 @@ def upgrade() -> None:
         $$ LANGUAGE plpgsql;
     """)
 
-    # Trigger para capacidade_dia
     op.execute("""
         CREATE TRIGGER trigger_capacidade_dia_atualizado_em
         BEFORE UPDATE ON capacidade.capacidade_dia
         FOR EACH ROW EXECUTE FUNCTION capacidade.atualizar_timestamp();
     """)
 
-    # Trigger para agenda_prevista_admin
     op.execute("""
         CREATE TRIGGER trigger_agenda_prevista_atualizado_em
         BEFORE UPDATE ON capacidade.agenda_prevista_admin
         FOR EACH ROW EXECUTE FUNCTION capacidade.atualizar_timestamp();
     """)
 
-    # Trigger para agenda_lancamento
     op.execute("""
         CREATE TRIGGER trigger_agenda_lancamento_atualizado_em
         BEFORE UPDATE ON capacidade.agenda_lancamento
@@ -435,13 +474,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Remover triggers
     op.execute("DROP TRIGGER IF EXISTS trigger_agenda_lancamento_atualizado_em ON capacidade.agenda_lancamento")
     op.execute("DROP TRIGGER IF EXISTS trigger_agenda_prevista_atualizado_em ON capacidade.agenda_prevista_admin")
     op.execute("DROP TRIGGER IF EXISTS trigger_capacidade_dia_atualizado_em ON capacidade.capacidade_dia")
     op.execute("DROP FUNCTION IF EXISTS capacidade.atualizar_timestamp()")
 
-    # Remover tabelas
     op.drop_table("audit_log", schema="capacidade")
     op.drop_table("agenda_lancamento", schema="capacidade")
     op.drop_table("agenda_prevista_admin", schema="capacidade")
@@ -451,7 +488,6 @@ def downgrade() -> None:
     op.drop_table("parametro_capacidade", schema="capacidade")
     op.drop_table("tipo_atividade", schema="capacidade")
 
-    # Remover tipos ENUM
     op.execute("DROP TYPE IF EXISTS capacidade.acao_auditoria_enum")
     op.execute("DROP TYPE IF EXISTS capacidade.tipo_indisponibilidade_enum")
     op.execute("DROP TYPE IF EXISTS capacidade.status_dia_enum")
@@ -459,5 +495,4 @@ def downgrade() -> None:
     op.execute("DROP TYPE IF EXISTS capacidade.grupo_atividade")
     op.execute("DROP TYPE IF EXISTS capacidade.codigo_atividade")
 
-    # Remover schema
     op.execute("DROP SCHEMA IF EXISTS capacidade CASCADE")

@@ -5,30 +5,13 @@ import type {
     InconsistenciasResponse,
     KpiDashboardResponse,
     KpiProjetosResponse,
+    MeuDashboardResponse,
+    PizzaDistribuicaoResponse,
     SyncStatus,
     UsuarioMe,
+    UsuarioResumo,
 } from "@/types";
 import { apiClient } from "./client";
-
-// ── Auth ─────────────────────────────────────────────────────
-// O login é feito contra o servico_autenticacao externo.
-// O frontend envia as credenciais para o auth e recebe o JWT,
-// depois usa o JWT para chamar /api/usuarios/me para obter o perfil.
-export async function loginAuth(
-  authUrl: string,
-  username: string,
-  password: string,
-): Promise<string> {
-  // O servico_autenticacao pode variar — aqui assumimos POST /login → { token }
-  const res = await fetch(`${authUrl}/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!res.ok) throw new Error("Credenciais inválidas");
-  const data = (await res.json()) as { token?: string; access_token?: string };
-  return data.token ?? data.access_token ?? "";
-}
 
 export async function getUsuarioMe(): Promise<UsuarioMe> {
   const res = await apiClient.get<UsuarioMe>("/usuarios/me");
@@ -67,5 +50,27 @@ export async function getHealth(): Promise<{ status: string }> {
 
 export async function getKpiDashboard(): Promise<KpiDashboardResponse> {
   const res = await apiClient.get<KpiDashboardResponse>("/kpi/dashboard")
+  return res.data
+}
+
+export async function getMeuDashboard(): Promise<MeuDashboardResponse> {
+  const res = await apiClient.get<MeuDashboardResponse>("/kpi/meu-dashboard")
+  return res.data
+}
+
+export async function getMinhaPizzaMensal(mes: string): Promise<PizzaDistribuicaoResponse> {
+  const res = await apiClient.get<PizzaDistribuicaoResponse>("/kpi/minha-distribuicao", { params: { mes } })
+  return res.data
+}
+
+export async function getPizzaMensal(mes: string, usuarioId = 0): Promise<PizzaDistribuicaoResponse> {
+  const res = await apiClient.get<PizzaDistribuicaoResponse>("/kpi/distribuicao-mensal", {
+    params: { mes, usuario_id: usuarioId },
+  })
+  return res.data
+}
+
+export async function getUsuarios(): Promise<UsuarioResumo[]> {
+  const res = await apiClient.get<UsuarioResumo[]>("/usuarios")
   return res.data
 }

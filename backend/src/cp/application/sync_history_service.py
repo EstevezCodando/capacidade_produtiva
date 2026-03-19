@@ -58,6 +58,8 @@ def registrar_inicio_sync(engine_cp: Engine, origem: str) -> int:
             {"origem": origem},
         )
         row = result.fetchone()
+        if row is None:
+            raise RuntimeError("INSERT INTO sync_execucao não retornou id")
         return int(row.id)
 
 
