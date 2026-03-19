@@ -36,6 +36,56 @@
   color: var(--tx-muted);
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── Seletor de bloco ─────────────────────────────────────── */
+
+.blocoSelector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.blocoSelectorSelect {
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--bd-faint);
+  background: var(--bg-raised);
+  font-size: 13px;
+  color: var(--tx-primary);
+  min-width: 200px;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+
+.blocoSelectorSelect:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.blocoSelectorClear {
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--bd-faint);
+  background: transparent;
+  color: var(--tx-muted);
+  cursor: pointer;
+  font-size: 12px;
+  transition: border-color 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+
+.blocoSelectorClear:hover {
+  border-color: var(--error);
+  color: var(--error);
+}
+
 .syncButton {
   border: 1px solid var(--bd-default);
   background: var(--bg-surface);
@@ -334,6 +384,20 @@
   stroke-width: 1.5;
 }
 
+/* D — divergência (fora do bloco planejado) — vermelho */
+.lineDivergente {
+  stroke: #EF4444;
+  stroke-width: 2;
+  stroke-opacity: 0.85;
+}
+
+/* Ponto D — vermelho */
+.dotDiv {
+  fill: #EF4444;
+  stroke: var(--bg-surface);
+  stroke-width: 1.5;
+}
+
 .chartTooltip {
   position: absolute;
   top: 8px;
@@ -379,6 +443,13 @@
   color: #6366F1;
 }
 
+/* D = divergente — vermelho */
+.tooltipD {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #EF4444;
+}
+
 .tooltipPrev { font-family: var(--font-mono); font-size: 11px; color: var(--info); }
 .tooltipLanc { font-family: var(--font-mono); font-size: 11px; color: var(--accent); }
 
@@ -409,6 +480,12 @@
 /* P — índigo */
 .legendP {
   color: #6366F1;
+  font-weight: 600;
+}
+
+/* D — vermelho (divergência de bloco) */
+.legendD {
+  color: #EF4444;
   font-weight: 600;
 }
 

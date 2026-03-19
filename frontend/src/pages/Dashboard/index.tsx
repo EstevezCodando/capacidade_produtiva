@@ -191,12 +191,19 @@ function GraficoDiario({ dados }: { dados: DiaHorasResposta[] }) {
 function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
   const [hovIdx, setHovIdx] = useState<number | null>(null)
 
+  const maxD = useMemo(
+    () => Math.max(...dados.map((d) => d.minutos_divergente_acum ?? 0), 0),
+    [dados],
+  )
+  const showD = maxD > 0
+
   const maxMin = useMemo(
     () => Math.max(
       ...dados.map((d) => Math.max(
         d.minutos_previstos_acum,
         d.minutos_lancados_normal_acum,
         d.minutos_lancados_total_acum,
+        d.minutos_divergente_acum ?? 0,
       )),
       60,
     ),
@@ -213,6 +220,9 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
   const polyJ = dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_previstos_acum)}`).join(" ")
   const polyK = dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_lancados_normal_acum)}`).join(" ")
   const polyP = dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_lancados_total_acum)}`).join(" ")
+  const polyD = showD
+    ? dados.map((d, i) => `${xOf(i)},${yOf(d.minutos_divergente_acum ?? 0)}`).join(" ")
+    : ""
 
   const yStep = Math.max(1, Math.ceil(maxH / 6))
   const yTicks = Array.from({ length: Math.floor(maxH / yStep) + 1 }, (_, k) => k * yStep)
@@ -242,10 +252,15 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
           </text>
         ))}
 
-        {/* Retas */}
+        {/* Retas J / K / P */}
         <polyline points={polyJ} fill="none" className={styles.linePrevista} strokeDasharray="6 3" />
         <polyline points={polyK} fill="none" className={styles.lineNormal} />
         <polyline points={polyP} fill="none" className={styles.lineLancada} />
+
+        {/* Reta D — divergência (só com filtro de bloco ativo) */}
+        {showD && (
+          <polyline points={polyD} fill="none" className={styles.lineDivergente} strokeDasharray="4 4" />
+        )}
 
         {/* Áreas de hover */}
         {dados.map((_, i) => {
@@ -263,6 +278,9 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
             <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_previstos_acum)} r={4} className={styles.dotPrev} />
             <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_lancados_normal_acum)} r={4} className={styles.dotNormal} />
             <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_lancados_total_acum)} r={4} className={styles.dotLanc} />
+            {showD && (
+              <circle cx={xOf(hovIdx)} cy={yOf(dados[hovIdx].minutos_divergente_acum ?? 0)} r={4} className={styles.dotDiv} />
+            )}
           </>
         )}
       </svg>
@@ -274,6 +292,9 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
           <span className={styles.tooltipJ}>J Previsto: {fmtMin(dados[hovIdx].minutos_previstos_acum)}</span>
           <span className={styles.tooltipK}>K Normal: {fmtMin(dados[hovIdx].minutos_lancados_normal_acum)}</span>
           <span className={styles.tooltipP}>P Total: {fmtMin(dados[hovIdx].minutos_lancados_total_acum)}</span>
+          {showD && (
+            <span className={styles.tooltipD}>D Divergente: {fmtMin(dados[hovIdx].minutos_divergente_acum ?? 0)}</span>
+          )}
         </div>
       )}
 
@@ -282,6 +303,9 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
         <span className={styles.legendJ}>- - J Previsto acum.</span>
         <span className={styles.legendK}>── K Normal acum.</span>
         <span className={styles.legendP}>── P Total acum. (normal + extra)</span>
+        {showD && (
+          <span className={styles.legendD}>- - D Fora do bloco planejado acum.</span>
+        )}
       </div>
     </div>
   )
@@ -911,7 +935,7 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string 
 }
 
 function ProgressBar({ value }: { value: number }) {
-  const p = Math.round((value ?? 0) * 100)
+  const p = Math.min(100, Math.round(value ?? 0))
   const color = p >= 80 ? "var(--ok)" : p >= 40 ? "var(--info)" : "var(--warn)"
   return (
     <div className={styles.progressWrap}>
@@ -1078,6 +1102,7 @@ function OperadorDashboard() {
 
 function AdminDashboard() {
   const queryClient = useQueryClient()
+  const [blocoFiltro, setBlocoFiltro] = useState<number | null>(null)
 
   const { data: kpiProjetos, isLoading: kpiLoading, error: kpiError } = useQuery({
     queryKey: ["kpiProjetos"],
@@ -1086,8 +1111,8 @@ function AdminDashboard() {
   })
 
   const { data: dashboard } = useQuery({
-    queryKey: ["kpiDashboard"],
-    queryFn: getKpiDashboard,
+    queryKey: ["kpiDashboard", blocoFiltro],
+    queryFn: () => getKpiDashboard(blocoFiltro ?? undefined),
     refetchInterval: 60_000,
   })
 
@@ -1137,16 +1162,42 @@ function AdminDashboard() {
             {kpiTs && <span className={styles.staleness}>{` · calculado ${kpiTs}`}</span>}
           </p>
         </div>
-        <button
-          type="button"
-          className={styles.syncButton}
-          onClick={() => sincMutation.mutate()}
-          disabled={sincMutation.isPending || sync?.ultima_execucao_status === "executando"}
-        >
-          {sincMutation.isPending || sync?.ultima_execucao_status === "executando"
-            ? "Sincronizando..."
-            : "Sincronizar SAP"}
-        </button>
+        <div className={styles.headerActions}>
+          {/* Seletor de bloco — filtra todos os widgets */}
+          {(dashboard?.blocos_destaque ?? []).length > 0 && (
+            <div className={styles.blocoSelector}>
+              <select
+                className={styles.blocoSelectorSelect}
+                value={blocoFiltro ?? ""}
+                onChange={(e) => setBlocoFiltro(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Todos os blocos</option>
+                {dashboard!.blocos_destaque.map((b) => (
+                  <option key={b.bloco_id} value={b.bloco_id}>{b.bloco_nome}</option>
+                ))}
+              </select>
+              {blocoFiltro && (
+                <button
+                  type="button"
+                  onClick={() => setBlocoFiltro(null)}
+                  className={styles.blocoSelectorClear}
+                >
+                  ✕ Limpar
+                </button>
+              )}
+            </div>
+          )}
+          <button
+            type="button"
+            className={styles.syncButton}
+            onClick={() => sincMutation.mutate()}
+            disabled={sincMutation.isPending || sync?.ultima_execucao_status === "executando"}
+          >
+            {sincMutation.isPending || sync?.ultima_execucao_status === "executando"
+              ? "Sincronizando..."
+              : "Sincronizar SAP"}
+          </button>
+        </div>
       </div>
 
       <div className={styles.statsRow}>

@@ -172,6 +172,8 @@ export interface KpiDashboardResponse {
   ranking_operadores: RankingOperador[]
   velocidade_semanal: SemanaVelocidade[]
   distribuicao_ciclos: DistribuicaoCiclo[]
+  bloco_filtro_id?: number | null
+  bloco_filtro_nome?: string | null
 }
 
 // ── Dashboard do operador ─────────────────────────────────────
@@ -227,6 +229,7 @@ export interface MesTrilha {
   minutos_previstos_acum: number     // J: previsto acumulado
   minutos_lancados_normal_acum: number  // K: normal acumulado
   minutos_lancados_total_acum: number   // P: normal+extra acumulado
+  minutos_divergente_acum?: number   // D: horas fora do bloco planejado (só com filtro ativo)
 }
 
 export interface MeuDashboardResponse {

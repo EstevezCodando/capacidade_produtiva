@@ -178,10 +178,11 @@ class InconsistenciasResponse(BaseModel):
 class MesTrilhaResposta(BaseModel):
     """Ponto mensal da timeline acumulada de horas."""
 
-    mes: str                         # "YYYY-MM-DD" — 1º dia do mês
-    minutos_previstos_acum: int      # J: previsto acumulado até este mês
+    mes: str                           # "YYYY-MM-DD" — 1º dia do mês
+    minutos_previstos_acum: int        # J: previsto acumulado até este mês
     minutos_lancados_normal_acum: int  # K: lançado horário normal acumulado
     minutos_lancados_total_acum: int   # P: lançado normal + extra acumulado
+    minutos_divergente_acum: int = 0   # D: horas fora do bloco selecionado (só com filtro)
 
 
 class TopUsuario(BaseModel):
@@ -308,6 +309,9 @@ class DashboardResponse(BaseModel):
     ranking_operadores: list[RankingOperador] = []
     velocidade_semanal: list[SemanaVelocidade] = []
     distribuicao_ciclos: list[DistribuicaoCiclo] = []
+    # ── Filtro de bloco ativo ──────────────────────────────────
+    bloco_filtro_id: int | None = None
+    bloco_filtro_nome: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -694,8 +698,16 @@ def kpi_inconsistencias(_: SomenteAdmin, request: Request) -> InconsistenciasRes
 
 
 @router.get("/dashboard", summary="Dashboard completo com hierarquia e destaques")
-def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
-    """Dashboard consolidado com progresso geral, hierarquia de projetos e top performers."""
+def kpi_dashboard(
+    _: UsuarioLogado,
+    request: Request,
+    bloco_id: int | None = Query(None, description="Filtrar dashboard por bloco específico"),
+) -> DashboardResponse:
+    """Dashboard consolidado com progresso geral, hierarquia de projetos e top performers.
+
+    Quando bloco_id é fornecido, todos os widgets são filtrados para aquele bloco,
+    e a timeline exibe a série D (horas lançadas fora do contexto planejado).
+    """
     engine_cp = request.app.state.engine_cp
     snapshot_ts, kpi_ts = _get_sync_timestamps(engine_cp)
 
@@ -716,9 +728,23 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
     ranking_operadores: list[RankingOperador] = []
     velocidade_semanal: list[SemanaVelocidade] = []
     distribuicao_ciclos: list[DistribuicaoCiclo] = []
+    bloco_filtro_nome: str | None = None
+
+    # Helpers de filtro — injetados nos SQLs quando bloco_id está ativo
+    bloco_cond_e = "AND e.bloco_id = :bloco_id" if bloco_id else ""
+    bloco_cond_d = "AND d.bloco_id = :bloco_id" if bloco_id else ""
+    bp = {"bloco_id": bloco_id} if bloco_id else {}
 
     try:
         with engine_cp.connect() as conn:
+            # 0. Resolve nome do bloco filtrado (se houver)
+            if bloco_id:
+                r = conn.execute(
+                    text("SELECT nome FROM sap_snapshot.macrocontrole_bloco WHERE id = :bid"),
+                    {"bid": bloco_id},
+                ).fetchone()
+                bloco_filtro_nome = r.nome if r else None
+
             # 1. Contagem de projetos ativos
             result = conn.execute(text("SELECT COUNT(*) FROM sap_snapshot.macrocontrole_projeto WHERE status_id = 1"))
             row = result.fetchone()
@@ -730,21 +756,24 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
             blocos_sap_cadastrados = int(row[0]) if row else 0
 
             # 1.2. Horas previstas e horas lançadas em produção (bloco)
+            _bloco_filter_ap = "AND ap.bloco_id = :bloco_id" if bloco_id else "AND ap.bloco_id IS NOT NULL"
+            _bloco_filter_al = "AND al.bloco_id = :bloco_id" if bloco_id else "AND ta.codigo = 'BLOCO'"
             result = conn.execute(
-                text("""
+                text(f"""
                 SELECT
                     COALESCE(SUM(ap.minutos_planejados_normais + ap.minutos_planejados_extras), 0) AS horas_previstas_producao_min,
                     COALESCE((
                         SELECT SUM(al.minutos)
                         FROM capacidade.agenda_lancamento al
-                        JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
+                        LEFT JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
                         WHERE al.em_uso = TRUE
-                          AND ta.codigo = 'BLOCO'
+                          {_bloco_filter_al}
                     ), 0) AS horas_lancadas_producao_min
                 FROM capacidade.agenda_prevista_admin ap
                 WHERE ap.em_uso = TRUE
-                  AND ap.bloco_id IS NOT NULL
-                """)
+                  {_bloco_filter_ap}
+                """),
+                bp,
             )
             row = result.fetchone()
             if row:
@@ -753,17 +782,19 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
 
             # 2. Pontos totais e realizados
             result = conn.execute(
-                text("""
-                SELECT 
+                text(f"""
+                SELECT
                     COALESCE(SUM(e.ut_dificuldade), 0) as pontos_totais,
                     COALESCE(SUM(
-                        COALESCE(d.pontos_executor, 0) + 
-                        COALESCE(d.pontos_revisor, 0) + 
+                        COALESCE(d.pontos_executor, 0) +
+                        COALESCE(d.pontos_revisor, 0) +
                         COALESCE(d.pontos_corretor, 0)
                     ), 0) as pontos_realizados
                 FROM kpi.estado_ut e
                 LEFT JOIN kpi.distribuicao_pontos d ON d.ut_id = e.ut_id
-            """)
+                WHERE TRUE {bloco_cond_e}
+            """),
+                bp,
             )
             row = result.fetchone()
             if row:
@@ -771,8 +802,9 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                 pontos_realizados = float(row.pontos_realizados or 0)
 
             # 3. Hierarquia: Projeto -> Lote -> Bloco -> Subfase
-            sql = text("""
-                SELECT 
+            _bloco_hier = "AND b.id = :bloco_id" if bloco_id else ""
+            sql = text(f"""
+                SELECT
                     p.id as projeto_id,
                     p.nome as projeto_nome,
                     l.id as lote_id,
@@ -785,8 +817,8 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                     tf.cor as fase_cor,
                     COALESCE(SUM(e.ut_dificuldade), 0) as pontos_total,
                     COALESCE(SUM(
-                        COALESCE(d.pontos_executor, 0) + 
-                        COALESCE(d.pontos_revisor, 0) + 
+                        COALESCE(d.pontos_executor, 0) +
+                        COALESCE(d.pontos_revisor, 0) +
                         COALESCE(d.pontos_corretor, 0)
                     ), 0) as pontos_realizados
                 FROM sap_snapshot.macrocontrole_projeto p
@@ -798,11 +830,11 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                 JOIN sap_snapshot.dominio_tipo_fase tf ON tf.code = f.tipo_fase_id
                 LEFT JOIN kpi.estado_ut e ON e.ut_id = ut.id
                 LEFT JOIN kpi.distribuicao_pontos d ON d.ut_id = ut.id
-                WHERE p.status_id = 1
+                WHERE p.status_id = 1 {_bloco_hier}
                 GROUP BY p.id, p.nome, l.id, l.nome, b.id, b.nome, sf.id, sf.nome, tf.nome, tf.cor
                 ORDER BY p.nome, l.nome, b.nome, sf.nome
             """)
-            result = conn.execute(sql)
+            result = conn.execute(sql, bp)
 
             projetos_dict: dict[int, dict[str, Any]] = {}
             for row in result:
@@ -871,20 +903,20 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                 )
 
             # 4. Top executor
-            sql = text("""
-                SELECT 
+            sql = text(f"""
+                SELECT
                     u.id as usuario_id,
                     u.nome,
                     u.nome_guerra,
                     SUM(d.pontos_executor) as pontos
                 FROM kpi.distribuicao_pontos d
                 JOIN sap_snapshot.dgeo_usuario u ON u.id = d.executor_id
-                WHERE d.pontos_executor > 0
+                WHERE d.pontos_executor > 0 {bloco_cond_d}
                 GROUP BY u.id, u.nome, u.nome_guerra
                 ORDER BY pontos DESC
                 LIMIT 1
             """)
-            result = conn.execute(sql)
+            result = conn.execute(sql, bp)
             row = result.fetchone()
             if row:
                 top_executor = TopUsuario(
@@ -895,20 +927,20 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                 )
 
             # 5. Top revisor
-            sql = text("""
-                SELECT 
+            sql = text(f"""
+                SELECT
                     u.id as usuario_id,
                     u.nome,
                     u.nome_guerra,
                     SUM(d.pontos_revisor) as pontos
                 FROM kpi.distribuicao_pontos d
                 JOIN sap_snapshot.dgeo_usuario u ON u.id = d.revisor_id
-                WHERE d.pontos_revisor > 0
+                WHERE d.pontos_revisor > 0 {bloco_cond_d}
                 GROUP BY u.id, u.nome, u.nome_guerra
                 ORDER BY pontos DESC
                 LIMIT 1
             """)
-            result = conn.execute(sql)
+            result = conn.execute(sql, bp)
             row = result.fetchone()
             if row:
                 top_revisor = TopUsuario(
@@ -919,22 +951,22 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                 )
 
             # 6. Busca os Top Executores por Subfase
-            sql_exec = text("""
+            sql_exec = text(f"""
                 WITH ranking AS (
-                    SELECT 
+                    SELECT
                         e.subfase_id, e.subfase_nome, d.executor_id as usr_id, u.nome, u.nome_guerra,
                         SUM(d.pontos_executor) as pontos,
                         ROW_NUMBER() OVER(PARTITION BY e.subfase_id ORDER BY SUM(d.pontos_executor) DESC) as rn
                     FROM kpi.estado_ut e
                     JOIN kpi.distribuicao_pontos d ON e.ut_id = d.ut_id
                     JOIN sap_snapshot.dgeo_usuario u ON u.id = d.executor_id
-                    WHERE d.pontos_executor > 0
+                    WHERE d.pontos_executor > 0 {bloco_cond_e}
                     GROUP BY e.subfase_id, e.subfase_nome, d.executor_id, u.nome, u.nome_guerra
                 )
                 SELECT subfase_id, subfase_nome, usr_id, nome, nome_guerra, pontos
                 FROM ranking WHERE rn = 1
             """)
-            for row in conn.execute(sql_exec):
+            for row in conn.execute(sql_exec, bp):
                 top_executores_subfase.append(
                     {
                         "subfase_id": row.subfase_id,
@@ -946,22 +978,22 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                 )
 
             # 7. Busca os Top Revisores por Subfase
-            sql_rev = text("""
+            sql_rev = text(f"""
                 WITH ranking AS (
-                    SELECT 
+                    SELECT
                         e.subfase_id, e.subfase_nome, d.revisor_id as usr_id, u.nome, u.nome_guerra,
                         SUM(d.pontos_revisor) as pontos,
                         ROW_NUMBER() OVER(PARTITION BY e.subfase_id ORDER BY SUM(d.pontos_revisor) DESC) as rn
                     FROM kpi.estado_ut e
                     JOIN kpi.distribuicao_pontos d ON e.ut_id = d.ut_id
                     JOIN sap_snapshot.dgeo_usuario u ON u.id = d.revisor_id
-                    WHERE d.pontos_revisor > 0
+                    WHERE d.pontos_revisor > 0 {bloco_cond_e}
                     GROUP BY e.subfase_id, e.subfase_nome, d.revisor_id, u.nome, u.nome_guerra
                 )
                 SELECT subfase_id, subfase_nome, usr_id, nome, nome_guerra, pontos
                 FROM ranking WHERE rn = 1
             """)
-            for row in conn.execute(sql_rev):
+            for row in conn.execute(sql_rev, bp):
                 top_revisores_subfase.append(
                     {
                         "subfase_id": row.subfase_id,
@@ -972,9 +1004,33 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                     }
                 )
 
-            # 8. Timeline mensal acumulada — J (previsto), K (normal), P (total)
+            # 8. Timeline mensal acumulada — J (previsto), K (normal), P (total), D (divergente)
             # Sempre gera exatamente 12 meses para garantir que o gráfico seja exibido.
-            sql_timeline_mensal = text("""
+            # Quando bloco_id ativo: filtra por bloco e calcula série D (horas fora do contexto).
+            _prev_filter   = "AND ap.bloco_id = :bloco_id" if bloco_id else "AND ap.bloco_id IS NOT NULL"
+            _norm_filter   = "AND al.bloco_id = :bloco_id" if bloco_id else "AND ta.codigo = 'BLOCO'"
+            _total_filter  = "AND al.bloco_id = :bloco_id" if bloco_id else "AND ta.codigo = 'BLOCO'"
+            _div_cte = f"""
+                ,divergente_mensal AS (
+                    SELECT date_trunc('month', al.data_lancamento)::date AS mes,
+                           SUM(al.minutos) AS min_div
+                    FROM capacidade.agenda_lancamento al
+                    WHERE al.em_uso = TRUE
+                      AND al.faixa_minuto::text = 'NORMAL'
+                      AND (al.bloco_id IS NULL OR al.bloco_id != :bloco_id)
+                      AND al.data_lancamento IN (
+                          SELECT DISTINCT ap2.data
+                          FROM capacidade.agenda_prevista_admin ap2
+                          WHERE ap2.em_uso = TRUE AND ap2.bloco_id = :bloco_id
+                      )
+                    GROUP BY 1
+                )
+            """ if bloco_id else ""
+            _div_join  = "LEFT JOIN divergente_mensal dv ON dv.mes = m.mes" if bloco_id else ""
+            _div_col   = "SUM(COALESCE(dv.min_div, 0)) OVER (ORDER BY m.mes ROWS UNBOUNDED PRECEDING) AS minutos_divergente_acum" if bloco_id else "0 AS minutos_divergente_acum"
+            _norm_join = "LEFT JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id" if not bloco_id else ""
+            _norm_join2 = "LEFT JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id" if not bloco_id else ""
+            sql_timeline_mensal = text(f"""
                 WITH meses AS (
                     SELECT generate_series(
                         date_trunc('month', CURRENT_DATE - INTERVAL '11 months')::date,
@@ -986,15 +1042,15 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                     SELECT date_trunc('month', ap.data)::date AS mes,
                            SUM(ap.minutos_planejados_normais + ap.minutos_planejados_extras) AS min_prev
                     FROM capacidade.agenda_prevista_admin ap
-                    WHERE ap.em_uso = TRUE AND ap.bloco_id IS NOT NULL
+                    WHERE ap.em_uso = TRUE {_prev_filter}
                     GROUP BY 1
                 ),
                 lancado_normal_mensal AS (
                     SELECT date_trunc('month', al.data_lancamento)::date AS mes,
                            SUM(al.minutos) AS min_norm
                     FROM capacidade.agenda_lancamento al
-                    JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
-                    WHERE al.em_uso = TRUE AND ta.codigo = 'BLOCO'
+                    {_norm_join}
+                    WHERE al.em_uso = TRUE {_norm_filter}
                       AND al.faixa_minuto::text = 'NORMAL'
                     GROUP BY 1
                 ),
@@ -1002,10 +1058,11 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                     SELECT date_trunc('month', al.data_lancamento)::date AS mes,
                            SUM(al.minutos) AS min_total
                     FROM capacidade.agenda_lancamento al
-                    JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
-                    WHERE al.em_uso = TRUE AND ta.codigo = 'BLOCO'
+                    {_norm_join2}
+                    WHERE al.em_uso = TRUE {_total_filter}
                     GROUP BY 1
                 )
+                {_div_cte}
                 SELECT
                     m.mes::text AS mes,
                     SUM(COALESCE(p.min_prev,   0))
@@ -1013,23 +1070,27 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                     SUM(COALESCE(ln.min_norm,  0))
                         OVER (ORDER BY m.mes ROWS UNBOUNDED PRECEDING) AS minutos_lancados_normal_acum,
                     SUM(COALESCE(lt.min_total, 0))
-                        OVER (ORDER BY m.mes ROWS UNBOUNDED PRECEDING) AS minutos_lancados_total_acum
+                        OVER (ORDER BY m.mes ROWS UNBOUNDED PRECEDING) AS minutos_lancados_total_acum,
+                    {_div_col}
                 FROM meses m
                 LEFT JOIN previsto_mensal       p  ON p.mes  = m.mes
                 LEFT JOIN lancado_normal_mensal ln ON ln.mes = m.mes
                 LEFT JOIN lancado_total_mensal  lt ON lt.mes = m.mes
+                {_div_join}
                 ORDER BY m.mes
             """)
-            for row in conn.execute(sql_timeline_mensal):
+            for row in conn.execute(sql_timeline_mensal, bp):
                 timeline_mensal.append(MesTrilhaResposta(
                     mes=str(row.mes),
                     minutos_previstos_acum=int(row.minutos_previstos_acum),
                     minutos_lancados_normal_acum=int(row.minutos_lancados_normal_acum),
                     minutos_lancados_total_acum=int(row.minutos_lancados_total_acum),
+                    minutos_divergente_acum=int(row.minutos_divergente_acum or 0),
                 ))
 
             # 9. Blocos destaque — progresso + top performers por bloco
-            sql_blocos_destaque = text("""
+            _bloco_destaque_cond = "AND b.id = :bloco_id" if bloco_id else ""
+            sql_blocos_destaque = text(f"""
                 WITH bloco_stats AS (
                     SELECT
                         b.id AS bloco_id,
@@ -1055,37 +1116,36 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                     LEFT JOIN kpi.estado_ut e ON e.ut_id = ut.id
                     LEFT JOIN kpi.distribuicao_pontos d ON d.ut_id = ut.id
                     WHERE p.status_id = 1
+                    {_bloco_destaque_cond}
                     GROUP BY b.id, b.nome, p.nome, l.nome
                 ),
                 exec_rank AS (
-                    SELECT ut2.bloco_id,
+                    SELECT d2.bloco_id,
                            d2.executor_id AS usuario_id,
                            COALESCE(u2.nome_guerra, u2.nome) AS nome_guerra,
                            SUM(d2.pontos_executor) AS pontos,
                            ROW_NUMBER() OVER (
-                               PARTITION BY ut2.bloco_id
+                               PARTITION BY d2.bloco_id
                                ORDER BY SUM(d2.pontos_executor) DESC
                            ) AS rn
                     FROM kpi.distribuicao_pontos d2
-                    JOIN sap_snapshot.macrocontrole_unidade_trabalho ut2 ON ut2.id = d2.ut_id
                     JOIN sap_snapshot.dgeo_usuario u2 ON u2.id = d2.executor_id
                     WHERE d2.pontos_executor > 0
-                    GROUP BY ut2.bloco_id, d2.executor_id, u2.nome, u2.nome_guerra
+                    GROUP BY d2.bloco_id, d2.executor_id, u2.nome, u2.nome_guerra
                 ),
                 rev_rank AS (
-                    SELECT ut3.bloco_id,
+                    SELECT d3.bloco_id,
                            d3.revisor_id AS usuario_id,
                            COALESCE(u3.nome_guerra, u3.nome) AS nome_guerra,
                            SUM(d3.pontos_revisor) AS pontos,
                            ROW_NUMBER() OVER (
-                               PARTITION BY ut3.bloco_id
+                               PARTITION BY d3.bloco_id
                                ORDER BY SUM(d3.pontos_revisor) DESC
                            ) AS rn
                     FROM kpi.distribuicao_pontos d3
-                    JOIN sap_snapshot.macrocontrole_unidade_trabalho ut3 ON ut3.id = d3.ut_id
                     JOIN sap_snapshot.dgeo_usuario u3 ON u3.id = d3.revisor_id
                     WHERE d3.pontos_revisor > 0
-                    GROUP BY ut3.bloco_id, d3.revisor_id, u3.nome, u3.nome_guerra
+                    GROUP BY d3.bloco_id, d3.revisor_id, u3.nome, u3.nome_guerra
                 ),
                 exec_agg AS (
                     SELECT bloco_id,
@@ -1122,7 +1182,7 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
             """)
 
             import json as _json
-            for row in conn.execute(sql_blocos_destaque):
+            for row in conn.execute(sql_blocos_destaque, bp):
                 pt = float(row.pontos_total or 0)
                 pr = float(row.pontos_realizados or 0)
                 prog = round(pr / pt * 100, 2) if pt > 0 else None
@@ -1163,7 +1223,7 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                 ))
 
             # 10. Alertas — UTs concluídas sem nota ou com nota inválida
-            sql_alertas = text("""
+            sql_alertas = text(f"""
                 SELECT
                     e.ut_id,
                     b.nome  AS bloco_nome,
@@ -1183,10 +1243,11 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                 LEFT JOIN kpi.fluxo_ut f ON f.ut_id = e.ut_id
                 WHERE e.concluida = TRUE
                   AND e.ocorrencia IN ('NOTA_AUSENTE', 'NOTA_INVALIDA')
+                  {bloco_cond_e}
                 ORDER BY b.nome, e.subfase_nome, e.ut_id
                 LIMIT 500
             """)
-            for row in conn.execute(sql_alertas):
+            for row in conn.execute(sql_alertas, bp):
                 alertas_nota.append(AlertaNotaAusente(
                     ut_id=int(row.ut_id),
                     bloco_nome=str(row.bloco_nome or ""),
@@ -1201,7 +1262,8 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                 ))
 
             # 11. Ranking global de operadores
-            sql_ranking = text("""
+            _bloco_rank_cond = "AND d.bloco_id = :bloco_id" if bloco_id else ""
+            sql_ranking = text(f"""
                 SELECT
                     ROW_NUMBER() OVER (
                         ORDER BY
@@ -1225,9 +1287,10 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                     END) AS uts_revisadas
                 FROM sap_snapshot.dgeo_usuario u
                 JOIN kpi.distribuicao_pontos d
-                    ON d.executor_id = u.id
-                    OR d.revisor_id  = u.id
-                    OR d.corretor_id = u.id
+                    ON (d.executor_id = u.id
+                    OR  d.revisor_id  = u.id
+                    OR  d.corretor_id = u.id)
+                    {_bloco_rank_cond}
                 GROUP BY u.id, u.nome, u.nome_guerra
                 HAVING
                     COALESCE(SUM(d.pontos_executor), 0) +
@@ -1236,7 +1299,7 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                 ORDER BY pontos_total DESC
                 LIMIT 20
             """)
-            for row in conn.execute(sql_ranking):
+            for row in conn.execute(sql_ranking, bp):
                 ranking_operadores.append(RankingOperador(
                     posicao=int(row.posicao),
                     usuario_id=int(row.usuario_id),
@@ -1250,7 +1313,7 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                 ))
 
             # 12. Velocidade semanal — UTs concluídas nas últimas 8 semanas
-            sql_velocidade = text("""
+            sql_velocidade = text(f"""
                 WITH semanas AS (
                     SELECT generate_series(
                         date_trunc('week', CURRENT_DATE) - INTERVAL '7 weeks',
@@ -1273,6 +1336,7 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                       AND e.data_fim_fluxo IS NOT NULL
                       AND e.data_fim_fluxo >=
                           date_trunc('week', CURRENT_DATE) - INTERVAL '7 weeks'
+                      {bloco_cond_e}
                     GROUP BY 1
                 )
                 SELECT
@@ -1284,7 +1348,7 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                 LEFT JOIN uts_sem u ON u.semana = s.semana_inicio
                 ORDER BY s.semana_inicio
             """)
-            for row in conn.execute(sql_velocidade):
+            for row in conn.execute(sql_velocidade, bp):
                 velocidade_semanal.append(SemanaVelocidade(
                     semana_label=str(row.semana_label),
                     semana_inicio=str(row.semana_inicio),
@@ -1293,17 +1357,24 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
                 ))
 
             # 13. Distribuição por ciclo
-            sql_ciclos = text("""
-                WITH totais AS (SELECT COUNT(*) AS total FROM kpi.estado_ut)
+            _bloco_ciclo_cond = "WHERE e2.bloco_id = :bloco_id" if bloco_id else ""
+            _bloco_ciclo_cond2 = "WHERE e3.bloco_id = :bloco_id" if bloco_id else ""
+            sql_ciclos = text(f"""
+                WITH totais AS (
+                    SELECT COUNT(*) AS total
+                    FROM kpi.estado_ut e2
+                    {_bloco_ciclo_cond}
+                )
                 SELECT
-                    COALESCE(ciclo_modelo, 'DESCONHECIDO') AS ciclo,
+                    COALESCE(e3.ciclo_modelo, 'DESCONHECIDO') AS ciclo,
                     COUNT(*) AS quantidade,
                     ROUND(COUNT(*) * 100.0 / NULLIF(t.total, 0), 1) AS percentual
-                FROM kpi.estado_ut, totais t
-                GROUP BY ciclo_modelo, t.total
+                FROM kpi.estado_ut e3, totais t
+                {_bloco_ciclo_cond2}
+                GROUP BY e3.ciclo_modelo, t.total
                 ORDER BY quantidade DESC
             """)
-            for row in conn.execute(sql_ciclos):
+            for row in conn.execute(sql_ciclos, bp):
                 distribuicao_ciclos.append(DistribuicaoCiclo(
                     ciclo=str(row.ciclo or ""),
                     quantidade=int(row.quantidade or 0),
@@ -1336,6 +1407,8 @@ def kpi_dashboard(_: UsuarioLogado, request: Request) -> DashboardResponse:
         ranking_operadores=ranking_operadores,
         velocidade_semanal=velocidade_semanal,
         distribuicao_ciclos=distribuicao_ciclos,
+        bloco_filtro_id=bloco_id,
+        bloco_filtro_nome=bloco_filtro_nome,
     )
 
 
