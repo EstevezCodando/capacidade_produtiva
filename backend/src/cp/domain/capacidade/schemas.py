@@ -368,6 +368,7 @@ class PendenciaResponse(BaseModel):
     data: date
     tipo: TipoPendencia
     motivo: str
+    minutos_nao_lancados: int | None = None  # minutos de capacidade não registrados neste dia
 
 
 class ConsolidacaoResponse(BaseModel):
@@ -376,6 +377,34 @@ class ConsolidacaoResponse(BaseModel):
     consolidado: bool
     pendencias: list[PendenciaResponse] = Field(default_factory=list)
     mensagem: str
+
+
+class DesconsolidacaoResponse(BaseModel):
+    """Resultado de desconsolidação."""
+
+    desconsolidado: bool
+    dias_reabertos: int
+    mensagem: str
+
+
+class LinhaExportacaoCSV(BaseModel):
+    """Linha para exportação CSV de inconsistências."""
+
+    nome_usuario: str
+    data: date
+    minutos_nao_lancados: int
+
+    @property
+    def horas_nao_lancadas(self) -> float:
+        return round(self.minutos_nao_lancados / 60, 2)
+
+
+class ExportacaoInconsistenciasResponse(BaseModel):
+    """Lista de inconsistências exportáveis."""
+
+    linhas: list[LinhaExportacaoCSV]
+    total_usuarios: int
+    total_dias: int
 
 
 class StatusDiasResponse(BaseModel):

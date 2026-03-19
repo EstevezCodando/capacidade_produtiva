@@ -245,6 +245,7 @@ export interface Pendencia {
   data: string
   tipo: TipoPendencia
   motivo: string
+  minutos_nao_lancados?: number | null
 }
 
 export interface ConsolidacaoInput {
@@ -258,6 +259,33 @@ export interface ConsolidacaoResult {
   consolidado: boolean
   pendencias: Pendencia[]
   mensagem: string
+}
+
+export interface DesconsolidacaoInput {
+  data_inicio: string
+  data_fim: string
+  usuarios_ids: number[]
+}
+
+export interface DesconsolidacaoResult {
+  desconsolidado: boolean
+  dias_reabertos: number
+  mensagem: string
+}
+
+// Inconsistências agrupadas por usuário (para exibição com hover)
+export interface InconsistenciaDia {
+  data: string
+  tipo: TipoPendencia
+  motivo: string
+  minutos_nao_lancados?: number | null
+}
+
+export interface InconsistenciaUsuario {
+  usuario_id: number
+  usuario_nome: string
+  dias: InconsistenciaDia[]
+  total_minutos_nao_lancados: number
 }
 
 // ── Respostas genéricas ──────────────────────────────────────

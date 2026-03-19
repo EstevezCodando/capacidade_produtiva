@@ -126,6 +126,26 @@ class CapacidadeDiaRepository:
             session.commit()
             return result.rowcount  # type: ignore[attr-defined, no-any-return]
 
+    def desconsolidar_periodo(
+        self, usuario_id: int, data_inicio: date, data_fim: date
+    ) -> int:
+        """Reabre dias consolidados no período. Retorna quantidade de dias atualizados."""
+        with Session(self._engine) as session:
+            result = session.execute(
+                update(CapacidadeDia)
+                .where(
+                    and_(
+                        CapacidadeDia.usuario_id == usuario_id,
+                        CapacidadeDia.data >= data_inicio,
+                        CapacidadeDia.data <= data_fim,
+                        CapacidadeDia.status_dia == StatusDia.CONSOLIDADO,
+                    )
+                )
+                .values(status_dia=StatusDia.ABERTO)
+            )
+            session.commit()
+            return result.rowcount  # type: ignore[attr-defined, no-any-return]
+
     def listar_por_status(
         self, data_inicio: date, data_fim: date, status: StatusDia | None = None
     ) -> Sequence[CapacidadeDia]:

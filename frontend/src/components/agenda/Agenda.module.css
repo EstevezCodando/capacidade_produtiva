@@ -629,3 +629,253 @@
   color: #ffb4b4;
   font-size: 13px;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   INCONSISTÊNCIAS — Painel de pendências no modal de consolidação
+   ══════════════════════════════════════════════════════════════ */
+
+/* Estado de aviso: consolidado com pendências ignoradas */
+.consolidacaoWarn {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  background: var(--warn-bg);
+  border: 1px solid rgba(245, 166, 35, 0.3);
+  border-radius: var(--r-md);
+}
+
+.warnIcon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 166, 35, 0.15);
+  border-radius: 50%;
+  color: var(--warn);
+  flex-shrink: 0;
+}
+
+.consolidacaoWarn h4 {
+  font-size: 14px;
+  color: var(--warn);
+  margin: 0 0 4px;
+}
+
+.consolidacaoWarn p {
+  font-size: 12px;
+  color: var(--tx-secondary);
+  margin: 0;
+}
+
+/* Wrapper do painel de inconsistências */
+.inconsistenciasWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Cabeçalho do painel: título + badge + botão CSV */
+.inconsistenciasHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-raised);
+  border: 1px solid var(--bd-faint);
+  border-radius: var(--r-md);
+}
+
+.inconsistenciasTitle {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tx-primary);
+}
+
+/* Botão de exportar CSV (estilo compacto, ghost) */
+.exportCsvBtn {
+  padding: 5px 10px;
+  background: transparent;
+  border: 1px solid var(--bd-subtle);
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  color: var(--tx-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.exportCsvBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.exportCsvBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Layout de duas colunas: lista de usuários + detalhe */
+.inconsistenciasCols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  min-height: 200px;
+  max-height: 320px;
+}
+
+/* Coluna esquerda: lista de usuários com inconsistências */
+.inconsistenciasLista {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  background: var(--bg-raised);
+  border: 1px solid var(--bd-faint);
+  border-radius: var(--r-md);
+  padding: 8px;
+}
+
+/* Linha de usuário na lista */
+.inconsistenciaUsuarioRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  cursor: default;
+  transition: background 0.12s;
+}
+
+.inconsistenciaUsuarioHov {
+  background: var(--bg-overlay);
+}
+
+.inconsistenciaAvatar {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-surface);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tx-secondary);
+  flex-shrink: 0;
+}
+
+.inconsistenciaNome {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tx-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inconsistenciaBadges {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Botão de navegação para a agenda do usuário */
+.inconsistenciaNavBtn {
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid var(--bd-faint);
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  color: var(--tx-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+  flex-shrink: 0;
+}
+
+.inconsistenciaNavBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Coluna direita: detalhe dos dias do usuário hovered */
+.inconsistenciaDetalhe {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-raised);
+  border: 1px solid var(--bd-faint);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.inconsistenciaDetalheHeader {
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tx-primary);
+  border-bottom: 1px solid var(--bd-faint);
+  background: var(--bg-overlay);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inconsistenciaDetalheScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+/* Estado vazio no painel de detalhe */
+.inconsistenciaDetalheVazio {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  font-size: 12px;
+  color: var(--tx-muted);
+  text-align: center;
+}
+
+/* Linha de dia dentro do detalhe */
+.inconsistenciaDiaRow {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--bd-faint);
+  font-size: 12px;
+}
+
+.inconsistenciaDiaRow:last-child {
+  border-bottom: none;
+}
+
+.inconsistenciaDiaData {
+  font-family: var(--font-mono);
+  color: var(--tx-muted);
+  font-size: 11px;
+}
+
+.inconsistenciaDiaTipo {
+  color: var(--error);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inconsistenciaDiaHoras {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--warn);
+  white-space: nowrap;
+}

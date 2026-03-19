@@ -93,6 +93,7 @@ class AcaoAuditoria(str, Enum):
     UPDATE = "UPDATE"
     DELETE = "DELETE"
     CONSOLIDATE = "CONSOLIDATE"
+    DECONSOLIDATE = "DECONSOLIDATE"
 
 
 class TipoPendencia(str, Enum):

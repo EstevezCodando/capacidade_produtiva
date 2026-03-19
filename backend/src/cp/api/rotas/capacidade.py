@@ -9,6 +9,8 @@ Política de autorização:
     PUT    /capacidade/parametro/{id}              — admin
     GET    /capacidade/status                      — admin
     POST   /capacidade/consolidar-periodo          — admin
+    POST   /capacidade/desconsolidar-periodo       — admin
+    GET    /capacidade/exportar-sem-lancamento     — admin
     GET    /capacidade/feriados                    — autenticado
     POST   /capacidade/feriados                    — admin
     DELETE /capacidade/feriados/{id}               — admin
@@ -21,7 +23,11 @@ from __future__ import annotations
 
 from datetime import date
 
+import csv
+import io
+
 from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from cp.api.deps import SomenteAdmin, UsuarioLogado
@@ -33,6 +39,8 @@ from cp.domain.capacidade.schemas import (
     ConfigTetoResponse,
     ConsolidacaoInput,
     ConsolidacaoResponse,
+    DesconsolidacaoResponse,
+    ExportacaoInconsistenciasResponse,
     FeriadoInput,
     FeriadoResponse,
     FeriadosListResponse,
@@ -317,6 +325,7 @@ def consolidar_periodo(
                 data=p.data,
                 tipo=p.tipo,
                 motivo=p.motivo,
+                minutos_nao_lancados=p.minutos_nao_lancados,
             )
             for p in resultado.pendencias
         ]
@@ -324,6 +333,84 @@ def consolidar_periodo(
             consolidado=resultado.consolidado,
             pendencias=pendencias_response,
             mensagem=resultado.mensagem,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        handle_domain_exception(exc)
+
+
+@router.post("/desconsolidar-periodo", summary="Desconsolidar intervalo de datas (admin)")
+def desconsolidar_periodo(
+    request: Request,
+    body: ConsolidacaoInputExtended,
+    admin: SomenteAdmin,
+) -> DesconsolidacaoResponse:
+    """Reabre período consolidado, permitindo edição pelos operadores novamente."""
+    service = _get_consolidacao_service(request)
+
+    try:
+        if not body.usuarios_ids:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Especifique os IDs dos usuários em usuarios_ids",
+            )
+
+        resultado = service.desconsolidar_periodo_todos_usuarios(
+            usuarios_ids=body.usuarios_ids,
+            data_inicio=body.data_inicio,
+            data_fim=body.data_fim,
+            executor_id=admin.usuario_id,
+        )
+        return resultado
+    except HTTPException:
+        raise
+    except Exception as exc:
+        handle_domain_exception(exc)
+
+
+@router.get("/exportar-sem-lancamento", summary="Exportar inconsistências de lançamentos como CSV")
+def exportar_sem_lancamento(
+    request: Request,
+    _: SomenteAdmin,
+    data_inicio: date = Query(..., description="Data de início (YYYY-MM-DD)"),
+    data_fim: date = Query(..., description="Data de fim (YYYY-MM-DD)"),
+    usuarios_ids: str = Query(..., description="IDs dos usuários separados por vírgula"),
+) -> StreamingResponse:
+    """Gera CSV com usuário, data e horas não lançadas para o período especificado.
+
+    O CSV inclui apenas dias úteis com ausência ou incompletude de lançamentos.
+    """
+    service = _get_consolidacao_service(request)
+
+    try:
+        ids_list = [int(i.strip()) for i in usuarios_ids.split(",") if i.strip()]
+        if not ids_list:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Informe ao menos um ID de usuário em usuarios_ids",
+            )
+
+        resultado = service.obter_inconsistencias(ids_list, data_inicio, data_fim)
+
+        # Gera CSV em memória
+        output = io.StringIO()
+        writer = csv.writer(output, delimiter=";")
+        writer.writerow(["Nome do Usuário", "Data", "Horas Não Lançadas"])
+        for linha in resultado.linhas:
+            writer.writerow([
+                linha.nome_usuario,
+                linha.data.strftime("%d/%m/%Y"),
+                f"{linha.horas_nao_lancadas:.1f}".replace(".", ","),
+            ])
+
+        output.seek(0)
+        nome_arquivo = f"inconsistencias_{data_inicio}_{data_fim}.csv"
+
+        return StreamingResponse(
+            iter([output.getvalue().encode("utf-8-sig")]),  # utf-8-sig para compatibilidade Excel
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{nome_arquivo}"'},
         )
     except HTTPException:
         raise

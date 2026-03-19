@@ -41,6 +41,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, isAfter, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import styles from "./AgendaPage.module.css";
 
 // ── Interfaces locais ──────────────────────────────────────
@@ -176,9 +177,27 @@ export default function AgendaRealizada() {
     const { ehAdmin, usuario } = useAuth();
     const calendar = useCalendarNavigation({ initialView: "month" });
 
+    // Suporte a ?usuario_id=X na URL (usado pela tela de consolidação para navegar direto ao usuário)
+    const [searchParams, setSearchParams] = useSearchParams();
+    const urlUsuarioId = searchParams.get("usuario_id")
+        ? Number(searchParams.get("usuario_id"))
+        : undefined;
+
     const [selectedUsuarioId, setSelectedUsuarioId] = useState<
         number | undefined
-    >(undefined);
+    >(urlUsuarioId);
+
+    // Limpa o param da URL após leitura inicial, para não prender o estado
+    useMemo(() => {
+        if (urlUsuarioId && searchParams.has("usuario_id")) {
+            setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete("usuario_id");
+                return next;
+            }, { replace: true });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     const [lancamentoOpen, setLancamentoOpen] = useState(false);
     const [consolidacaoOpen, setConsolidacaoOpen] = useState(false);
     const [diaDetalheSelecionado, setDiaDetalheSelecionado] =

@@ -160,6 +160,7 @@ class PendenciaConsolidacao:
     data: date
     tipo: TipoPendencia
     motivo: str
+    minutos_nao_lancados: int | None = None  # minutos de capacidade não cobertos
 
 
 @dataclass
