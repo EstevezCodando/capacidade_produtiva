@@ -1745,11 +1745,26 @@ def _pizza_query(
     mes_inicio: date,
     usuario_id: int | None,
 ) -> PizzaDistribuicaoResponse:
-    """Calcula a distribuição de lançamentos para um mês, opcionalmente filtrado por usuário."""
+    """Calcula a distribuição de lançamentos para um mês, opcionalmente filtrado por usuário.
+
+    A base de cálculo é sempre a capacidade normal disponível nos dias úteis.
+    Quando nenhum lançamento existe, exibe 100% como "Não alocado".
+    Quando usuario_id é None (todos), considera apenas usuários ativos (dgeo.usuarios.ativo).
+    """
     mes_str = mes_inicio.strftime("%Y-%m-%d")
 
-    uid_filter = "AND al.usuario_id = :uid" if usuario_id else ""
-    cap_filter = "AND cd.usuario_id = :uid" if usuario_id else ""
+    if usuario_id:
+        # Filtro por usuário específico — usa uid diretamente
+        fatia_user_join   = ""
+        fatia_user_filter = "AND al.usuario_id = :uid"
+        cap_user_join     = ""
+        cap_user_filter   = "AND cd.usuario_id = :uid"
+    else:
+        # Todos os usuários ativos
+        fatia_user_join   = "JOIN dgeo.usuarios u ON u.id = al.usuario_id AND u.ativo = TRUE"
+        fatia_user_filter = ""
+        cap_user_join     = "JOIN dgeo.usuarios u ON u.id = cd.usuario_id AND u.ativo = TRUE"
+        cap_user_filter   = ""
 
     sql_fatias = text(f"""
         SELECT
@@ -1758,19 +1773,23 @@ def _pizza_query(
             SUM(al.minutos) AS minutos
         FROM capacidade.agenda_lancamento al
         JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id
+        {fatia_user_join}
         WHERE al.em_uso = TRUE
           AND al.faixa_minuto::text = 'NORMAL'
           AND date_trunc('month', al.data_lancamento)::date = :mes_inicio
-          {uid_filter}
+          {fatia_user_filter}
         GROUP BY ta.nome, ta.cor
         ORDER BY minutos DESC
     """)
 
+    # Capacidade: apenas dias úteis (eh_dia_util = TRUE), usuários ativos
     sql_capacidade = text(f"""
         SELECT COALESCE(SUM(cd.minutos_capacidade_normal_prevista), 0) AS total
         FROM capacidade.capacidade_dia cd
+        {cap_user_join}
         WHERE date_trunc('month', cd.data)::date = :mes_inicio
-          {cap_filter}
+          AND cd.eh_dia_util = TRUE
+          {cap_user_filter}
     """)
 
     params: dict[str, Any] = {"mes_inicio": mes_str}
@@ -1796,7 +1815,9 @@ def _pizza_query(
     except Exception:
         _logger.exception("Erro ao calcular pizza mes=%s uid=%s", mes_str, usuario_id)
 
-    base = max(total_capacidade, total_lancado)
+    # Base = capacidade disponível nos dias úteis.
+    # Se não há capacidade cadastrada mas há lançamentos, usa total lançado (evita gráfico quebrado).
+    base = total_capacidade if total_capacidade > 0 else total_lancado
     nao_alocado = max(0, base - total_lancado)
 
     fatias = [

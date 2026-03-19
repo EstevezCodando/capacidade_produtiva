@@ -370,18 +370,28 @@ function GraficoPizza({
             onMouseLeave={() => setHovIdx(null)}
           />
         ))}
-        {/* Centro */}
-        <text x={PIZZA_CX} y={PIZZA_CY - 10} textAnchor="middle" className={styles.pizzaCenterPct}>
-          {pctAlocado}%
-        </text>
-        <text x={PIZZA_CX} y={PIZZA_CY + 8} textAnchor="middle" className={styles.pizzaCenterSub}>
-          alocado
-        </text>
-        {/* Tooltip da fatia hovered */}
-        {hovIdx !== null && (
-          <text x={PIZZA_CX} y={PIZZA_CY + 24} textAnchor="middle" className={styles.pizzaCenterMin}>
-            {fmtMin(allSlices[hovIdx].minutos)}
-          </text>
+        {/* Centro — mostra % alocado ou detalhe da fatia ao hover */}
+        {hovIdx === null ? (
+          <>
+            <text x={PIZZA_CX} y={PIZZA_CY - 12} textAnchor="middle" className={styles.pizzaCenterPct}>
+              {pctAlocado}%
+            </text>
+            <text x={PIZZA_CX} y={PIZZA_CY + 6} textAnchor="middle" className={styles.pizzaCenterSub}>
+              alocado
+            </text>
+            <text x={PIZZA_CX} y={PIZZA_CY + 22} textAnchor="middle" className={styles.pizzaCenterCap}>
+              {fmtMin(base)}
+            </text>
+          </>
+        ) : (
+          <>
+            <text x={PIZZA_CX} y={PIZZA_CY - 6} textAnchor="middle" className={styles.pizzaCenterPct}>
+              {allSlices[hovIdx].percentual.toFixed(1)}%
+            </text>
+            <text x={PIZZA_CX} y={PIZZA_CY + 12} textAnchor="middle" className={styles.pizzaCenterMin}>
+              {fmtMin(allSlices[hovIdx].minutos)}
+            </text>
+          </>
         )}
       </svg>
 
@@ -399,6 +409,10 @@ function GraficoPizza({
             <span className={styles.pizzaHoras}>{fmtMin(s.minutos)}</span>
           </div>
         ))}
+        <div className={styles.pizzaCapacidadeTotal}>
+          <span>Capacidade total (dias úteis):</span>
+          <strong>{fmtMin(base)}</strong>
+        </div>
       </div>
     </div>
   )
@@ -641,7 +655,7 @@ function BlocoProgressoCard({ bloco }: { bloco: BlocoDestaque }) {
 // ─────────────────────────────────────────────────────────────
 
 function RankingPanel({ operadores }: { operadores: RankingOperador[] }) {
-  if (operadores.length === 0) return null
+  if (operadores.length === 0) return <div className={styles.emptyState}>Nenhum operador com produção registrada.</div>
   const maxTotal = Math.max(...operadores.map((o) => o.pontos_total), 1)
 
   return (
@@ -797,7 +811,7 @@ const CICLO_COLORS: Record<string, string> = {
 }
 
 function DistribuicaoCiclos({ dados }: { dados: DistribuicaoCiclo[] }) {
-  if (dados.length === 0) return null
+  if (dados.length === 0) return <div className={styles.emptyState}>Sem dados de distribuição por ciclo.</div>
   return (
     <div className={styles.ciclosWrap}>
       {dados.map((c) => (
@@ -832,7 +846,9 @@ const OCORRENCIA_LABEL: Record<string, string> = {
 }
 
 function AlertasNotaTable({ alertas }: { alertas: AlertaNotaAusente[] }) {
-  if (alertas.length === 0) return null
+  if (alertas.length === 0) return (
+    <div className={styles.emptyStateOk}>✓ Nenhuma UT com problema de nota — qualidade em dia.</div>
+  )
   return (
     <div className={styles.alertasWrap}>
       <div className={styles.alertasScrollArea}>
@@ -1029,7 +1045,9 @@ function OperadorDashboard() {
             naoAlocadoMin={pizzaData.nao_alocado_min}
           />
         ) : (
-          <div className={styles.emptyState}>Nenhum lançamento registrado neste mês.</div>
+          <div className={styles.emptyState}>
+            {pizzaData ? "Sem capacidade de dias úteis cadastrada para este mês." : "Carregando…"}
+          </div>
         )}
       </div>
 
@@ -1163,19 +1181,25 @@ function AdminDashboard() {
       </div>
 
       {/* ── Blocos em destaque ── */}
-      {(dashboard?.blocos_destaque ?? []).length > 0 && (
-        <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>
-            Situação dos blocos
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>
+          Situação dos blocos
+          {(dashboard?.blocos_destaque ?? []).length > 0 && (
             <span className={styles.sectionCount}>{dashboard!.blocos_destaque.length}</span>
-          </h2>
+          )}
+        </h2>
+        {(dashboard?.blocos_destaque ?? []).length === 0 ? (
+          <div className={styles.emptyState}>
+            {dashboard ? "Nenhum bloco ativo encontrado." : "Carregando dados dos blocos…"}
+          </div>
+        ) : (
           <div className={styles.blocoDestaqueGrid}>
             {dashboard!.blocos_destaque.map((b) => (
               <BlocoProgressoCard key={b.bloco_id} bloco={b} />
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ── Timeline acumulada ── */}
       {dashboard && (
@@ -1192,25 +1216,23 @@ function AdminDashboard() {
 
       {/* ── Ranking global de operadores + Velocidade semanal ── */}
       <div className={styles.rankVelRow}>
-        {(dashboard?.ranking_operadores ?? []).length > 0 && (
-          <div className={`${styles.section} ${styles.rankVelColRanking}`}>
-            <h2 className={styles.sectionTitle}>
-              Ranking de produção
+        <div className={`${styles.section} ${styles.rankVelColRanking}`}>
+          <h2 className={styles.sectionTitle}>
+            Ranking de produção
+            {(dashboard?.ranking_operadores ?? []).length > 0 && (
               <span className={styles.sectionCount}>{dashboard!.ranking_operadores.length}</span>
-            </h2>
-            <div className={styles.chartCard}>
-              <RankingPanel operadores={dashboard!.ranking_operadores} />
-            </div>
+            )}
+          </h2>
+          <div className={styles.chartCard}>
+            <RankingPanel operadores={dashboard?.ranking_operadores ?? []} />
           </div>
-        )}
-        {(dashboard?.velocidade_semanal ?? []).length > 0 && (
-          <div className={`${styles.section} ${styles.rankVelColVel}`}>
-            <h2 className={styles.sectionTitle}>Velocidade — últimas 8 semanas (UTs/sem)</h2>
-            <div className={styles.chartCard}>
-              <GraficoVelocidade dados={dashboard!.velocidade_semanal} />
-            </div>
+        </div>
+        <div className={`${styles.section} ${styles.rankVelColVel}`}>
+          <h2 className={styles.sectionTitle}>Velocidade — últimas 8 semanas (UTs/sem)</h2>
+          <div className={styles.chartCard}>
+            <GraficoVelocidade dados={dashboard?.velocidade_semanal ?? []} />
           </div>
-        )}
+        </div>
       </div>
 
       {/* ── Pizza + distribuição por ciclo ── */}
@@ -1249,36 +1271,40 @@ function AdminDashboard() {
               naoAlocadoMin={pizzaData.nao_alocado_min}
             />
           ) : (
-            <div className={styles.emptyState}>Nenhum lançamento registrado neste mês.</div>
+            <div className={styles.emptyState}>
+              {pizzaData ? "Sem capacidade de dias úteis cadastrada para este mês." : "Carregando…"}
+            </div>
           )}
         </div>
 
-        {(dashboard?.distribuicao_ciclos ?? []).length > 0 && (
-          <div className={styles.pizzaCiclosColCiclos}>
-            <h2 className={styles.sectionTitle} style={{ marginBottom: 12 }}>
-              Distribuição por ciclo
-            </h2>
-            <div className={styles.chartCard}>
-              <DistribuicaoCiclos dados={dashboard!.distribuicao_ciclos} />
-            </div>
+        <div className={styles.pizzaCiclosColCiclos}>
+          <h2 className={styles.sectionTitle} style={{ marginBottom: 12 }}>
+            Distribuição por ciclo
+          </h2>
+          <div className={styles.chartCard}>
+            <DistribuicaoCiclos dados={dashboard?.distribuicao_ciclos ?? []} />
           </div>
-        )}
+        </div>
       </div>
 
       {/* ── Alertas de qualidade ── */}
-      {(dashboard?.alertas_nota ?? []).length > 0 && (
-        <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>
-            <span className={styles.alertasTitulo}>⚠ Alertas de nota</span>
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>
+          <span className={styles.alertasTitulo}>
+            {(dashboard?.alertas_nota ?? []).length > 0 ? "⚠ Alertas de nota" : "Alertas de nota"}
+          </span>
+          {(dashboard?.alertas_nota ?? []).length > 0 && (
             <span className={styles.sectionCountWarn}>{dashboard!.alertas_nota.length}</span>
-          </h2>
+          )}
+        </h2>
+        {(dashboard?.alertas_nota ?? []).length > 0 && (
           <p className={styles.alertasDesc}>
             UTs concluídas sem nota de qualidade ou com nota inválida.
             Verifique o revisor responsável e, se aplicável, a atividade de correção.
           </p>
-          <AlertasNotaTable alertas={dashboard!.alertas_nota} />
-        </div>
-      )}
+        )}
+        <AlertasNotaTable alertas={dashboard?.alertas_nota ?? []} />
+      </div>
 
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>Projetos</h2>

@@ -759,6 +759,19 @@
   color: var(--tx-muted);
 }
 
+.emptyStateOk {
+  background: #F0FDF4;
+  border: 1px solid #86EFAC;
+  border-radius: var(--r-md);
+  padding: 16px 24px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #166534;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* ── Section header com controles alinhados ──────────────── */
 
 .sectionHeader {
@@ -863,8 +876,14 @@
 
 .pizzaCenterMin {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   fill: var(--tx-secondary);
+}
+
+.pizzaCenterCap {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--tx-muted);
 }
 
 /* ── Legenda do pizza ────────────────────────────────────── */
@@ -924,6 +943,24 @@
   white-space: nowrap;
   min-width: 52px;
   text-align: right;
+}
+
+.pizzaCapacidadeTotal {
+  margin-top: 8px;
+  padding: 8px 8px;
+  border-top: 1px solid var(--bd-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-secondary);
+  gap: 8px;
+}
+
+.pizzaCapacidadeTotal strong {
+  color: var(--tx-primary);
+  font-weight: 600;
 }
 
 /* ══════════════════════════════════════════════════════════════
