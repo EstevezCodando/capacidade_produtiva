@@ -48,7 +48,7 @@ def upgrade() -> None:
     )
     
 
-        op.execute(
+    op.execute(
         """
         ALTER TABLE capacidade.agenda_prevista_admin
         ADD COLUMN IF NOT EXISTS consolidado boolean NOT NULL DEFAULT false

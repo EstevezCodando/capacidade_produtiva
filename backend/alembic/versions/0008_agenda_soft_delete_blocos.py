@@ -28,7 +28,7 @@ def upgrade() -> None:
         sa.Column("em_uso", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         schema="capacidade",
     )
-        op.add_column(
+    op.add_column(
         "agenda_prevista_admin",
         sa.Column("consolidado", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         schema="capacidade",
