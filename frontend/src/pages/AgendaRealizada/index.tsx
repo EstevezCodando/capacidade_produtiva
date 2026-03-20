@@ -1154,22 +1154,6 @@ export default function AgendaRealizada() {
                     >
                         Mês inteiro
                     </button>
-                    <button
-                        type="button"
-                        className={styles.quickSelectBtn}
-                        onClick={() => calendar.selectSemanaAtual(feriadosDatas)}
-                        title="Selecionar dias úteis da semana atual"
-                    >
-                        Semana atual
-                    </button>
-                    <button
-                        type="button"
-                        className={styles.quickSelectBtn}
-                        onClick={() => calendar.selectDiasUteisNaoLancados(feriadosDatas, diasComLancamento)}
-                        title="Selecionar dias úteis ainda sem lançamento"
-                    >
-                        Sem lançamento
-                    </button>
                     {calendar.selectedDates.length > 0 && (
                         <>
                             <span className={styles.quickSelectCount}>
