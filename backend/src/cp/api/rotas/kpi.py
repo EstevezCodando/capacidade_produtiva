@@ -1484,9 +1484,6 @@ def kpi_timeline_diario(
     engine_cp = request.app.state.engine_cp
     result: list[MesTrilhaResposta] = []
 
-    bloco_cond_ap = "AND ap.bloco_id = :bloco_id" if bloco_id else ""
-    bloco_cond_al = "AND al.bloco_id = :bloco_id" if bloco_id else ""
-
     # Calcular os limites do mês em Python para evitar cast `:param::date` que
     # psycopg2 não suporta na sintaxe de named params do SQLAlchemy text()
     from datetime import date as _date
@@ -1496,6 +1493,22 @@ def kpi_timeline_diario(
         dia_fim = _date(ano + 1, 1, 1)
     else:
         dia_fim = _date(ano, mm + 1, 1)
+
+    # Mesmos filtros do gráfico anual para garantir consistência:
+    # — sem bloco_id: apenas agenda de bloco produtivo (bloco_id IS NOT NULL, ta.codigo='BLOCO')
+    # — com bloco_id: filtra pelo bloco específico
+    if bloco_id:
+        _prev_cond   = "AND ap.bloco_id = :bloco_id"
+        _norm_join   = ""
+        _norm_cond   = "AND al.bloco_id = :bloco_id"
+        _total_join  = ""
+        _total_cond  = "AND al.bloco_id = :bloco_id"
+    else:
+        _prev_cond   = "AND ap.bloco_id IS NOT NULL"
+        _norm_join   = "LEFT JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id"
+        _norm_cond   = "AND ta.codigo = 'BLOCO'"
+        _total_join  = "LEFT JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id"
+        _total_cond  = "AND ta.codigo = 'BLOCO'"
 
     bp: dict = {"dia_ini": dia_ini, "dia_fim": dia_fim}
     if bloco_id:
@@ -1512,28 +1525,30 @@ def kpi_timeline_diario(
             WHERE ap.em_uso = TRUE
               AND ap.data >= :dia_ini
               AND ap.data <  :dia_fim
-              {bloco_cond_ap}
+              {_prev_cond}
             GROUP BY 1
         ),
         lancado_normal AS (
             SELECT al.data_lancamento AS dia,
                    SUM(al.minutos)    AS min_norm
             FROM capacidade.agenda_lancamento al
+            {_norm_join}
             WHERE al.em_uso = TRUE
               AND al.faixa_minuto::text = 'NORMAL'
               AND al.data_lancamento >= :dia_ini
               AND al.data_lancamento <  :dia_fim
-              {bloco_cond_al}
+              {_norm_cond}
             GROUP BY 1
         ),
         lancado_total AS (
             SELECT al.data_lancamento AS dia,
                    SUM(al.minutos)    AS min_total
             FROM capacidade.agenda_lancamento al
+            {_total_join}
             WHERE al.em_uso = TRUE
               AND al.data_lancamento >= :dia_ini
               AND al.data_lancamento <  :dia_fim
-              {bloco_cond_al}
+              {_total_cond}
             GROUP BY 1
         )
         SELECT

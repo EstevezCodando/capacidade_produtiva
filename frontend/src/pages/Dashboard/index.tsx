@@ -174,11 +174,11 @@ function GraficoDiario({ dados }: { dados: DiaHorasResposta[] }) {
         </span>
         <span className={styles.legendItem}>
           <span className={`${styles.legendSym} ${styles.legendK}`} />
-          <span className={styles.legendK}>Normal acum.</span>
+          <span className={styles.legendK}>Realizadas acum.</span>
         </span>
         <span className={styles.legendItem}>
           <span className={`${styles.legendSym} ${styles.legendP}`} />
-          <span className={styles.legendP}>Total acum.</span>
+          <span className={styles.legendP}>Real. + Extra acum.</span>
         </span>
       </div>
 
@@ -188,8 +188,8 @@ function GraficoDiario({ dados }: { dados: DiaHorasResposta[] }) {
           <>
             <span className={styles.chartDataBarDate}>{format(parseISO(dados[hovIdx].data), "dd/MM/yyyy", { locale: ptBR })}</span>
             <span className={styles.tooltipJ}>Previsto {fmtMin(acum[hovIdx].j)}</span>
-            <span className={styles.tooltipK}>Normal {fmtMin(acum[hovIdx].k)}</span>
-            <span className={styles.tooltipP}>Total {fmtMin(acum[hovIdx].p)}</span>
+            <span className={styles.tooltipK}>Realizadas {fmtMin(acum[hovIdx].k)}</span>
+            <span className={styles.tooltipP}>Real.+Extra {fmtMin(acum[hovIdx].p)}</span>
           </>
         ) : (
           <span className={styles.chartDataBarHint}>↔ passe o cursor sobre o gráfico</span>
@@ -292,11 +292,11 @@ function GraficoMensal({ dados, isDaily = false }: { dados: MesTrilha[]; isDaily
         </span>
         <span className={styles.legendItem}>
           <span className={`${styles.legendSym} ${styles.legendK}`} />
-          <span className={styles.legendK}>Normal acum.</span>
+          <span className={styles.legendK}>Realizadas acum.</span>
         </span>
         <span className={styles.legendItem}>
           <span className={`${styles.legendSym} ${styles.legendP}`} />
-          <span className={styles.legendP}>Total acum.</span>
+          <span className={styles.legendP}>Real. + Extra acum.</span>
         </span>
         {showD && (
           <span className={styles.legendItem}>
@@ -316,8 +316,8 @@ function GraficoMensal({ dados, isDaily = false }: { dados: MesTrilha[]; isDaily
                 : format(parseISO(dados[hovIdx].mes), "MMMM yyyy", { locale: ptBR })}
             </span>
             <span className={styles.tooltipJ}>Previsto {fmtMin(dados[hovIdx].minutos_previstos_acum)}</span>
-            <span className={styles.tooltipK}>Normal {fmtMin(dados[hovIdx].minutos_lancados_normal_acum)}</span>
-            <span className={styles.tooltipP}>Total {fmtMin(dados[hovIdx].minutos_lancados_total_acum)}</span>
+            <span className={styles.tooltipK}>Realizadas {fmtMin(dados[hovIdx].minutos_lancados_normal_acum)}</span>
+            <span className={styles.tooltipP}>Real.+Extra {fmtMin(dados[hovIdx].minutos_lancados_total_acum)}</span>
             {showD && <span className={styles.tooltipD}>Fora bloco {fmtMin(dados[hovIdx].minutos_divergente_acum ?? 0)}</span>}
           </>
         ) : (
