@@ -10,7 +10,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=("config.env", ".env"),
-        env_file_encoding="utf-8",
+        # Sem env_file_encoding → usa o encoding do sistema (cp1252 no Windows,
+        # UTF-8 no Linux). quote_plus() nos urls garante que qualquer caractere
+        # especial nas credenciais seja % -encoded antes de chegar ao psycopg2.
         case_sensitive=False,
         extra="ignore",
     )
