@@ -2056,8 +2056,12 @@ def _pizza_query(
             ) AS val
         ),
         dias_uteis AS (
-            SELECT d::date AS dia
-            FROM generate_series(:mes_inicio::date, :mes_fim::date, '1 day'::interval) d
+            SELECT d AS dia
+            FROM generate_series(
+                CAST(:mes_inicio AS date),
+                CAST(:mes_fim AS date),
+                '1 day'::interval
+            ) d
             WHERE EXTRACT(ISODOW FROM d) BETWEEN 1 AND 5
         )
     """
