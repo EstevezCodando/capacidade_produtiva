@@ -14,7 +14,7 @@ import type {
   RankingOperador, SemanaVelocidade, SubfaseDisponivel,
 } from "@/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { format, formatDistanceToNow, parseISO } from "date-fns"
+import { format, formatDistanceToNow, parseISO, subMonths, startOfMonth } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useMemo, useState } from "react"
 import styles from "./Dashboard.module.css"
@@ -22,6 +22,43 @@ import styles from "./Dashboard.module.css"
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
+
+/** Gera lista de meses dos últimos N meses (inclusive o atual), do mais recente ao mais antigo */
+function gerarMesesOpcoes(n = 24): { value: string; label: string }[] {
+  const hoje = startOfMonth(new Date())
+  return Array.from({ length: n }, (_, i) => {
+    const d = subMonths(hoje, i)
+    return {
+      value: format(d, "yyyy-MM"),
+      label: format(d, "MMMM yyyy", { locale: ptBR }),
+    }
+  })
+}
+
+const MESES_OPCOES = gerarMesesOpcoes(36)
+
+/** Select elegante de mês — "março 2026" — sem risco de estado parcial */
+function MesSeletor({
+  value,
+  onChange,
+  className,
+}: {
+  value: string
+  onChange: (v: string) => void
+  className?: string
+}) {
+  return (
+    <select
+      className={className ?? styles.timelineMesPicker}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      {MESES_OPCOES.map((m) => (
+        <option key={m.value} value={m.value}>{m.label}</option>
+      ))}
+    </select>
+  )
+}
 
 function fmtMin(minutos: number): string {
   const h = Math.floor(minutos / 60)
@@ -1181,12 +1218,7 @@ function OperadorDashboard() {
             Distribuição de horas —{" "}
             {format(parseISO(`${mesPizza}-01`), "MMMM yyyy", { locale: ptBR })}
           </h2>
-          <input
-            type="month"
-            value={mesPizza}
-            onChange={(e) => setMesPizza(e.target.value)}
-            className={styles.mesInput}
-          />
+          <MesSeletor value={mesPizza} onChange={setMesPizza} className={styles.mesInput} />
         </div>
         {pizzaData && pizzaData.total_capacidade_min > 0 ? (
           <GraficoPizza
@@ -1412,13 +1444,7 @@ function AdminDashboard() {
               Mês
             </button>
             {timelineContexto === "mes" && (
-              <input
-                type="month"
-                className={styles.timelineMesPicker}
-                value={timelineMes}
-                max={format(new Date(), "yyyy-MM")}
-                onChange={(e) => setTimelineMes(e.target.value)}
-              />
+              <MesSeletor value={timelineMes} onChange={setTimelineMes} />
             )}
           </div>
           <div className={styles.chartCard}>
@@ -1474,12 +1500,7 @@ function AdminDashboard() {
               {format(parseISO(`${mesPizza}-01`), "MMMM yyyy", { locale: ptBR })}
             </h2>
             <div className={styles.pizzaControls}>
-              <input
-                type="month"
-                value={mesPizza}
-                onChange={(e) => setMesPizza(e.target.value)}
-                className={styles.mesInput}
-              />
+              <MesSeletor value={mesPizza} onChange={setMesPizza} className={styles.mesInput} />
               <select
                 value={usuarioPizza}
                 onChange={(e) => setUsuarioPizza(Number(e.target.value))}

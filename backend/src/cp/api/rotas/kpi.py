@@ -1472,24 +1472,32 @@ def kpi_timeline_diario(
 
     bloco_cond_ap = "AND ap.bloco_id = :bloco_id" if bloco_id else ""
     bloco_cond_al = "AND al.bloco_id = :bloco_id" if bloco_id else ""
-    bp = {"mes_inicio": f"{mes}-01", "bloco_id": bloco_id} if bloco_id else {"mes_inicio": f"{mes}-01"}
+
+    # Calcular os limites do mês em Python para evitar cast `:param::date` que
+    # psycopg2 não suporta na sintaxe de named params do SQLAlchemy text()
+    from datetime import date as _date
+    ano, mm = int(mes[:4]), int(mes[5:7])
+    dia_ini = _date(ano, mm, 1)
+    if mm == 12:
+        dia_fim = _date(ano + 1, 1, 1)
+    else:
+        dia_fim = _date(ano, mm + 1, 1)
+
+    bp: dict = {"dia_ini": dia_ini, "dia_fim": dia_fim}
+    if bloco_id:
+        bp["bloco_id"] = bloco_id
 
     sql = text(f"""
         WITH dias AS (
-            SELECT generate_series(
-                date_trunc('month', :mes_inicio::date)::date,
-                (date_trunc('month', :mes_inicio::date)
-                    + INTERVAL '1 month' - INTERVAL '1 day')::date,
-                '1 day'::interval
-            )::date AS dia
+            SELECT generate_series(:dia_ini, :dia_fim - INTERVAL '1 day', '1 day'::interval)::date AS dia
         ),
         previsto AS (
             SELECT ap.data AS dia,
                    SUM(ap.minutos_planejados_normais + ap.minutos_planejados_extras) AS min_prev
             FROM capacidade.agenda_prevista_admin ap
             WHERE ap.em_uso = TRUE
-              AND ap.data >= date_trunc('month', :mes_inicio::date)::date
-              AND ap.data <  (date_trunc('month', :mes_inicio::date) + INTERVAL '1 month')::date
+              AND ap.data >= :dia_ini
+              AND ap.data <  :dia_fim
               {bloco_cond_ap}
             GROUP BY 1
         ),
@@ -1499,8 +1507,8 @@ def kpi_timeline_diario(
             FROM capacidade.agenda_lancamento al
             WHERE al.em_uso = TRUE
               AND al.faixa_minuto::text = 'NORMAL'
-              AND al.data_lancamento >= date_trunc('month', :mes_inicio::date)::date
-              AND al.data_lancamento <  (date_trunc('month', :mes_inicio::date) + INTERVAL '1 month')::date
+              AND al.data_lancamento >= :dia_ini
+              AND al.data_lancamento <  :dia_fim
               {bloco_cond_al}
             GROUP BY 1
         ),
@@ -1509,8 +1517,8 @@ def kpi_timeline_diario(
                    SUM(al.minutos)    AS min_total
             FROM capacidade.agenda_lancamento al
             WHERE al.em_uso = TRUE
-              AND al.data_lancamento >= date_trunc('month', :mes_inicio::date)::date
-              AND al.data_lancamento <  (date_trunc('month', :mes_inicio::date) + INTERVAL '1 month')::date
+              AND al.data_lancamento >= :dia_ini
+              AND al.data_lancamento <  :dia_fim
               {bloco_cond_al}
             GROUP BY 1
         )
