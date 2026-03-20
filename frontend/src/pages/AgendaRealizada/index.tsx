@@ -1136,8 +1136,6 @@ export default function AgendaRealizada() {
 
                 <CalendarHeader
                     periodLabel={calendar.periodLabel}
-                    view={calendar.view}
-                    onViewChange={calendar.setView}
                     onPrev={calendar.goToPrev}
                     onNext={calendar.goToNext}
                     onToday={calendar.goToToday}

@@ -154,8 +154,6 @@ export default function MinhaAgenda() {
       <main className={styles.main}>
         <CalendarHeader
           periodLabel={calendar.periodLabel}
-          view={calendar.view}
-          onViewChange={calendar.setView}
           onPrev={calendar.goToPrev}
           onNext={calendar.goToNext}
           onToday={calendar.goToToday}

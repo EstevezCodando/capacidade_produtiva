@@ -14,21 +14,13 @@ interface CalendarHeaderProps {
   loading?: boolean
 }
 
-const VIEW_OPTIONS: { value: CalendarView; label: string; shortLabel: string }[] = [
-  { value: 'day', label: 'Dia', shortLabel: 'D' },
-  { value: 'week', label: 'Semana', shortLabel: 'S' },
-  { value: 'month', label: 'Mês', shortLabel: 'M' },
-]
-
 export default function CalendarHeader({
   periodLabel,
-  view,
-  onViewChange,
   onPrev,
   onNext,
   onToday,
   loading,
-}: CalendarHeaderProps) {
+}: Omit<CalendarHeaderProps, 'view' | 'onViewChange'>) {
   return (
     <header className={styles.header}>
       {/* Navegação temporal */}
@@ -42,14 +34,14 @@ export default function CalendarHeader({
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </button>
-        
+
         <button
           className={styles.todayBtn}
           onClick={onToday}
         >
           Hoje
         </button>
-        
+
         <button
           className={styles.navBtn}
           onClick={onNext}
@@ -66,20 +58,6 @@ export default function CalendarHeader({
         {periodLabel}
         {loading && <span className={styles.loadingDot} />}
       </h2>
-
-      {/* Seletor de visualização */}
-      <div className={styles.viewSelector}>
-        {VIEW_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            className={`${styles.viewBtn} ${view === opt.value ? styles.viewBtnActive : ''}`}
-            onClick={() => onViewChange(opt.value)}
-          >
-            <span className={styles.viewBtnFull}>{opt.label}</span>
-            <span className={styles.viewBtnShort}>{opt.shortLabel}</span>
-          </button>
-        ))}
-      </div>
     </header>
   )
 }
