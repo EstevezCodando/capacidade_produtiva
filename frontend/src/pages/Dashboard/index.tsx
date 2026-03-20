@@ -612,8 +612,10 @@ function BlocoProgressoCard({ bloco }: { bloco: BlocoDestaque }) {
       <div className={styles.blocoDestaqueMain}>
         {/* Cabeçalho */}
         <div className={styles.blocoDestaqueHeader}>
-          <div className={styles.blocoDestaqueNome}>{bloco.bloco_nome}</div>
-          <div className={styles.blocoDestaqueMeta}>{bloco.projeto_nome} · {bloco.lote_nome}</div>
+          <div className={styles.blocoDestaqueNome} title={bloco.bloco_nome}>{bloco.bloco_nome}</div>
+          <div className={styles.blocoDestaqueMeta} title={`${bloco.projeto_nome} · ${bloco.lote_nome}`}>
+            {bloco.projeto_nome} · {bloco.lote_nome}
+          </div>
         </div>
 
         {/* Barra de progresso */}
@@ -1368,7 +1370,11 @@ function AdminDashboard() {
       </div>
 
       <div className={styles.statsRow}>
-        <StatCard label="Blocos SAP" value={dashboard?.blocos_sap_cadastrados ?? 0} sub="blocos no snapshot" />
+        <StatCard
+          label="Blocos SAP"
+          value={blocoFiltro && dashboard ? 1 : (dashboard?.blocos_sap_cadastrados ?? 0)}
+          sub={blocoFiltro && dashboard ? (dashboard.bloco_filtro_nome ?? "bloco selecionado") : "blocos no snapshot"}
+        />
         <StatCard
           label="Progresso geral"
           value={`${Math.round(progGeral ?? 0)}%`}
