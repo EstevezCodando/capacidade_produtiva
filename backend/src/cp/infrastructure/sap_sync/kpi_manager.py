@@ -50,6 +50,41 @@ def garantir_tabelas_kpi(engine_cp: Engine) -> None:
         for nome, ddl, _sql in TABELAS_KPI:
             _logger.debug("Criando tabela %s.%s", _SCHEMA, nome)
             conn.execute(text(ddl))
+        _garantir_indices(conn)
+
+
+# ---------------------------------------------------------------------------
+# Índices de performance — criados após tabelas, recriados no bootstrap
+# ---------------------------------------------------------------------------
+
+_INDICES: list[str] = [
+    # fluxo_ut — colunas usadas em WHERE e JOIN nas queries do dashboard
+    f"CREATE INDEX IF NOT EXISTS idx_fluxo_ut_bloco_id   ON {_SCHEMA}.fluxo_ut  (bloco_id)",
+    f"CREATE INDEX IF NOT EXISTS idx_fluxo_ut_subfase_id ON {_SCHEMA}.fluxo_ut  (subfase_id)",
+    f"CREATE INDEX IF NOT EXISTS idx_fluxo_ut_projeto_id ON {_SCHEMA}.fluxo_ut  (projeto_id)",
+    f"CREATE INDEX IF NOT EXISTS idx_fluxo_ut_exec_id    ON {_SCHEMA}.fluxo_ut  (exec_usuario_id)",
+    f"CREATE INDEX IF NOT EXISTS idx_fluxo_ut_rev_id     ON {_SCHEMA}.fluxo_ut  (rev_usuario_id)",
+    # distribuicao_pontos — OR-join em três papéis (bitmap OR scan) + filtros frequentes
+    f"CREATE INDEX IF NOT EXISTS idx_dist_pontos_bloco    ON {_SCHEMA}.distribuicao_pontos (bloco_id)",
+    f"CREATE INDEX IF NOT EXISTS idx_dist_pontos_subfase  ON {_SCHEMA}.distribuicao_pontos (subfase_id)",
+    f"CREATE INDEX IF NOT EXISTS idx_dist_pontos_executor ON {_SCHEMA}.distribuicao_pontos (executor_id)",
+    f"CREATE INDEX IF NOT EXISTS idx_dist_pontos_revisor  ON {_SCHEMA}.distribuicao_pontos (revisor_id)",
+    f"CREATE INDEX IF NOT EXISTS idx_dist_pontos_corretor ON {_SCHEMA}.distribuicao_pontos (corretor_id)",
+    # estado_ut — filtros de contexto usados em quase todo endpoint KPI
+    f"CREATE INDEX IF NOT EXISTS idx_estado_ut_bloco_id   ON {_SCHEMA}.estado_ut (bloco_id)",
+    f"CREATE INDEX IF NOT EXISTS idx_estado_ut_subfase_id ON {_SCHEMA}.estado_ut (subfase_id)",
+    # pontos_usuario — agrupamentos por subfase/projeto no ranking
+    f"CREATE INDEX IF NOT EXISTS idx_pontos_usuario_subfase  ON {_SCHEMA}.pontos_usuario (subfase_id)",
+    f"CREATE INDEX IF NOT EXISTS idx_pontos_usuario_projeto  ON {_SCHEMA}.pontos_usuario (projeto_id)",
+]
+
+
+def _garantir_indices(conn: Connection) -> None:
+    """Cria (ou recria) todos os índices de performance nas tabelas kpi.*."""
+    for sql in _INDICES:
+        nome = sql.split("IF NOT EXISTS")[1].split("ON")[0].strip()
+        _logger.debug("Garantindo índice %s", nome)
+        conn.execute(text(sql))
 
 
 def _colunas_da_tabela(conn: Connection, tabela: str) -> list[str]:

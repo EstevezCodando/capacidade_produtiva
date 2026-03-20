@@ -16,7 +16,7 @@ import logging
 from typing import Any
 
 from datetime import date
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 
@@ -55,7 +55,7 @@ def _get_sync_timestamps(engine_cp: Any) -> tuple[str | None, str | None]:
             if row and row[0] > 0:
                 kpi_ts = snapshot_ts  # Usa mesmo timestamp por simplicidade
     except Exception:
-        pass
+        _logger.debug("Não foi possível obter timestamps de sync", exc_info=True)
 
     return snapshot_ts, kpi_ts
 
@@ -324,7 +324,7 @@ class DashboardResponse(BaseModel):
 
 
 @router.get("/projetos", summary="KPI agregado por projeto")
-def kpi_projetos(_: UsuarioLogado, request: Request) -> KpiProjetosResponse:
+def kpi_projetos(_: UsuarioLogado, request: Request, response: Response) -> KpiProjetosResponse:
     """Progresso percentual, pontos totais e concluidos por projeto ativo."""
     engine_cp = request.app.state.engine_cp
     snapshot_ts, kpi_ts = _get_sync_timestamps(engine_cp)
@@ -371,8 +371,10 @@ def kpi_projetos(_: UsuarioLogado, request: Request) -> KpiProjetosResponse:
                     )
                 )
     except Exception:
-        pass
+        _logger.exception("Erro ao buscar projetos KPI")
+        raise HTTPException(status_code=500, detail="Erro ao buscar projetos KPI")
 
+    response.headers["Cache-Control"] = "private, max-age=60, stale-while-revalidate=30"
     return KpiProjetosResponse(
         sap_snapshot_atualizado_em=snapshot_ts,
         kpi_calculado_em=kpi_ts,
@@ -381,7 +383,7 @@ def kpi_projetos(_: UsuarioLogado, request: Request) -> KpiProjetosResponse:
 
 
 @router.get("/projetos/{projeto_id}", summary="KPI do projeto por bloco e subfase")
-def kpi_projeto_detalhe(projeto_id: int, _: UsuarioLogado, request: Request) -> KpiProjetoDetalhe:
+def kpi_projeto_detalhe(projeto_id: int, _: UsuarioLogado, request: Request, response: Response) -> KpiProjetoDetalhe:
     """Drill-down do projeto: progresso por lote, bloco e subfase."""
     engine_cp = request.app.state.engine_cp
     snapshot_ts, kpi_ts = _get_sync_timestamps(engine_cp)
@@ -493,8 +495,10 @@ def kpi_projeto_detalhe(projeto_id: int, _: UsuarioLogado, request: Request) -> 
                 for b in blocos_dict.values()
             ]
     except Exception:
-        pass
+        _logger.exception("Erro ao buscar detalhe do projeto projeto_id=%s", projeto_id)
+        raise HTTPException(status_code=500, detail="Erro ao buscar detalhe do projeto")
 
+    response.headers["Cache-Control"] = "private, max-age=60, stale-while-revalidate=30"
     return KpiProjetoDetalhe(
         projeto_id=projeto_id,
         projeto_nome=projeto_nome,
@@ -506,7 +510,7 @@ def kpi_projeto_detalhe(projeto_id: int, _: UsuarioLogado, request: Request) -> 
 
 
 @router.get("/subfase/{subfase_id}", summary="UTs de uma subfase")
-def kpi_subfase(subfase_id: int, _: UsuarioLogado, request: Request) -> KpiSubfaseDetalhe:
+def kpi_subfase(subfase_id: int, _: UsuarioLogado, request: Request, response: Response) -> KpiSubfaseDetalhe:
     """Listagem completa das UTs da subfase com estado, ciclo, nota e pontos."""
     engine_cp = request.app.state.engine_cp
     snapshot_ts, kpi_ts = _get_sync_timestamps(engine_cp)
@@ -564,8 +568,10 @@ def kpi_subfase(subfase_id: int, _: UsuarioLogado, request: Request) -> KpiSubfa
                     )
                 )
     except Exception:
-        pass
+        _logger.exception("Erro ao buscar UTs da subfase subfase_id=%s", subfase_id)
+        raise HTTPException(status_code=500, detail="Erro ao buscar dados da subfase")
 
+    response.headers["Cache-Control"] = "private, max-age=30, stale-while-revalidate=15"
     return KpiSubfaseDetalhe(
         subfase_id=subfase_id,
         subfase_nome=subfase_nome,
@@ -576,7 +582,7 @@ def kpi_subfase(subfase_id: int, _: UsuarioLogado, request: Request) -> KpiSubfa
 
 
 @router.get("/uts/{ut_id}", summary="Detalhe completo de uma UT")
-def kpi_ut(ut_id: int, _: UsuarioLogado, request: Request) -> KpiUtDetalhe:
+def kpi_ut(ut_id: int, _: UsuarioLogado, request: Request, response: Response) -> KpiUtDetalhe:
     """Estado completo da UT: ciclo, fluxo, nota, participantes e pontos."""
     engine_cp = request.app.state.engine_cp
     snapshot_ts, kpi_ts = _get_sync_timestamps(engine_cp)
@@ -630,8 +636,10 @@ def kpi_ut(ut_id: int, _: UsuarioLogado, request: Request) -> KpiUtDetalhe:
                     kpi_calculado_em=kpi_ts,
                 )
     except Exception:
-        pass
+        _logger.exception("Erro ao buscar detalhe da UT ut_id=%s", ut_id)
+        raise HTTPException(status_code=500, detail="Erro ao buscar detalhe da UT")
 
+    response.headers["Cache-Control"] = "private, max-age=30, stale-while-revalidate=15"
     return KpiUtDetalhe(
         ut_id=ut_id,
         ciclo_modelo="",
@@ -655,7 +663,7 @@ def kpi_ut(ut_id: int, _: UsuarioLogado, request: Request) -> KpiUtDetalhe:
 
 
 @router.get("/inconsistencias", summary="Alertas e inconsistencias de nota e ciclo")
-def kpi_inconsistencias(_: SomenteAdmin, request: Request) -> InconsistenciasResponse:
+def kpi_inconsistencias(_: SomenteAdmin, request: Request, response: Response) -> InconsistenciasResponse:
     """UTs com NOTA_AUSENTE, NOTA_INVALIDA, INCONSISTENTE_CICLO ou INCONSISTENTE_DIFICULDADE."""
     engine_cp = request.app.state.engine_cp
     snapshot_ts, kpi_ts = _get_sync_timestamps(engine_cp)
@@ -692,8 +700,10 @@ def kpi_inconsistencias(_: SomenteAdmin, request: Request) -> InconsistenciasRes
                     )
                 )
     except Exception:
-        pass
+        _logger.exception("Erro ao buscar inconsistencias KPI")
+        raise HTTPException(status_code=500, detail="Erro ao buscar inconsistências")
 
+    response.headers["Cache-Control"] = "private, max-age=60, stale-while-revalidate=30"
     return InconsistenciasResponse(
         total=len(itens),
         sap_snapshot_atualizado_em=snapshot_ts,
@@ -705,6 +715,7 @@ def kpi_inconsistencias(_: SomenteAdmin, request: Request) -> InconsistenciasRes
 def kpi_dashboard(
     _: UsuarioLogado,
     request: Request,
+    response: Response,
     bloco_id: int | None = Query(None, description="Filtrar dashboard por bloco específico"),
     subfase_id: int | None = Query(None, description="Filtrar ranking por subfase"),
 ) -> DashboardResponse:
@@ -1418,10 +1429,11 @@ def kpi_dashboard(
                 ))
 
     except Exception:
-        _logger.exception("Erro ao calcular kpi_dashboard")
+        _logger.exception("Erro ao calcular kpi_dashboard bloco_id=%s subfase_id=%s", bloco_id, subfase_id)
+        raise HTTPException(status_code=500, detail="Erro ao calcular dashboard KPI")
 
     progresso_geral = (pontos_realizados / pontos_totais * 100) if pontos_totais > 0 else None
-
+    response.headers["Cache-Control"] = "private, max-age=60, stale-while-revalidate=30"
     return DashboardResponse(
         sap_snapshot_atualizado_em=snapshot_ts,
         kpi_calculado_em=kpi_ts,
@@ -1459,6 +1471,7 @@ def kpi_dashboard(
 def kpi_timeline_diario(
     _: UsuarioLogado,
     request: Request,
+    response: Response,
     mes: str = Query(..., description="Mês no formato YYYY-MM"),
     bloco_id: int | None = Query(None),
 ) -> list[MesTrilhaResposta]:
@@ -1546,8 +1559,10 @@ def kpi_timeline_diario(
                     minutos_divergente_acum=0,
                 ))
     except Exception:
-        _logger.exception("Erro ao calcular timeline diária")
+        _logger.exception("Erro ao calcular timeline diária mes=%s bloco_id=%s", mes, bloco_id)
+        raise HTTPException(status_code=500, detail="Erro ao calcular timeline diária")
 
+    response.headers["Cache-Control"] = "private, max-age=300, stale-while-revalidate=60"
     return result
 
 
@@ -1614,7 +1629,7 @@ class MeuDashboardResposta(BaseModel):
 
 
 @router.get("/meu-dashboard", summary="Dashboard do usuário autenticado")
-def meu_dashboard(usuario: UsuarioLogado, request: Request) -> MeuDashboardResposta:
+def meu_dashboard(usuario: UsuarioLogado, request: Request, response: Response) -> MeuDashboardResposta:
     """Retorna KPI personalizado para o usuário logado.
 
     Inclui:
@@ -1917,11 +1932,13 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request) -> MeuDashboardRespo
                 ))
     except Exception:
         _logger.exception("Erro ao calcular meu-dashboard para usuario_id=%s", uid)
+        raise HTTPException(status_code=500, detail="Erro ao calcular seu dashboard")
 
     blocos_list = sorted(blocos_map.values(), key=lambda b: b.bloco_nome)
     pontos_total_geral   = sum(b.pontos_total_bloco   for b in blocos_list)
     pontos_usuario_geral = sum(b.pontos_usuario_bloco for b in blocos_list)
 
+    response.headers["Cache-Control"] = "private, max-age=60, stale-while-revalidate=30"
     return MeuDashboardResposta(
         sap_snapshot_atualizado_em=snapshot_ts,
         kpi_calculado_em=kpi_ts,
@@ -1947,7 +1964,7 @@ def _parse_mes(mes: str) -> date:
             ano, m = mes.split("-")
             return date(int(ano), int(m), 1)
         except Exception:
-            pass
+            _logger.debug("Formato de mês inválido '%s', usando mês atual", mes)
     today = date.today()
     return today.replace(day=1)
 
@@ -2026,6 +2043,7 @@ def _pizza_query(
             total_capacidade = int(row_cap.total) if row_cap else 0
     except Exception:
         _logger.exception("Erro ao calcular pizza mes=%s uid=%s", mes_str, usuario_id)
+        raise HTTPException(status_code=500, detail="Erro ao calcular distribuição de horas")
 
     # Base = capacidade disponível nos dias úteis.
     # Se não há capacidade cadastrada mas há lançamentos, usa total lançado (evita gráfico quebrado).
