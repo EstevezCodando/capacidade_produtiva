@@ -1198,11 +1198,17 @@ export default function AgendaRealizada() {
                                 weekDays={calendar.weekDays}
                                 view={calendar.view}
                                 getDiaData={getDiaData}
-                                getCapacityDisplay={(date) =>
-                                    capacidadeVisualPorDia.get(
-                                        format(date, "yyyy-MM-dd"),
-                                    ) ?? null
-                                }
+                                getCapacityDisplay={(date) => {
+                                    const d = capacidadeVisualPorDia.get(format(date, "yyyy-MM-dd"));
+                                    if (!d) return null;
+                                    return {
+                                        ...d,
+                                        segmentos: d.segmentos.map((s) => ({
+                                            ...s,
+                                            percentual: s.percentual ?? 0,
+                                        })),
+                                    };
+                                }}
                                 getOciosoDisplay={(date) => {
                                     if (isDiaFuturo(date)) return { ativo: false, minutos: 0 };
                                     const diaData = getDiaData(date);

@@ -1321,10 +1321,26 @@ export default function AgendaPrevista() {
                 weekDays={calendar.weekDays}
                 view={calendar.view}
                 getDiaData={getDiaData}
-                getHoverUsuarios={(date) => conteudoTooltipPorDia.get(date)}
-                getCapacityDisplay={(date) =>
-                  capacidadeVisualPorDia.get(format(date, "yyyy-MM-dd")) ?? null
+                getHoverUsuarios={(date) =>
+                  (conteudoTooltipPorDia.get(date) ?? []).map((u) => ({
+                    ...u,
+                    segmentos: u.segmentos?.map((s) => ({
+                      ...s,
+                      percentual: s.percentual ?? 0,
+                    })),
+                  }))
                 }
+                getCapacityDisplay={(date) => {
+                  const d = capacidadeVisualPorDia.get(format(date, "yyyy-MM-dd"));
+                  if (!d) return null;
+                  return {
+                    ...d,
+                    segmentos: d.segmentos.map((s) => ({
+                      ...s,
+                      percentual: s.percentual ?? 0,
+                    })),
+                  };
+                }}
                 selectedDates={calendar.selectedDates}
                 onSelectDate={calendar.selectDate}
                 onSelectRange={(start, end) =>

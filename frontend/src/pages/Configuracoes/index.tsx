@@ -16,7 +16,7 @@ export default function Configuracoes() {
   const queryClient = useQueryClient()
 
   // Query de configuração de teto
-  const { data: configTeto, isLoading: loadingConfig } = useQuery({
+  const { data: configTeto } = useQuery({
     queryKey: ['configTeto'],
     queryFn: getConfigTeto,
     enabled: ehAdmin,

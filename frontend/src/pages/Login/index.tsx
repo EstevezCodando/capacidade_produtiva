@@ -3,6 +3,7 @@
 // ============================================================
 import { apiClient } from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
+import type { UsuarioMe } from "@/types";
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./Login.module.css";
@@ -11,13 +12,6 @@ interface LoginResponse {
   success: boolean;
   token: string;
   uuid: string;
-  administrador: boolean;
-}
-
-interface UsuarioMe {
-  uuid: string;
-  login: string;
-  nome: string;
   administrador: boolean;
 }
 
@@ -62,9 +56,10 @@ export default function Login() {
       } catch {
         // Se /usuarios/me falhar, usa dados do login
         usuario = {
-          uuid,
-          login: username,
+          usuario_id: 0,
+          usuario_uuid: uuid,
           nome: username,
+          nome_guerra: null,
           administrador,
         };
       }

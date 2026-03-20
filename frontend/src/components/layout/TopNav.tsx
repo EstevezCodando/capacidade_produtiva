@@ -224,7 +224,7 @@ function PerfilDropdown({ onClose }: { onClose: () => void }) {
 
 // ── TopNav principal ─────────────────────────────────────────
 export default function TopNav() {
-  const { usuario, ehAdmin, sessao } = useAuth();
+  const { usuario, ehAdmin } = useAuth();
   const location = useLocation();
   const queryClient = useQueryClient();
 

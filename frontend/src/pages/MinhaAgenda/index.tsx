@@ -124,7 +124,7 @@ export default function MinhaAgenda() {
                 <StatCard label="Realizado em Bloco" value={resumoPeriodo?.minutos_realizados_bloco_normais ?? 0} suffix="min" variant="accent" size="sm" />
               </Card>
               <Card padding="sm">
-                <StatCard label="Atividades Externas" value={resumoPeriodo?.minutos_perdidos_externas_normais ?? 0} suffix="min" variant="info" size="sm" />
+                <StatCard label="Atividades Externas" value={resumoPeriodo?.minutos_perdidos_externas_normais ?? 0} suffix="min" variant="default" size="sm" />
               </Card>
               <Card padding="sm">
                 <StatCard label="Hora Extra" value={resumoPeriodo?.minutos_extras_totais ?? 0} suffix="min" variant="warning" size="sm" />

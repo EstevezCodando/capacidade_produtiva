@@ -20,8 +20,6 @@ import {
   isWeekend,
   eachDayOfInterval,
   startOfDay,
-  startOfISOWeek,
-  endOfISOWeek,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { CalendarView, CalendarDay, DateRange, DiaDaAgenda } from '@/types/agenda'

@@ -4,7 +4,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getConfigTeto, atualizarConfigTeto } from '@/api/agenda'
-import type { ConfigTeto, ConfigTetoInput } from '@/types/agenda'
 import { Card, Button, Input, StatCard, Skeleton } from '@/components/ui/Common'
 import styles from './Configuracoes.module.css'
 
