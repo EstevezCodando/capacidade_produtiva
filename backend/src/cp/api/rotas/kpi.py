@@ -12,6 +12,7 @@ Politica de autorizacao:
 
 from __future__ import annotations
 
+import calendar
 import logging
 from typing import Any
 
@@ -1969,6 +1970,17 @@ def _parse_mes(mes: str) -> date:
     return today.replace(day=1)
 
 
+def _dias_uteis_do_mes(mes_inicio: date) -> int:
+    """Retorna a quantidade de dias úteis (seg–sex) no mês, sem contar feriados.
+
+    Usado como fallback quando o usuário não tem capacidade_dia cadastrada —
+    garante que o gráfico de pizza exiba 100% não alocado em vez de ficar em branco.
+    """
+    ano, mes = mes_inicio.year, mes_inicio.month
+    _, ultimo = calendar.monthrange(ano, mes)
+    return sum(1 for d in range(1, ultimo + 1) if date(ano, mes, d).weekday() < 5)
+
+
 def _pizza_query(
     engine_cp: Any,
     mes_inicio: date,
@@ -2046,8 +2058,15 @@ def _pizza_query(
         raise HTTPException(status_code=500, detail="Erro ao calcular distribuição de horas")
 
     # Base = capacidade disponível nos dias úteis.
-    # Se não há capacidade cadastrada mas há lançamentos, usa total lançado (evita gráfico quebrado).
-    base = total_capacidade if total_capacidade > 0 else total_lancado
+    # Prioridade: (1) capacidade cadastrada, (2) total lançado, (3) dias úteis × 480 min.
+    # O fallback garante que meses sem lançamento apareçam como 100% não alocado
+    # em vez de mostrar "sem capacidade cadastrada".
+    if total_capacidade > 0:
+        base = total_capacidade
+    elif total_lancado > 0:
+        base = total_lancado
+    else:
+        base = _dias_uteis_do_mes(mes_inicio) * 480  # 8 h por dia útil
     nao_alocado = max(0, base - total_lancado)
 
     fatias = [

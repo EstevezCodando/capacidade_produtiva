@@ -1220,16 +1220,14 @@ function OperadorDashboard() {
           </h2>
           <MesSeletor value={mesPizza} onChange={setMesPizza} className={styles.mesInput} />
         </div>
-        {pizzaData && pizzaData.total_capacidade_min > 0 ? (
+        {pizzaData ? (
           <GraficoPizza
             fatias={pizzaData.fatias}
             totalCapacidadeMin={pizzaData.total_capacidade_min}
             naoAlocadoMin={pizzaData.nao_alocado_min}
           />
         ) : (
-          <div className={styles.emptyState}>
-            {pizzaData ? "Sem capacidade de dias úteis cadastrada para este mês." : "Carregando…"}
-          </div>
+          <div className={styles.emptyState}>Carregando…</div>
         )}
       </div>
 
@@ -1515,16 +1513,14 @@ function AdminDashboard() {
               </select>
             </div>
           </div>
-          {pizzaData && pizzaData.total_capacidade_min > 0 ? (
+          {pizzaData ? (
             <GraficoPizza
               fatias={pizzaData.fatias}
               totalCapacidadeMin={pizzaData.total_capacidade_min}
               naoAlocadoMin={pizzaData.nao_alocado_min}
             />
           ) : (
-            <div className={styles.emptyState}>
-              {pizzaData ? "Sem capacidade de dias úteis cadastrada para este mês." : "Carregando…"}
-            </div>
+            <div className={styles.emptyState}>Carregando…</div>
           )}
         </div>
 
