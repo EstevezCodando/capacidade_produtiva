@@ -2003,24 +2003,24 @@ def _pizza_query(
 ) -> PizzaDistribuicaoResponse:
     """Calcula a distribuição de lançamentos para um mês, opcionalmente filtrado por usuário.
 
-    A base de cálculo é sempre a capacidade normal disponível nos dias úteis.
-    Quando nenhum lançamento existe, exibe 100% como "Não alocado".
-    Quando usuario_id é None (todos), considera apenas usuários ativos (sap_snapshot.dgeo_usuario.ativo).
+    A base de cálculo é sempre a capacidade teórica completa:
+    - Gera o grid de (usuário × dia_útil) para o mês inteiro.
+    - Usa capacidade_dia quando disponível; aplica o default do sistema para dias sem registro.
+    - Ignora usuários com ativo = FALSE.
+    - Quando não há lançamentos, o resultado é 100% "Não alocado".
     """
-    mes_str = mes_inicio.strftime("%Y-%m-%d")
+    ano, mes = mes_inicio.year, mes_inicio.month
+    _, ultimo_dia = calendar.monthrange(ano, mes)
+    mes_str     = mes_inicio.strftime("%Y-%m-%d")
+    mes_fim_str = date(ano, mes, ultimo_dia).strftime("%Y-%m-%d")
 
+    # ── SQL fatias (lançamentos por tipo de atividade) ────────────────────
     if usuario_id:
-        # Filtro por usuário específico — usa uid diretamente
         fatia_user_join   = ""
         fatia_user_filter = "AND al.usuario_id = :uid"
-        cap_user_join     = ""
-        cap_user_filter   = "AND cd.usuario_id = :uid"
     else:
-        # Todos os usuários ativos
         fatia_user_join   = "JOIN sap_snapshot.dgeo_usuario u ON u.id = al.usuario_id AND u.ativo = TRUE"
         fatia_user_filter = ""
-        cap_user_join     = "JOIN sap_snapshot.dgeo_usuario u ON u.id = cd.usuario_id AND u.ativo = TRUE"
-        cap_user_filter   = ""
 
     sql_fatias = text(f"""
         SELECT
@@ -2038,22 +2038,67 @@ def _pizza_query(
         ORDER BY minutos DESC
     """)
 
-    # Capacidade: apenas dias úteis (eh_dia_util = TRUE), usuários ativos
-    sql_capacidade = text(f"""
-        SELECT COALESCE(SUM(cd.minutos_capacidade_normal_prevista), 0) AS total
-        FROM capacidade.capacidade_dia cd
-        {cap_user_join}
-        WHERE date_trunc('month', cd.data)::date = :mes_inicio
-          AND cd.eh_dia_util = TRUE
-          {cap_user_filter}
-    """)
+    # ── SQL capacidade teórica ─────────────────────────────────────────────
+    # Gera o grid completo (usuários × dias úteis) e faz LEFT JOIN em
+    # capacidade_dia. Dias sem registro recebem o valor default do sistema.
+    # Isso garante que a base reflita 100% da capacidade teórica do mês,
+    # independente de quantos registros foram materializados em capacidade_dia.
+    _CTE_MINUTO_PADRAO = """
+        minuto_padrao AS (
+            SELECT COALESCE(
+                (SELECT minutos_dia_util_default
+                 FROM capacidade.parametro_capacidade
+                 WHERE data_inicio_vigencia <= :mes_inicio
+                   AND (data_fim_vigencia IS NULL OR data_fim_vigencia >= :mes_inicio)
+                 ORDER BY data_inicio_vigencia DESC
+                 LIMIT 1),
+                360
+            ) AS val
+        ),
+        dias_uteis AS (
+            SELECT d::date AS dia
+            FROM generate_series(:mes_inicio::date, :mes_fim::date, '1 day'::interval) d
+            WHERE EXTRACT(ISODOW FROM d) BETWEEN 1 AND 5
+        )
+    """
+    _CASE_MINUTOS = """
+        CASE
+            WHEN cd.id IS NOT NULL AND cd.eh_dia_util = FALSE THEN 0
+            WHEN cd.id IS NOT NULL THEN cd.minutos_capacidade_normal_prevista
+            ELSE (SELECT val FROM minuto_padrao)
+        END
+    """
 
-    params: dict[str, Any] = {"mes_inicio": mes_str}
+    if usuario_id:
+        sql_capacidade = text(f"""
+            WITH {_CTE_MINUTO_PADRAO}
+            SELECT COALESCE(SUM({_CASE_MINUTOS}), 0) AS total
+            FROM dias_uteis du
+            LEFT JOIN capacidade.capacidade_dia cd
+                ON cd.usuario_id = :uid AND cd.data = du.dia
+        """)
+    else:
+        sql_capacidade = text(f"""
+            WITH {_CTE_MINUTO_PADRAO},
+            usuarios_ativos AS (
+                SELECT id FROM sap_snapshot.dgeo_usuario WHERE ativo = TRUE
+            ),
+            grade AS (
+                SELECT u.id AS usuario_id, du.dia
+                FROM usuarios_ativos u CROSS JOIN dias_uteis du
+            )
+            SELECT COALESCE(SUM({_CASE_MINUTOS}), 0) AS total
+            FROM grade g
+            LEFT JOIN capacidade.capacidade_dia cd
+                ON cd.usuario_id = g.usuario_id AND cd.data = g.dia
+        """)
+
+    params: dict[str, Any] = {"mes_inicio": mes_str, "mes_fim": mes_fim_str}
     if usuario_id:
         params["uid"] = usuario_id
 
     fatias_raw: list[dict[str, Any]] = []
-    total_lancado = 0
+    total_lancado   = 0
     total_capacidade = 0
 
     try:
@@ -2072,16 +2117,9 @@ def _pizza_query(
         _logger.exception("Erro ao calcular pizza mes=%s uid=%s", mes_str, usuario_id)
         raise HTTPException(status_code=500, detail="Erro ao calcular distribuição de horas")
 
-    # Base = capacidade disponível nos dias úteis.
-    # Prioridade: (1) capacidade cadastrada, (2) total lançado, (3) dias úteis × 480 min.
-    # O fallback garante que meses sem lançamento apareçam como 100% não alocado
-    # em vez de mostrar "sem capacidade cadastrada".
-    if total_capacidade > 0:
-        base = total_capacidade
-    elif total_lancado > 0:
-        base = total_lancado
-    else:
-        base = _dias_uteis_do_mes(mes_inicio) * 480  # 8 h por dia útil
+    # Base = capacidade teórica completa do mês.
+    # Fallback apenas se não houver usuários ativos com capacidade registrada.
+    base = total_capacidade or total_lancado or (_dias_uteis_do_mes(mes_inicio) * 360)
     nao_alocado = max(0, base - total_lancado)
 
     fatias = [
