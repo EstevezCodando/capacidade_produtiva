@@ -99,7 +99,7 @@ export default function Login() {
         <div className={styles.header}>
           <img src="/dsg-logo.png" alt="DSG" className={styles.logoImg} />
           <div>
-            <h1 className={styles.title}>DSG</h1>
+            <h1 className={styles.title}>Capacidade Produtiva</h1>
             <p className={styles.subtitle}>Sistema de Gestão Operacional</p>
           </div>
         </div>
