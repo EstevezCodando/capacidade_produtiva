@@ -247,8 +247,8 @@ export default function TopNav() {
       {/* ── Esquerda: logo + tabs ─────────────────────────── */}
       <div className={styles.left}>
         <div className={styles.logo}>
-          <span className={styles.logoMark}>CP</span>
-          <span className={styles.logoName}>CapacidadeProdutiva</span>
+          <img src="/dsg-logo.png" alt="DSG" className={styles.logoImg} />
+          <span className={styles.logoName}>DSG</span>
         </div>
 
         <nav className={styles.tabs} aria-label="Navegação principal">

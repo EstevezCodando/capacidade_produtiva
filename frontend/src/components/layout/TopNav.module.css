@@ -30,28 +30,20 @@
   flex-shrink: 0;
 }
 
-.logoMark {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--accent);
-  background: var(--accent-glow);
-  border: 1px solid var(--accent-border);
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--r-sm);
-  letter-spacing: 0.5px;
+.logoImg {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .logoName {
   font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--tx-primary);
-  letter-spacing: 0.3px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 

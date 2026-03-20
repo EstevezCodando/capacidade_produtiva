@@ -97,9 +97,9 @@ export default function Login() {
       <div className={styles.card}>
         {/* Logo / título */}
         <div className={styles.header}>
-          <span className={styles.logoMark}>CP</span>
+          <img src="/dsg-logo.png" alt="DSG" className={styles.logoImg} />
           <div>
-            <h1 className={styles.title}>CapacidadeProdutiva</h1>
+            <h1 className={styles.title}>DSG</h1>
             <p className={styles.subtitle}>Sistema de Gestão Operacional</p>
           </div>
         </div>
