@@ -5,6 +5,7 @@ import type {
     InconsistenciasResponse,
     KpiDashboardResponse,
     KpiProjetosResponse,
+    MesTrilha,
     MeuDashboardResponse,
     PizzaDistribuicaoResponse,
     SyncStatus,
@@ -55,6 +56,13 @@ export async function getKpiDashboard(blocoId?: number, subfaseId?: number): Pro
   const res = await apiClient.get<KpiDashboardResponse>("/kpi/dashboard", {
     params: Object.keys(params).length ? params : undefined,
   })
+  return res.data
+}
+
+export async function getKpiTimelineDiario(mes: string, blocoId?: number): Promise<MesTrilha[]> {
+  const params: Record<string, string | number> = { mes }
+  if (blocoId) params.bloco_id = blocoId
+  const res = await apiClient.get<MesTrilha[]>("/kpi/timeline-diario", { params })
   return res.data
 }
 

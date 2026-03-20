@@ -5,7 +5,7 @@
 // ============================================================
 import {
   getMeuDashboard, executarSync, getKpiDashboard, getKpiProjetos, getSyncStatus,
-  getMinhaPizzaMensal, getPizzaMensal, getUsuarios,
+  getMinhaPizzaMensal, getPizzaMensal, getUsuarios, getKpiTimelineDiario,
 } from "@/api/endpoints"
 import { useAuth } from "@/context/AuthContext"
 import type {
@@ -129,11 +129,20 @@ function GraficoDiario({ dados }: { dados: DiaHorasResposta[] }) {
         )}
       </svg>
 
-      {/* Legenda estática — sempre visível */}
+      {/* Legenda elegante — sem prefixos J/K/P */}
       <div className={styles.chartLegend}>
-        <span className={styles.legendJ}>- - J Previsto acum.</span>
-        <span className={styles.legendK}>── K Normal acum.</span>
-        <span className={styles.legendP}>── P Total acum. (normal + extra)</span>
+        <span className={styles.legendItem}>
+          <span className={`${styles.legendSym} ${styles.legendSymDash} ${styles.legendJ}`} />
+          <span className={styles.legendJ}>Previsto acum.</span>
+        </span>
+        <span className={styles.legendItem}>
+          <span className={`${styles.legendSym} ${styles.legendK}`} />
+          <span className={styles.legendK}>Normal acum.</span>
+        </span>
+        <span className={styles.legendItem}>
+          <span className={`${styles.legendSym} ${styles.legendP}`} />
+          <span className={styles.legendP}>Total acum.</span>
+        </span>
       </div>
 
       {/* Barra de dados — abaixo do SVG, fora das linhas */}
@@ -141,9 +150,9 @@ function GraficoDiario({ dados }: { dados: DiaHorasResposta[] }) {
         {hovIdx !== null ? (
           <>
             <span className={styles.chartDataBarDate}>{format(parseISO(dados[hovIdx].data), "dd/MM/yyyy", { locale: ptBR })}</span>
-            <span className={styles.tooltipJ}>J {fmtMin(acum[hovIdx].j)}</span>
-            <span className={styles.tooltipK}>K {fmtMin(acum[hovIdx].k)}</span>
-            <span className={styles.tooltipP}>P {fmtMin(acum[hovIdx].p)}</span>
+            <span className={styles.tooltipJ}>Previsto {fmtMin(acum[hovIdx].j)}</span>
+            <span className={styles.tooltipK}>Normal {fmtMin(acum[hovIdx].k)}</span>
+            <span className={styles.tooltipP}>Total {fmtMin(acum[hovIdx].p)}</span>
           </>
         ) : (
           <span className={styles.chartDataBarHint}>↔ passe o cursor sobre o gráfico</span>
@@ -157,7 +166,7 @@ function GraficoDiario({ dados }: { dados: DiaHorasResposta[] }) {
 // SVG Gráfico mensal acumulado (admin) — mesma estrutura, dados mensais
 // ─────────────────────────────────────────────────────────────
 
-function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
+function GraficoMensal({ dados, isDaily = false }: { dados: MesTrilha[]; isDaily?: boolean }) {
   const [hovIdx, setHovIdx] = useState<number | null>(null)
 
   const maxD = useMemo(
@@ -214,7 +223,9 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
         ))}
         {dados.map((d, i) => i % xLabelStep === 0 && (
           <text key={d.mes} x={xOf(i)} y={CHART_H - 4} className={styles.axisLabel} textAnchor="middle">
-            {format(parseISO(d.mes), "MMM/yy", { locale: ptBR })}
+            {isDaily
+              ? format(parseISO(d.mes), "dd/MM")
+              : format(parseISO(d.mes), "MMM/yy", { locale: ptBR })}
           </text>
         ))}
         <polyline points={polyJ} fill="none" className={styles.linePrevista} strokeDasharray="6 3" />
@@ -236,23 +247,41 @@ function GraficoMensal({ dados }: { dados: MesTrilha[] }) {
         )}
       </svg>
 
-      {/* Legenda estática — sempre visível */}
+      {/* Legenda elegante — nome sem prefixo J/K/P */}
       <div className={styles.chartLegend}>
-        <span className={styles.legendJ}>- - J Previsto acum.</span>
-        <span className={styles.legendK}>── K Normal acum.</span>
-        <span className={styles.legendP}>── P Total acum. (normal + extra)</span>
-        {showD && <span className={styles.legendD}>- - D Fora do bloco planejado acum.</span>}
+        <span className={styles.legendItem}>
+          <span className={`${styles.legendSym} ${styles.legendSymDash} ${styles.legendJ}`} />
+          <span className={styles.legendJ}>Previsto acum.</span>
+        </span>
+        <span className={styles.legendItem}>
+          <span className={`${styles.legendSym} ${styles.legendK}`} />
+          <span className={styles.legendK}>Normal acum.</span>
+        </span>
+        <span className={styles.legendItem}>
+          <span className={`${styles.legendSym} ${styles.legendP}`} />
+          <span className={styles.legendP}>Total acum.</span>
+        </span>
+        {showD && (
+          <span className={styles.legendItem}>
+            <span className={`${styles.legendSym} ${styles.legendSymDash} ${styles.legendD}`} />
+            <span className={styles.legendD}>Fora do bloco acum.</span>
+          </span>
+        )}
       </div>
 
       {/* Barra de dados — abaixo do SVG, fora das linhas */}
       <div className={styles.chartDataBar}>
         {hovIdx !== null ? (
           <>
-            <span className={styles.chartDataBarDate}>{format(parseISO(dados[hovIdx].mes), "MMMM yyyy", { locale: ptBR })}</span>
-            <span className={styles.tooltipJ}>J {fmtMin(dados[hovIdx].minutos_previstos_acum)}</span>
-            <span className={styles.tooltipK}>K {fmtMin(dados[hovIdx].minutos_lancados_normal_acum)}</span>
-            <span className={styles.tooltipP}>P {fmtMin(dados[hovIdx].minutos_lancados_total_acum)}</span>
-            {showD && <span className={styles.tooltipD}>D {fmtMin(dados[hovIdx].minutos_divergente_acum ?? 0)}</span>}
+            <span className={styles.chartDataBarDate}>
+              {isDaily
+                ? format(parseISO(dados[hovIdx].mes), "dd 'de' MMMM", { locale: ptBR })
+                : format(parseISO(dados[hovIdx].mes), "MMMM yyyy", { locale: ptBR })}
+            </span>
+            <span className={styles.tooltipJ}>Previsto {fmtMin(dados[hovIdx].minutos_previstos_acum)}</span>
+            <span className={styles.tooltipK}>Normal {fmtMin(dados[hovIdx].minutos_lancados_normal_acum)}</span>
+            <span className={styles.tooltipP}>Total {fmtMin(dados[hovIdx].minutos_lancados_total_acum)}</span>
+            {showD && <span className={styles.tooltipD}>Fora bloco {fmtMin(dados[hovIdx].minutos_divergente_acum ?? 0)}</span>}
           </>
         ) : (
           <span className={styles.chartDataBarHint}>↔ passe o cursor sobre o gráfico</span>
@@ -1226,6 +1255,16 @@ function AdminDashboard() {
     queryFn: getUsuarios,
   })
 
+  // ── Timeline: contexto Ano ou Mês ─────────────────────────
+  const [timelineContexto, setTimelineContexto] = useState<"ano" | "mes">("ano")
+  const [timelineMes, setTimelineMes] = useState(() => format(new Date(), "yyyy-MM"))
+
+  const { data: timelineDiaria } = useQuery({
+    queryKey: ["timelineDiario", timelineMes, blocoFiltro],
+    queryFn: () => getKpiTimelineDiario(timelineMes, blocoFiltro ?? undefined),
+    enabled: timelineContexto === "mes",
+  })
+
   const [mesPizza, setMesPizza] = useState(() => format(new Date(), "yyyy-MM"))
   const [usuarioPizza, setUsuarioPizza] = useState(0)
   const { data: pizzaData } = useQuery({
@@ -1353,13 +1392,45 @@ function AdminDashboard() {
       {/* ── Timeline acumulada ── */}
       {dashboard && (
         <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>Evolução acumulada de horas em produção — todos os operadores</h2>
-          <div className={styles.chartCard}>
-            <GraficoMensal dados={dashboard.timeline_mensal ?? []} />
+          <h2 className={styles.sectionTitle}>
+            Evolução acumulada de horas em produção — todos os operadores
+          </h2>
+          {/* Barra de contexto: Ano / Mês + seletor de mês */}
+          <div className={styles.timelineContextBar} style={{ marginBottom: 10 }}>
+            <button
+              type="button"
+              className={`${styles.timelineContextBtn} ${timelineContexto === "ano" ? styles.timelineContextBtnActive : ""}`}
+              onClick={() => setTimelineContexto("ano")}
+            >
+              12 meses
+            </button>
+            <button
+              type="button"
+              className={`${styles.timelineContextBtn} ${timelineContexto === "mes" ? styles.timelineContextBtnActive : ""}`}
+              onClick={() => setTimelineContexto("mes")}
+            >
+              Mês
+            </button>
+            {timelineContexto === "mes" && (
+              <input
+                type="month"
+                className={styles.timelineMesPicker}
+                value={timelineMes}
+                max={format(new Date(), "yyyy-MM")}
+                onChange={(e) => setTimelineMes(e.target.value)}
+              />
+            )}
           </div>
-          <p className={styles.chartCaption}>
-            Reta J = meta prevista acum. · Reta K = horas normais acum. · Reta P = normal + extra acum.
-          </p>
+          <div className={styles.chartCard}>
+            {timelineContexto === "ano" ? (
+              <GraficoMensal dados={dashboard.timeline_mensal ?? []} />
+            ) : (
+              <GraficoMensal
+                dados={timelineDiaria ?? []}
+                isDaily
+              />
+            )}
+          </div>
         </div>
       )}
 

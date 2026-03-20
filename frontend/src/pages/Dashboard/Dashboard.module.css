@@ -514,6 +514,83 @@
 .legendPrev { color: var(--info); opacity: 0.8; }
 .legendLanc { color: var(--accent); }
 
+/* ── Legend item (símbolo + texto) ─────────────────────────── */
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Símbolo da legenda — linha horizontal colorida */
+.legendSym {
+  display: inline-block;
+  width: 18px;
+  height: 2.5px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  background: currentColor;
+}
+
+/* Variante tracejada — usa border-bottom em vez de background */
+.legendSymDash {
+  background: none;
+  border-bottom: 2px dashed currentColor;
+  height: 0;
+  margin-bottom: 1px;
+}
+
+/* ── Timeline context bar (Ano / Mês) ──────────────────────── */
+
+.timelineContextBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.timelineContextBtn {
+  padding: 4px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--bd-faint);
+  background: var(--bg-raised);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-secondary);
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.timelineContextBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.timelineContextBtnActive {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-raised));
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.timelineMesPicker {
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--bd-faint);
+  background: var(--bg-raised);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-secondary);
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+
+.timelineMesPicker:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .chartCaption {
   font-family: var(--font-mono);
   font-size: 10px;

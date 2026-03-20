@@ -1452,6 +1452,98 @@ def kpi_dashboard(
 
 
 # ---------------------------------------------------------------------------
+# Timeline diária — admin (granularidade por dia dentro de um mês)
+# ---------------------------------------------------------------------------
+
+@router.get("/timeline-diario", summary="Timeline diária de horas produzidas em um mês")
+def kpi_timeline_diario(
+    _: UsuarioLogado,
+    request: Request,
+    mes: str = Query(..., description="Mês no formato YYYY-MM"),
+    bloco_id: int | None = Query(None),
+) -> list[MesTrilhaResposta]:
+    """Retorna a evolução acumulada de horas dia-a-dia para um mês específico.
+
+    Usa o mesmo modelo MesTrilhaResposta com o campo `mes` contendo a data no
+    formato YYYY-MM-DD (um ponto por dia do mês).
+    """
+    engine_cp = request.app.state.engine_cp
+    result: list[MesTrilhaResposta] = []
+
+    bloco_cond_ap = "AND ap.bloco_id = :bloco_id" if bloco_id else ""
+    bloco_cond_al = "AND al.bloco_id = :bloco_id" if bloco_id else ""
+    bp = {"mes_inicio": f"{mes}-01", "bloco_id": bloco_id} if bloco_id else {"mes_inicio": f"{mes}-01"}
+
+    sql = text(f"""
+        WITH dias AS (
+            SELECT generate_series(
+                date_trunc('month', :mes_inicio::date)::date,
+                (date_trunc('month', :mes_inicio::date)
+                    + INTERVAL '1 month' - INTERVAL '1 day')::date,
+                '1 day'::interval
+            )::date AS dia
+        ),
+        previsto AS (
+            SELECT ap.data AS dia,
+                   SUM(ap.minutos_planejados_normais + ap.minutos_planejados_extras) AS min_prev
+            FROM capacidade.agenda_prevista_admin ap
+            WHERE ap.em_uso = TRUE
+              AND ap.data >= date_trunc('month', :mes_inicio::date)::date
+              AND ap.data <  (date_trunc('month', :mes_inicio::date) + INTERVAL '1 month')::date
+              {bloco_cond_ap}
+            GROUP BY 1
+        ),
+        lancado_normal AS (
+            SELECT al.data_lancamento AS dia,
+                   SUM(al.minutos)    AS min_norm
+            FROM capacidade.agenda_lancamento al
+            WHERE al.em_uso = TRUE
+              AND al.faixa_minuto::text = 'NORMAL'
+              AND al.data_lancamento >= date_trunc('month', :mes_inicio::date)::date
+              AND al.data_lancamento <  (date_trunc('month', :mes_inicio::date) + INTERVAL '1 month')::date
+              {bloco_cond_al}
+            GROUP BY 1
+        ),
+        lancado_total AS (
+            SELECT al.data_lancamento AS dia,
+                   SUM(al.minutos)    AS min_total
+            FROM capacidade.agenda_lancamento al
+            WHERE al.em_uso = TRUE
+              AND al.data_lancamento >= date_trunc('month', :mes_inicio::date)::date
+              AND al.data_lancamento <  (date_trunc('month', :mes_inicio::date) + INTERVAL '1 month')::date
+              {bloco_cond_al}
+            GROUP BY 1
+        )
+        SELECT
+            d.dia::text AS mes,
+            SUM(COALESCE(p.min_prev,   0)) OVER (ORDER BY d.dia ROWS UNBOUNDED PRECEDING) AS minutos_previstos_acum,
+            SUM(COALESCE(ln.min_norm,  0)) OVER (ORDER BY d.dia ROWS UNBOUNDED PRECEDING) AS minutos_lancados_normal_acum,
+            SUM(COALESCE(lt.min_total, 0)) OVER (ORDER BY d.dia ROWS UNBOUNDED PRECEDING) AS minutos_lancados_total_acum,
+            0 AS minutos_divergente_acum
+        FROM dias d
+        LEFT JOIN previsto       p  ON p.dia  = d.dia
+        LEFT JOIN lancado_normal ln ON ln.dia  = d.dia
+        LEFT JOIN lancado_total  lt ON lt.dia  = d.dia
+        ORDER BY d.dia
+    """)
+
+    try:
+        with engine_cp.connect() as conn:
+            for row in conn.execute(sql, bp):
+                result.append(MesTrilhaResposta(
+                    mes=str(row.mes),
+                    minutos_previstos_acum=int(row.minutos_previstos_acum or 0),
+                    minutos_lancados_normal_acum=int(row.minutos_lancados_normal_acum or 0),
+                    minutos_lancados_total_acum=int(row.minutos_lancados_total_acum or 0),
+                    minutos_divergente_acum=0,
+                ))
+    except Exception:
+        _logger.exception("Erro ao calcular timeline diária")
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Modelos — Dashboard do usuário (operador)
 # ---------------------------------------------------------------------------
 
