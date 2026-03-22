@@ -971,3 +971,55 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Quick-select bar ─────────────────────────────────────── */
+
+.quickSelectBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--bd-faint);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.quickSelectBtn {
+  padding: 4px 10px;
+  border-radius: var(--r-sm, 6px);
+  border: 1px solid var(--bd-faint);
+  background: var(--bg-raised);
+  font-size: 11px;
+  color: var(--tx-secondary);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.quickSelectBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.quickSelectBtnActive {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow, rgba(99, 179, 237, 0.08));
+}
+
+.quickSelectCount {
+  font-size: 11px;
+  color: var(--tx-muted);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.quickSelectClear {
+  color: var(--tx-muted);
+}
+
+.quickSelectClear:hover {
+  border-color: var(--error, #f56565);
+  color: var(--error, #f56565);
+}

@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+from cp.domain.capacidade.enums import TipoPendencia
+
 
 class CapacidadeError(Exception):
     """Exceção base do módulo de capacidade."""
@@ -156,8 +158,9 @@ class PendenciaConsolidacao:
 
     usuario_id: int
     data: date
-    tipo: str
+    tipo: TipoPendencia
     motivo: str
+    minutos_nao_lancados: int | None = None  # minutos de capacidade não cobertos
 
 
 @dataclass

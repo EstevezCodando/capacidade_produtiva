@@ -2,7 +2,7 @@
 // CalendarGrid — Grid de calendário mensal/semanal
 // ============================================================
 import { useMemo, useState, useCallback, useRef } from 'react'
-import { format, isSameDay } from 'date-fns'
+import { format, isSameDay, isWeekend } from 'date-fns'
 import type { CalendarDay, DiaDaAgenda, CalendarView } from '@/types/agenda'
 import DayCell from './DayCell'
 import styles from './Calendar.module.css'
@@ -47,6 +47,8 @@ interface CalendarGridProps {
   isAdmin?: boolean
   loading?: boolean
   exibirIndicadorOcioso?: boolean
+  /** Lista de 'yyyy-MM-dd' para filtrar feriados no preview visual do drag */
+  feriados?: string[]
 }
 
 export default function CalendarGrid({
@@ -64,10 +66,12 @@ export default function CalendarGrid({
   isAdmin = false,
   loading = false,
   exibirIndicadorOcioso = true,
+  feriados = [],
 }: CalendarGridProps) {
   const [dragStart, setDragStart] = useState<Date | null>(null)
   const [dragEnd, setDragEnd] = useState<Date | null>(null)
   const isDragging = useRef(false)
+  const isCtrlMode = useRef(false)
 
   const visibleDays = useMemo(() => {
     if (view === 'month') return days
@@ -77,6 +81,7 @@ export default function CalendarGrid({
 
   const handleMouseDown = useCallback((date: Date, e: React.MouseEvent) => {
     if (e.button !== 0) return
+    isCtrlMode.current = e.ctrlKey || e.metaKey
     isDragging.current = true
     setDragStart(date)
     setDragEnd(date)
@@ -91,12 +96,14 @@ export default function CalendarGrid({
   const handleMouseUp = useCallback(() => {
     if (isDragging.current && dragStart && dragEnd) {
       if (isSameDay(dragStart, dragEnd)) {
-        onSelectDate(dragStart)
+        // Ctrl/Meta+Click → toggle individual day in selection
+        onSelectDate(dragStart, isCtrlMode.current)
       } else {
         onSelectRange(dragStart, dragEnd)
       }
     }
     isDragging.current = false
+    isCtrlMode.current = false
     setDragStart(null)
     setDragEnd(null)
   }, [dragStart, dragEnd, onSelectDate, onSelectRange])
@@ -105,8 +112,12 @@ export default function CalendarGrid({
     if (!dragStart || !dragEnd) return false
     const start = dragStart < dragEnd ? dragStart : dragEnd
     const end = dragStart < dragEnd ? dragEnd : dragStart
-    return date >= start && date <= end
-  }, [dragStart, dragEnd])
+    if (date < start || date > end) return false
+    // Always filter weekends; also filter holidays when feriados list is provided
+    if (isWeekend(date)) return false
+    if (feriados.includes(format(date, 'yyyy-MM-dd'))) return false
+    return true
+  }, [dragStart, dragEnd, feriados])
 
   const isSelected = useCallback((date: Date) => {
     return selectedDates.some((d) => isSameDay(d, date))

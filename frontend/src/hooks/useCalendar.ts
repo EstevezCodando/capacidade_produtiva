@@ -153,6 +153,56 @@ export function useCalendarNavigation(options: UseCalendarNavigationOptions = {}
     setSelectedDates(days)
   }, [])
 
+  // ── Helpers de dia útil ───────────────────────────────────
+  const isDiaUtil = useCallback((date: Date, feriadosDatas: string[]): boolean => {
+    return !isWeekend(date) && !feriadosDatas.includes(format(date, 'yyyy-MM-dd'))
+  }, [])
+
+  /** Seleciona range filtrando apenas dias úteis (sem fins de semana e feriados). */
+  const selectRangeDiasUteis = useCallback((start: Date, end: Date, feriadosDatas: string[]) => {
+    const interval = eachDayOfInterval({
+      start: start < end ? start : end,
+      end: start < end ? end : start,
+    })
+    setSelectedDates(interval.filter((d) => !isWeekend(d) && !feriadosDatas.includes(format(d, 'yyyy-MM-dd'))))
+  }, [])
+
+  /** Seleciona todos os dias úteis do mês visível. */
+  const selectDiasUteisDoMes = useCallback((feriadosDatas: string[]) => {
+    const days = eachDayOfInterval({
+      start: startOfMonth(currentDate),
+      end: endOfMonth(currentDate),
+    })
+    setSelectedDates(days.filter((d) => !isWeekend(d) && !feriadosDatas.includes(format(d, 'yyyy-MM-dd'))))
+  }, [currentDate])
+
+  /** Seleciona dias úteis da semana que contém `currentDate`. */
+  const selectSemanaAtual = useCallback((feriadosDatas: string[]) => {
+    const days = eachDayOfInterval({
+      start: startOfWeek(currentDate, { weekStartsOn }),
+      end: endOfWeek(currentDate, { weekStartsOn }),
+    })
+    setSelectedDates(days.filter((d) => !isWeekend(d) && !feriadosDatas.includes(format(d, 'yyyy-MM-dd'))))
+  }, [currentDate, weekStartsOn])
+
+  /**
+   * Seleciona dias úteis do mês que NÃO aparecem em `diasComLancamento`.
+   * `diasComLancamento` deve ser um Set (ou array) de strings 'yyyy-MM-dd'.
+   */
+  const selectDiasUteisNaoLancados = useCallback((feriadosDatas: string[], diasComLancamento: Set<string> | string[]) => {
+    const lancadoSet = new Set(diasComLancamento)
+    const days = eachDayOfInterval({
+      start: startOfMonth(currentDate),
+      end: endOfMonth(currentDate),
+    })
+    setSelectedDates(
+      days.filter((d) => {
+        const key = format(d, 'yyyy-MM-dd')
+        return !isWeekend(d) && !feriadosDatas.includes(key) && !lancadoSet.has(key)
+      })
+    )
+  }, [currentDate])
+
   const clearSelection = useCallback(() => {
     setSelectedDates([])
   }, [])
@@ -199,9 +249,14 @@ export function useCalendarNavigation(options: UseCalendarNavigationOptions = {}
     // Seleção
     selectDate,
     selectRange,
+    selectRangeDiasUteis,
+    selectDiasUteisDoMes,
+    selectSemanaAtual,
+    selectDiasUteisNaoLancados,
     clearSelection,
     isSelected,
-    
+    isDiaUtil,
+
     // Utilitários
     formatForApi,
   }
@@ -210,7 +265,7 @@ export function useCalendarNavigation(options: UseCalendarNavigationOptions = {}
 // ============================================================
 // useAgendaData — Hook para carregar dados da agenda
 // ============================================================
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { 
   getMeuPlanejamento,
   getAgendaUsuario,

@@ -9,6 +9,8 @@ Política de autorização:
     PUT    /capacidade/parametro/{id}              — admin
     GET    /capacidade/status                      — admin
     POST   /capacidade/consolidar-periodo          — admin
+    POST   /capacidade/desconsolidar-periodo       — admin
+    GET    /capacidade/exportar-sem-lancamento     — admin
     GET    /capacidade/feriados                    — autenticado
     POST   /capacidade/feriados                    — admin
     DELETE /capacidade/feriados/{id}               — admin
@@ -21,27 +23,31 @@ from __future__ import annotations
 
 from datetime import date
 
+import csv
+import io
+
 from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from cp.api.deps import SomenteAdmin, UsuarioLogado
-from cp.domain.capacidade.exceptions import (
-    CapacidadeError,
-    IntervaloInvalidoError,
-    PermissaoError,
-    RegistroNaoEncontradoError,
-    ValidacaoError,
-    VigenciaConflitanteError,
-)
+from cp.api.exception_handlers import handle_domain_exception
+from cp.domain.capacidade.constants import MINUTOS_DIA_UTIL_DEFAULT, MINUTOS_EXTRA_MAXIMO_DEFAULT
+from cp.domain.capacidade.models import TipoAtividade
 from cp.domain.capacidade.schemas import (
     CapacidadePeriodoResponse,
     ConfigTetoResponse,
     ConsolidacaoInput,
     ConsolidacaoResponse,
+    DesconsolidacaoResponse,
+    ExportacaoInconsistenciasResponse,
+    FeriadoInput,
+    FeriadoResponse,
     FeriadosListResponse,
     ParametroCapacidadeInput,
     ParametroCapacidadeResponse,
     PendenciaResponse,
+    RemovidoResponse,
     StatusDiasResponse,
 )
 from cp.services.capacidade import AgendaService, CapacidadeService, ConsolidacaoService
@@ -61,14 +67,6 @@ class TipoAtividadeConfigResponse(BaseModel):
 class TipoAtividadeCorInput(BaseModel):
     cor: str = Field(..., pattern=r"^#[0-9A-Fa-f]{6}$")
 
-
-class FeriadoInput(BaseModel):
-    data: date
-    descricao: str = Field(..., min_length=1, max_length=255)
-
-
-class RemovidoResponse(BaseModel):
-    removido: bool
 
 
 class ConfigTetoInput(BaseModel):
@@ -125,29 +123,13 @@ def _get_consolidacao_service(request: Request) -> ConsolidacaoService:
     return ConsolidacaoService(engine)
 
 
-def _handle_exception(exc: Exception) -> None:
-    """Converte exceções de domínio em HTTPException."""
-    if isinstance(exc, VigenciaConflitanteError):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
-    if isinstance(exc, IntervaloInvalidoError):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
-    if isinstance(exc, RegistroNaoEncontradoError):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    if isinstance(exc, ValidacaoError):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
-    if isinstance(exc, PermissaoError):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
-    if isinstance(exc, CapacidadeError):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    raise exc
 
-
-def _mapear_tipo_atividade(tipo: object) -> TipoAtividadeConfigResponse:
+def _mapear_tipo_atividade(tipo: TipoAtividade) -> TipoAtividadeConfigResponse:
     return TipoAtividadeConfigResponse(
         id=tipo.id,
-        codigo=tipo.codigo.value if hasattr(tipo.codigo, "value") else str(tipo.codigo),
+        codigo=tipo.codigo.value,
         nome=tipo.nome,
-        grupo=tipo.grupo.value if hasattr(tipo.grupo, "value") else str(tipo.grupo),
+        grupo=tipo.grupo.value,
         bloco_id=tipo.bloco_id,
         cor=tipo.cor,
     )
@@ -182,8 +164,8 @@ def config_teto(request: Request, _: SomenteAdmin) -> ConfigTetoResponse:
 
     if not parametro:
         return ConfigTetoResponse(
-            teto_normal_min=360,
-            teto_extra_min=240,
+            teto_normal_min=MINUTOS_DIA_UTIL_DEFAULT,
+            teto_extra_min=MINUTOS_EXTRA_MAXIMO_DEFAULT,
             vigencia_inicio=date(2026, 1, 1),
             vigencia_fim=None,
             configurado_em=None,
@@ -237,7 +219,7 @@ def atualizar_config_teto(
             configurado_por=parametro.criado_por,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.post("/parametro", summary="Criar parâmetro de capacidade (admin)", status_code=201)
@@ -267,7 +249,7 @@ def criar_parametro(
             criado_em=parametro.criado_em,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.put("/parametro/{parametro_id}", summary="Atualizar parâmetro de capacidade (admin)")
@@ -298,7 +280,7 @@ def atualizar_parametro(
             criado_em=parametro.criado_em,
         )
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.get("/status", summary="Status dos dias no intervalo")
@@ -343,6 +325,7 @@ def consolidar_periodo(
                 data=p.data,
                 tipo=p.tipo,
                 motivo=p.motivo,
+                minutos_nao_lancados=p.minutos_nao_lancados,
             )
             for p in resultado.pendencias
         ]
@@ -354,15 +337,91 @@ def consolidar_periodo(
     except HTTPException:
         raise
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
+
+
+@router.post("/desconsolidar-periodo", summary="Desconsolidar intervalo de datas (admin)")
+def desconsolidar_periodo(
+    request: Request,
+    body: ConsolidacaoInputExtended,
+    admin: SomenteAdmin,
+) -> DesconsolidacaoResponse:
+    """Reabre período consolidado, permitindo edição pelos operadores novamente."""
+    service = _get_consolidacao_service(request)
+
+    try:
+        if not body.usuarios_ids:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Especifique os IDs dos usuários em usuarios_ids",
+            )
+
+        resultado = service.desconsolidar_periodo_todos_usuarios(
+            usuarios_ids=body.usuarios_ids,
+            data_inicio=body.data_inicio,
+            data_fim=body.data_fim,
+            executor_id=admin.usuario_id,
+        )
+        return resultado
+    except HTTPException:
+        raise
+    except Exception as exc:
+        handle_domain_exception(exc)
+
+
+@router.get("/exportar-sem-lancamento", summary="Exportar inconsistências de lançamentos como CSV")
+def exportar_sem_lancamento(
+    request: Request,
+    _: SomenteAdmin,
+    data_inicio: date = Query(..., description="Data de início (YYYY-MM-DD)"),
+    data_fim: date = Query(..., description="Data de fim (YYYY-MM-DD)"),
+    usuarios_ids: str = Query(..., description="IDs dos usuários separados por vírgula"),
+) -> StreamingResponse:
+    """Gera CSV com usuário, data e horas não lançadas para o período especificado.
+
+    O CSV inclui apenas dias úteis com ausência ou incompletude de lançamentos.
+    """
+    service = _get_consolidacao_service(request)
+
+    try:
+        ids_list = [int(i.strip()) for i in usuarios_ids.split(",") if i.strip()]
+        if not ids_list:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Informe ao menos um ID de usuário em usuarios_ids",
+            )
+
+        resultado = service.obter_inconsistencias(ids_list, data_inicio, data_fim)
+
+        # Gera CSV em memória
+        output = io.StringIO()
+        writer = csv.writer(output, delimiter=";")
+        writer.writerow(["Nome do Usuário", "Data", "Horas Não Lançadas"])
+        for linha in resultado.linhas:
+            writer.writerow([
+                linha.nome_usuario,
+                linha.data.strftime("%d/%m/%Y"),
+                f"{linha.horas_nao_lancadas:.1f}".replace(".", ","),
+            ])
+
+        output.seek(0)
+        nome_arquivo = f"inconsistencias_{data_inicio}_{data_fim}.csv"
+
+        return StreamingResponse(
+            iter([output.getvalue().encode("utf-8-sig")]),  # utf-8-sig para compatibilidade Excel
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{nome_arquivo}"'},
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        handle_domain_exception(exc)
 
 
 @router.get("/feriados", summary="Lista feriados cadastrados")
 def listar_feriados(request: Request, _: UsuarioLogado) -> FeriadosListResponse:
     """Lista todos os feriados cadastrados."""
     service = _get_agenda_service(request)
-    from cp.domain.capacidade.schemas import FeriadoResponse
-
     feriados = service.listar_feriados()
     return FeriadosListResponse(
         feriados=[
@@ -392,7 +451,7 @@ def criar_feriado(request: Request, body: FeriadoInput, admin: SomenteAdmin) -> 
             "criado_em": feriado.criado_em,
         }
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.delete("/feriados/{feriado_id}", summary="Remover feriado")
@@ -403,7 +462,7 @@ def remover_feriado(request: Request, feriado_id: int, admin: SomenteAdmin) -> R
         removido = service.remover_feriado(feriado_id, admin.usuario_id)
         return RemovidoResponse(removido=removido)
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.get("/meu-periodo", summary="Capacidade do usuário autenticado no período")
@@ -428,7 +487,7 @@ def meu_periodo(
         detalhes = agenda_service.obter_agenda_completa(usuario.usuario_id, data_inicio, data_fim)
         return CapacidadePeriodoResponse(resumo=resumo, detalhes_por_dia=detalhes)
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.get("/usuario/{usuario_id}", summary="Capacidade de um usuário (admin)")
@@ -454,7 +513,7 @@ def capacidade_usuario(
         detalhes = agenda_service.obter_agenda_completa(usuario_id, data_inicio, data_fim)
         return CapacidadePeriodoResponse(resumo=resumo, detalhes_por_dia=detalhes)
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)
 
 
 @router.post("/materializar", summary="Materializar capacidade diária (admin)", status_code=201)
@@ -475,4 +534,4 @@ def materializar_capacidade(
         )
         return {"dias_materializados": len(capacidades)}
     except Exception as exc:
-        _handle_exception(exc)
+        handle_domain_exception(exc)

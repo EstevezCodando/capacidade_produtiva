@@ -105,6 +105,7 @@ def listar_usuarios(_: SomenteAdmin, request: Request) -> list[UsuarioResumo]:
     sql = text("""
         SELECT id, nome, nome_guerra
         FROM sap_snapshot.dgeo_usuario
+        WHERE ativo = TRUE
         ORDER BY nome
     """)
     with engine_cp.connect() as conn:

@@ -88,6 +88,76 @@ export interface LogAcesso {
 }
 
 
+// ── Dashboard Admin — novos tipos de controle gerencial ──────
+
+export interface ContribuidorBloco {
+  usuario_id: number
+  nome_guerra: string
+  pontos: number
+  percentual: number  // % dos pontos do bloco
+}
+
+export interface BlocoDestaque {
+  bloco_id: number
+  bloco_nome: string
+  projeto_nome: string
+  lote_nome: string
+  uts_total: number
+  uts_concluidas: number
+  uts_em_andamento: number
+  uts_sem_inicio: number
+  pontos_total: number
+  pontos_realizados: number
+  progresso: number | null
+  top_executores: ContribuidorBloco[]
+  top_revisores: ContribuidorBloco[]
+}
+
+export interface AlertaNotaAusente {
+  ut_id: number
+  bloco_nome: string
+  lote_nome: string
+  subfase_nome: string
+  executor_id: number | null
+  nome_executor: string | null
+  revisor_id: number | null
+  nome_revisor: string | null
+  cor_atividade_id: number | null  // ID da atividade de correção
+  ocorrencia: string               // NOTA_AUSENTE | NOTA_INVALIDA
+}
+
+export interface RankingOperador {
+  posicao: number
+  usuario_id: number
+  nome_guerra: string
+  pontos_executor: number
+  pontos_revisor: number
+  pontos_corretor: number
+  pontos_total: number
+  uts_executadas: number
+  uts_revisadas: number
+}
+
+export interface SemanaVelocidade {
+  semana_label: string   // "DD/MM"
+  semana_inicio: string  // "YYYY-MM-DD"
+  uts_concluidas: number
+  pontos_realizados: number
+}
+
+export interface DistribuicaoCiclo {
+  ciclo: string
+  quantidade: number
+  percentual: number
+}
+
+export interface SubfaseDisponivel {
+  subfase_id: number
+  subfase_nome: string
+  bloco_id?: number | null
+  bloco_nome?: string | null
+}
+
 export interface KpiDashboardResponse {
   sap_snapshot_atualizado_em: string | null
   kpi_calculado_em: string | null
@@ -103,4 +173,84 @@ export interface KpiDashboardResponse {
   top_revisor: unknown | null
   top_executores_subfase: Array<Record<string, unknown>>
   top_revisores_subfase: Array<Record<string, unknown>>
+  timeline_mensal: MesTrilha[]
+  blocos_destaque: BlocoDestaque[]
+  alertas_nota: AlertaNotaAusente[]
+  ranking_operadores: RankingOperador[]
+  velocidade_semanal: SemanaVelocidade[]
+  distribuicao_ciclos: DistribuicaoCiclo[]
+  bloco_filtro_id?: number | null
+  bloco_filtro_nome?: string | null
+  subfase_filtro_id?: number | null
+  subfase_filtro_nome?: string | null
+  subfases_disponiveis?: SubfaseDisponivel[]
+}
+
+// ── Dashboard do operador ─────────────────────────────────────
+
+export interface PontosSubfaseResposta {
+  subfase_id: number
+  subfase_nome: string
+  pontos: number                   // pontos do usuário nesta subfase/papel
+  pontos_total_subfase: number     // total alocado na subfase/bloco (fluxo_ut)
+}
+
+export interface BlocoDetalheUsuario {
+  bloco_id: number
+  bloco_nome: string
+  projeto_nome: string
+  pontos_total_bloco: number       // total distribuído a todos os usuários
+  pontos_usuario_bloco: number     // contribuição do usuário
+  pontos_alocados_bloco: number    // total alocado no bloco (fluxo_ut) — base 100%
+  como_executor: PontosSubfaseResposta[]
+  como_revisor: PontosSubfaseResposta[]
+  como_corretor: PontosSubfaseResposta[]
+}
+
+export interface DiaHorasResposta {
+  data: string
+  minutos_previstos: number
+  minutos_lancados: number
+  minutos_lancados_normal: number
+}
+
+export interface PizzaFatia {
+  nome: string
+  cor: string
+  minutos: number
+  percentual: number
+}
+
+export interface PizzaDistribuicaoResponse {
+  mes: string
+  total_capacidade_min: number
+  nao_alocado_min: number
+  fatias: PizzaFatia[]
+}
+
+export interface UsuarioResumo {
+  id: number
+  nome: string
+  nome_guerra: string | null
+}
+
+export interface MesTrilha {
+  mes: string                        // "YYYY-MM-DD" 1º do mês
+  minutos_previstos_acum: number     // J: previsto acumulado
+  minutos_lancados_normal_acum: number  // K: normal acumulado
+  minutos_lancados_total_acum: number   // P: normal+extra acumulado
+  minutos_divergente_acum?: number   // D: horas fora do bloco planejado (só com filtro ativo)
+}
+
+export interface MeuDashboardResponse {
+  sap_snapshot_atualizado_em: string | null
+  kpi_calculado_em: string | null
+  blocos: BlocoDetalheUsuario[]
+  pontos_total_geral: number
+  pontos_usuario_geral: number
+  horas_previstas_producao_min: number
+  horas_lancadas_producao_min: number
+  horas_lancadas_externas_min: number
+  timeline: DiaHorasResposta[]
+  timeline_mensal: MesTrilha[]
 }

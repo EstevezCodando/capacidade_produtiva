@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { eachDayOfInterval, format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
 import Modal from '@/components/ui/Modal'
 import { Button, Badge } from '@/components/ui/Common'
 import { criarPlanejamento } from '@/api/agenda'

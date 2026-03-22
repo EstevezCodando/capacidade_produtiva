@@ -11,6 +11,11 @@ from typing import Sequence
 
 from sqlalchemy.engine import Engine
 
+from cp.domain.capacidade.constants import (
+    DIAS_UTEIS_SEMANA,
+    MINUTOS_DIA_UTIL_DEFAULT,
+    MINUTOS_EXTRA_MAXIMO_DEFAULT,
+)
 from cp.domain.capacidade.enums import (
     CodigoAtividade,
     FaixaMinuto,
@@ -114,6 +119,8 @@ class CapacidadeService:
             data_fim=data_fim,
         )
 
+        if depois is None:
+            raise RegistroNaoEncontradoError("ParametroCapacidade", id)
         self._audit.auditar_parametro_atualizado(antes, depois, atualizado_por)
         return depois
 
@@ -123,7 +130,7 @@ class CapacidadeService:
 
     def _eh_dia_util(self, data: date) -> bool:
         """Verifica se é dia útil (não é fim de semana)."""
-        return data.weekday() < 5  # 0=segunda, 4=sexta
+        return data.weekday() in DIAS_UTEIS_SEMANA
 
     def _obter_tipo_indisponibilidade(
         self, codigo: CodigoAtividade
@@ -156,8 +163,8 @@ class CapacidadeService:
 
         # Obter parâmetro vigente
         parametro = self._param_repo.buscar_vigente(data)
-        minutos_normal = parametro.minutos_dia_util_default if parametro else 360
-        minutos_extra = parametro.minutos_extra_maximo_default if parametro else 240
+        minutos_normal = parametro.minutos_dia_util_default if parametro else MINUTOS_DIA_UTIL_DEFAULT
+        minutos_extra = parametro.minutos_extra_maximo_default if parametro else MINUTOS_EXTRA_MAXIMO_DEFAULT
         origem_param = parametro.id if parametro else None
 
         # Verificar se é dia útil

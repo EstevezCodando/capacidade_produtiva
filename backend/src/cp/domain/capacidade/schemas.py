@@ -204,6 +204,36 @@ class LancamentoUpdateInput(BaseModel):
     descricao: str | None = Field(None, max_length=500, description="Descrição do lançamento")
 
 
+class LancamentoLoteInput(BaseModel):
+    """Entrada para criação em lote de lançamentos (operador — várias datas, mesmo usuário)."""
+
+    datas: list[date] = Field(..., min_length=1, description="Datas dos lançamentos")
+    bloco_id: int | None = Field(None, description="ID do bloco (obrigatório para BLOCO)")
+    tipo_atividade: CodigoAtividade = Field(..., description="Código do tipo de atividade")
+    faixa: FaixaMinuto = Field(..., description="Faixa do minuto (NORMAL ou EXTRA)")
+    minutos: int = Field(..., gt=0, description="Quantidade de minutos por dia")
+    descricao: str | None = Field(None, max_length=500, description="Descrição do lançamento")
+
+    @model_validator(mode="after")
+    def validar_bloco_obrigatorio(self) -> "LancamentoLoteInput":
+        if self.tipo_atividade == CodigoAtividade.BLOCO and self.bloco_id is None:
+            raise ValueError("bloco_id é obrigatório para atividade do tipo BLOCO")
+        return self
+
+
+class LancamentoAdminLoteInput(LancamentoLoteInput):
+    """Entrada para criação em lote de lançamentos (admin — múltiplos usuários × múltiplas datas)."""
+
+    usuario_ids: list[int] = Field(..., min_length=1, description="IDs dos usuários alvo")
+
+
+class LancamentoLoteResponse(BaseModel):
+    """Resposta do lançamento em lote."""
+
+    criados: int = Field(..., description="Número de lançamentos criados com sucesso")
+    erros: list[str] = Field(default_factory=list, description="Erros por data/usuário")
+
+
 class LancamentoResponse(BaseSchema):
     """Resposta com dados de lançamento."""
 
@@ -368,6 +398,7 @@ class PendenciaResponse(BaseModel):
     data: date
     tipo: TipoPendencia
     motivo: str
+    minutos_nao_lancados: int | None = None  # minutos de capacidade não registrados neste dia
 
 
 class ConsolidacaoResponse(BaseModel):
@@ -378,10 +409,38 @@ class ConsolidacaoResponse(BaseModel):
     mensagem: str
 
 
+class DesconsolidacaoResponse(BaseModel):
+    """Resultado de desconsolidação."""
+
+    desconsolidado: bool
+    dias_reabertos: int
+    mensagem: str
+
+
+class LinhaExportacaoCSV(BaseModel):
+    """Linha para exportação CSV de inconsistências."""
+
+    nome_usuario: str
+    data: date
+    minutos_nao_lancados: int
+
+    @property
+    def horas_nao_lancadas(self) -> float:
+        return round(self.minutos_nao_lancados / 60, 2)
+
+
+class ExportacaoInconsistenciasResponse(BaseModel):
+    """Lista de inconsistências exportáveis."""
+
+    linhas: list[LinhaExportacaoCSV]
+    total_usuarios: int
+    total_dias: int
+
+
 class StatusDiasResponse(BaseModel):
     """Status dos dias em um período."""
 
-    dias: list[dict[str, str | date]]
+    dias: list[dict[str, str | date | int]]
 
 
 # ──────────────────────────────────────────────────────────────────────────────

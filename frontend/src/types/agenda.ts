@@ -109,6 +109,7 @@ export interface Lancamento {
   tipo_atividade_id: number
   tipo_atividade_codigo: CodigoAtividade
   tipo_atividade_nome: string
+  tipo_atividade_cor: string
   faixa_minuto: FaixaMinuto
   minutos: number
   descricao: string | null
@@ -137,6 +138,24 @@ export interface LancamentoUpdateInput {
   descricao?: string | null
 }
 
+export interface LancamentoLoteInput {
+  datas: string[]
+  bloco_id: number | null
+  tipo_atividade: CodigoAtividade
+  faixa: FaixaMinuto
+  minutos: number
+  descricao?: string | null
+}
+
+export interface LancamentoAdminLoteInput extends LancamentoLoteInput {
+  usuario_ids: number[]
+}
+
+export interface LancamentoLoteResult {
+  criados: number
+  erros: string[]
+}
+
 // ── Apontamento (resumo para visualização) ───────────────────
 
 export interface ApontamentoResumo {
@@ -145,6 +164,9 @@ export interface ApontamentoResumo {
   bloco_id: number | null
   bloco_nome?: string | null
   tipo_atividade: CodigoAtividade
+  tipo_atividade_id: number
+  tipo_atividade_nome: string
+  tipo_atividade_cor: string
   minutos: number
   faixa: FaixaMinuto
 }
@@ -241,6 +263,7 @@ export interface Pendencia {
   data: string
   tipo: TipoPendencia
   motivo: string
+  minutos_nao_lancados?: number | null
 }
 
 export interface ConsolidacaoInput {
@@ -254,6 +277,33 @@ export interface ConsolidacaoResult {
   consolidado: boolean
   pendencias: Pendencia[]
   mensagem: string
+}
+
+export interface DesconsolidacaoInput {
+  data_inicio: string
+  data_fim: string
+  usuarios_ids: number[]
+}
+
+export interface DesconsolidacaoResult {
+  desconsolidado: boolean
+  dias_reabertos: number
+  mensagem: string
+}
+
+// Inconsistências agrupadas por usuário (para exibição com hover)
+export interface InconsistenciaDia {
+  data: string
+  tipo: TipoPendencia
+  motivo: string
+  minutos_nao_lancados?: number | null
+}
+
+export interface InconsistenciaUsuario {
+  usuario_id: number
+  usuario_nome: string
+  dias: InconsistenciaDia[]
+  total_minutos_nao_lancados: number
 }
 
 // ── Respostas genéricas ──────────────────────────────────────

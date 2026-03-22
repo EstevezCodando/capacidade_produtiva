@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Self
+from urllib.parse import quote_plus
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,6 +10,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=("config.env", ".env"),
+        # Sem env_file_encoding → usa o encoding do sistema (cp1252 no Windows,
+        # UTF-8 no Linux). quote_plus() nos urls garante que qualquer caractere
+        # especial nas credenciais seja % -encoded antes de chegar ao psycopg2.
         case_sensitive=False,
         extra="ignore",
     )
@@ -104,15 +108,18 @@ class Settings(BaseSettings):
 
     @property
     def cp_db_url(self) -> str:
-        return f"postgresql+psycopg2://{self.cp_db_user}:{self.cp_db_password}@{self.cp_db_host}:{self.cp_db_port}/{self.cp_db_name}"
+        u, p = quote_plus(self.cp_db_user), quote_plus(self.cp_db_password)
+        return f"postgresql+psycopg2://{u}:{p}@{self.cp_db_host}:{self.cp_db_port}/{self.cp_db_name}"
 
     @property
     def sap_db_url(self) -> str:
-        return f"postgresql+psycopg2://{self.sap_db_user}:{self.sap_db_password}@{self.sap_db_host}:{self.sap_db_port}/{self.sap_db_name}"
+        u, p = quote_plus(self.sap_db_user), quote_plus(self.sap_db_password)
+        return f"postgresql+psycopg2://{u}:{p}@{self.sap_db_host}:{self.sap_db_port}/{self.sap_db_name}"
 
     @property
     def sap_test_db_url(self) -> str:
+        u, p = quote_plus(self.sap_test_db_user), quote_plus(self.sap_test_db_password)
         return (
-            f"postgresql+psycopg2://{self.sap_test_db_user}:{self.sap_test_db_password}"
+            f"postgresql+psycopg2://{u}:{p}"
             f"@{self.sap_test_db_host}:{self.sap_test_db_port}/{self.sap_test_db_name}"
         )
