@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import text

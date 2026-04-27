@@ -7,13 +7,18 @@ import type {
   ConfigTetoInput,
   ConsolidacaoInput,
   ConsolidacaoResult,
+  DesconsolidacaoInput,
+  DesconsolidacaoResult,
   Feriado,
   FeriadoInput,
   Indisponibilidade,
   IndisponibilidadeInput,
   Lancamento,
   LancamentoAdminInput,
+  LancamentoAdminLoteInput,
   LancamentoInput,
+  LancamentoLoteInput,
+  LancamentoLoteResult,
   LancamentoUpdateInput,
   Planejamento,
   PlanejamentoInput,
@@ -101,6 +106,16 @@ export async function removerLancamentoAdmin(id: number): Promise<RemovidoRespon
   return res.data
 }
 
+export async function criarLancamentoLote(input: LancamentoLoteInput): Promise<LancamentoLoteResult> {
+  const res = await apiClient.post<LancamentoLoteResult>('/agenda/lancamento/lote', input)
+  return res.data
+}
+
+export async function criarLancamentoAdminLote(input: LancamentoAdminLoteInput): Promise<LancamentoLoteResult> {
+  const res = await apiClient.post<LancamentoLoteResult>('/agenda/lancamento-admin/lote', input)
+  return res.data
+}
+
 export async function getFeriados(): Promise<{ feriados: Feriado[] }> {
   try {
     const res = await apiClient.get<{ feriados: Feriado[] }>('/capacidade/feriados')
@@ -183,6 +198,44 @@ export async function getStatusDias(dataInicio: string, dataFim: string): Promis
 export async function consolidarPeriodo(input: ConsolidacaoInput): Promise<ConsolidacaoResult> {
   const res = await apiClient.post<ConsolidacaoResult>('/capacidade/consolidar-periodo', input)
   return res.data
+}
+
+export async function desconsolidarPeriodo(input: DesconsolidacaoInput): Promise<DesconsolidacaoResult> {
+  const res = await apiClient.post<DesconsolidacaoResult>('/capacidade/desconsolidar-periodo', input)
+  return res.data
+}
+
+/**
+ * Baixa o CSV de inconsistências diretamente no navegador.
+ * Retorna o conteúdo CSV como string para que o chamador possa decidir
+ * se quer disparar o download ou apenas apresentar os dados.
+ */
+export async function exportarInconsistenciasCSV(
+  dataInicio: string,
+  dataFim: string,
+  usuariosIds: number[],
+): Promise<void> {
+  const params = new URLSearchParams({
+    data_inicio: dataInicio,
+    data_fim: dataFim,
+    usuarios_ids: usuariosIds.join(','),
+  })
+  // Usamos fetch direto para obter o blob do CSV
+  const token = localStorage.getItem('token') ?? sessionStorage.getItem('token') ?? ''
+  const resp = await fetch(
+    `${apiClient.defaults.baseURL}/capacidade/exportar-sem-lancamento?${params.toString()}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  )
+  if (!resp.ok) throw new Error('Falha ao exportar CSV')
+  const blob = await resp.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `inconsistencias_${dataInicio}_${dataFim}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 export async function getBlocos(): Promise<Bloco[]> {

@@ -124,6 +124,27 @@ class AuditService:
             },
         )
 
+    def registrar_desconsolidacao(
+        self,
+        data_inicio: date,
+        data_fim: date,
+        usuarios_afetados: list[int],
+        usuario_executor: int,
+    ) -> None:
+        """Registra desconsolidação (reabertura) de período."""
+        self._repo.registrar(
+            entidade="consolidacao_periodo",
+            entidade_id=0,
+            acao=AcaoAuditoria.DECONSOLIDATE,
+            usuario_executor=usuario_executor,
+            antes={
+                "data_inicio": data_inicio.isoformat(),
+                "data_fim": data_fim.isoformat(),
+                "usuarios_afetados": usuarios_afetados,
+            },
+            depois=None,
+        )
+
     # Métodos específicos por entidade para melhor semântica
 
     def auditar_lancamento_criado(

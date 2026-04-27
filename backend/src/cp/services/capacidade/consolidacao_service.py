@@ -6,8 +6,10 @@ Responsável pela consolidação de períodos e verificação de pendências.
 from __future__ import annotations
 
 from datetime import date, timedelta
+from typing import TYPE_CHECKING
 
 from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 
 from cp.domain.capacidade.enums import FaixaMinuto, StatusDia, TipoPendencia
 from cp.domain.capacidade.exceptions import (
@@ -15,6 +17,7 @@ from cp.domain.capacidade.exceptions import (
     PendenciaConsolidacao,
     ResultadoConsolidacao,
 )
+from cp.domain.capacidade.schemas import DesconsolidacaoResponse, ExportacaoInconsistenciasResponse, LinhaExportacaoCSV
 from cp.repositories.capacidade import (
     AgendaLancamentoRepository,
     CapacidadeDiaRepository,
@@ -23,6 +26,9 @@ from cp.repositories.capacidade import (
     TipoAtividadeRepository,
 )
 from cp.services.capacidade.audit_service import AuditService
+
+if TYPE_CHECKING:
+    pass
 
 
 class ConsolidacaoService:
@@ -79,7 +85,7 @@ class ConsolidacaoService:
                         PendenciaConsolidacao(
                             usuario_id=usuario_id,
                             data=data_atual,
-                            tipo=TipoPendencia.SEM_LANCAMENTO.value,
+                            tipo=TipoPendencia.SEM_LANCAMENTO,
                             motivo="Dia útil sem capacidade materializada nem lançamentos",
                         )
                     )
@@ -102,7 +108,7 @@ class ConsolidacaoService:
                         PendenciaConsolidacao(
                             usuario_id=usuario_id,
                             data=data_atual,
-                            tipo=TipoPendencia.INDISPONIBILIDADE_NAO_TRATADA.value,
+                            tipo=TipoPendencia.INDISPONIBILIDADE_NAO_TRATADA,
                             motivo="Dia marcado como indisponível mas sem cadastro de indisponibilidade",
                         )
                     )
@@ -119,30 +125,33 @@ class ConsolidacaoService:
                         PendenciaConsolidacao(
                             usuario_id=usuario_id,
                             data=data_atual,
-                            tipo=TipoPendencia.SEM_LANCAMENTO.value,
+                            tipo=TipoPendencia.SEM_LANCAMENTO,
                             motivo="Dia útil sem nenhum lançamento",
+                            minutos_nao_lancados=capacidade.minutos_capacidade_normal_prevista,
                         )
                     )
                 else:
                     # Verificar soma de minutos normais
                     soma_normal = sum(
-                        l.minutos
-                        for l in lancamentos
-                        if l.faixa_minuto == FaixaMinuto.NORMAL
+                        lanc.minutos
+                        for lanc in lancamentos
+                        if lanc.faixa_minuto == FaixaMinuto.NORMAL
                     )
 
                     # Se a soma é muito baixa (menos de 50% do esperado), alertar
                     limite_minimo = capacidade.minutos_capacidade_normal_prevista * 0.5
                     if soma_normal < limite_minimo:
+                        faltam = max(0, capacidade.minutos_capacidade_normal_prevista - soma_normal)
                         pendencias.append(
                             PendenciaConsolidacao(
                                 usuario_id=usuario_id,
                                 data=data_atual,
-                                tipo=TipoPendencia.LANCAMENTO_INCOMPLETO.value,
+                                tipo=TipoPendencia.LANCAMENTO_INCOMPLETO,
                                 motivo=(
                                     f"Soma de minutos normais ({soma_normal}) abaixo de 50% "
                                     f"do esperado ({capacidade.minutos_capacidade_normal_prevista})"
                                 ),
+                                minutos_nao_lancados=faltam,
                             )
                         )
 
@@ -252,6 +261,10 @@ class ConsolidacaoService:
                 usuario_id, data_inicio, data_fim
             )
             total_dias += dias
+            # Sincronizar flag consolidado nos lançamentos do período
+            self._lancamento_repo.marcar_consolidado_periodo(
+                usuario_id, data_inicio, data_fim, consolidado=True
+            )
 
         # Auditar
         self._audit.registrar_consolidacao(
@@ -271,9 +284,117 @@ class ConsolidacaoService:
             mensagem=mensagem,
         )
 
+    def desconsolidar_periodo(
+        self,
+        usuario_id: int,
+        data_inicio: date,
+        data_fim: date,
+        executor_id: int,
+    ) -> DesconsolidacaoResponse:
+        """Reabre período consolidado para o usuário."""
+        if data_fim < data_inicio:
+            raise IntervaloInvalidoError(data_inicio, data_fim)
+
+        dias = self._capacidade_repo.desconsolidar_periodo(usuario_id, data_inicio, data_fim)
+
+        self._audit.registrar_desconsolidacao(
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            usuarios_afetados=[usuario_id],
+            usuario_executor=executor_id,
+        )
+
+        return DesconsolidacaoResponse(
+            desconsolidado=True,
+            dias_reabertos=dias,
+            mensagem=f"Reabertos {dias} dias para edição.",
+        )
+
+    def desconsolidar_periodo_todos_usuarios(
+        self,
+        usuarios_ids: list[int],
+        data_inicio: date,
+        data_fim: date,
+        executor_id: int,
+    ) -> DesconsolidacaoResponse:
+        """Reabre período consolidado para múltiplos usuários."""
+        if data_fim < data_inicio:
+            raise IntervaloInvalidoError(data_inicio, data_fim)
+
+        total_dias = 0
+        for usuario_id in usuarios_ids:
+            total_dias += self._capacidade_repo.desconsolidar_periodo(
+                usuario_id, data_inicio, data_fim
+            )
+            # Reverter flag consolidado nos lançamentos do período
+            self._lancamento_repo.marcar_consolidado_periodo(
+                usuario_id, data_inicio, data_fim, consolidado=False
+            )
+
+        self._audit.registrar_desconsolidacao(
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            usuarios_afetados=usuarios_ids,
+            usuario_executor=executor_id,
+        )
+
+        return DesconsolidacaoResponse(
+            desconsolidado=True,
+            dias_reabertos=total_dias,
+            mensagem=f"Reabertos {total_dias} dias para {len(usuarios_ids)} usuário(s).",
+        )
+
+    def obter_inconsistencias(
+        self,
+        usuarios_ids: list[int],
+        data_inicio: date,
+        data_fim: date,
+    ) -> ExportacaoInconsistenciasResponse:
+        """Retorna dias sem lançamento (ou incompletos) para exportação CSV.
+
+        Inclui apenas pendências do tipo SEM_LANCAMENTO e LANCAMENTO_INCOMPLETO.
+        Enriquece com nome do usuário via JOIN ao dgeo.usuarios.
+        """
+        from sqlalchemy import text
+
+        usuarios_nomes: dict[int, str] = {}
+        with Session(self._engine) as session:
+            rows = session.execute(
+                text("SELECT id, COALESCE(nome_guerra, nome) AS nome FROM dgeo.usuarios WHERE id = ANY(:ids)"),
+                {"ids": list(usuarios_ids)},
+            ).fetchall()
+            for row in rows:
+                usuarios_nomes[row.id] = row.nome
+
+        pendencias_totais = self.verificar_pendencias_todos_usuarios(
+            usuarios_ids, data_inicio, data_fim
+        )
+
+        linhas: list[LinhaExportacaoCSV] = []
+        for p in pendencias_totais:
+            if p.tipo in (TipoPendencia.SEM_LANCAMENTO, TipoPendencia.LANCAMENTO_INCOMPLETO):
+                linhas.append(
+                    LinhaExportacaoCSV(
+                        nome_usuario=usuarios_nomes.get(p.usuario_id, f"Usuário {p.usuario_id}"),
+                        data=p.data,
+                        minutos_nao_lancados=p.minutos_nao_lancados or 0,
+                    )
+                )
+
+        # Ordenar por nome e depois data
+        linhas.sort(key=lambda x: (x.nome_usuario, x.data))
+
+        usuarios_com_pendencia = {ln.nome_usuario for ln in linhas}
+
+        return ExportacaoInconsistenciasResponse(
+            linhas=linhas,
+            total_usuarios=len(usuarios_com_pendencia),
+            total_dias=len(linhas),
+        )
+
     def obter_status_dias(
         self, data_inicio: date, data_fim: date
-    ) -> list[dict[str, date | str]]:
+    ) -> list[dict[str, date | str | int]]:
         """Obtém status de todos os dias no período."""
         capacidades = self._capacidade_repo.listar_por_status(data_inicio, data_fim)
 

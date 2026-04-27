@@ -27,6 +27,7 @@ from cp.domain.capacidade.exceptions import (
     IntervaloInvalidoError,
     LimiteCapacidadeExcedidoError,
     RegistroNaoEncontradoError,
+    ValidacaoError,
 )
 from cp.domain.capacidade.models import (
     AgendaLancamento,
@@ -247,6 +248,8 @@ class AgendaService:
             descricao=descricao,
         )
 
+        if depois is None:
+            raise RegistroNaoEncontradoError("Planejamento", id)
         self._audit.auditar_planejamento_atualizado(antes, depois, atualizado_por)
         return depois
 
@@ -414,6 +417,8 @@ class AgendaService:
             atualizado_por=atualizado_por,
         )
 
+        if depois is None:
+            raise RegistroNaoEncontradoError("Lançamento", id)
         self._audit.auditar_lancamento_atualizado(antes, depois, atualizado_por)
         return depois, alertas
 
@@ -593,8 +598,8 @@ class AgendaService:
             planejamentos_por_data.setdefault(p.data, []).append(p)
 
         lancamentos_por_data: dict[date, list[AgendaLancamento]] = {}
-        for l in lancamentos:
-            lancamentos_por_data.setdefault(l.data_lancamento, []).append(l)
+        for lanc in lancamentos:
+            lancamentos_por_data.setdefault(lanc.data_lancamento, []).append(lanc)
 
         while data_atual <= data_fim:
             capacidade = capacidades.get(data_atual)
@@ -637,10 +642,10 @@ class AgendaService:
             # Calcular minutos apontados
             lancs_dia = lancamentos_por_data.get(data_atual, [])
             apontado_normal = sum(
-                l.minutos for l in lancs_dia if l.faixa_minuto == FaixaMinuto.NORMAL
+                lanc.minutos for lanc in lancs_dia if lanc.faixa_minuto == FaixaMinuto.NORMAL
             )
             apontado_extra = sum(
-                l.minutos for l in lancs_dia if l.faixa_minuto == FaixaMinuto.EXTRA
+                lanc.minutos for lanc in lancs_dia if lanc.faixa_minuto == FaixaMinuto.EXTRA
             )
 
             # Calcular ociosos
@@ -666,17 +671,20 @@ class AgendaService:
 
             # Converter lançamentos
             lancamentos_response = []
-            for l in lancs_dia:
-                tipo = self._tipo_atividade_repo.buscar_por_id(l.tipo_atividade_id)
+            for lanc in lancs_dia:
+                tipo = self._tipo_atividade_repo.buscar_por_id(lanc.tipo_atividade_id)
                 lancamentos_response.append(
                     ApontamentoResumo(
-                        id=l.id,
-                        data=l.data_lancamento,
-                        bloco_id=l.bloco_id,
+                        id=lanc.id,
+                        data=lanc.data_lancamento,
+                        bloco_id=lanc.bloco_id,
                         bloco_nome=None,  # TODO: buscar nome do bloco
+                        tipo_atividade_id=lanc.tipo_atividade_id,
                         tipo_atividade=tipo.codigo if tipo else CodigoAtividade.BLOCO,
-                        minutos=l.minutos,
-                        faixa=l.faixa_minuto,
+                        tipo_atividade_nome=tipo.nome if tipo else "",
+                        tipo_atividade_cor=tipo.cor if tipo else "",
+                        minutos=lanc.minutos,
+                        faixa=lanc.faixa_minuto,
                     )
                 )
 

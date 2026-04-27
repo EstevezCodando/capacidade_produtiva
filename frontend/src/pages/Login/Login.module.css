@@ -42,20 +42,10 @@
   margin-bottom: 32px;
 }
 
-.logoMark {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--accent);
-  background: var(--accent-glow);
-  border: 1px solid var(--accent-border);
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--r-md);
-  letter-spacing: 1px;
+.logoImg {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
   flex-shrink: 0;
 }
 
