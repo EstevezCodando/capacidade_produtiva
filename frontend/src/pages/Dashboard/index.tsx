@@ -4,17 +4,18 @@
 // Admin:    visão global, projetos, sync SAP
 // ============================================================
 import {
-  getMeuDashboard, executarSync, getKpiDashboard, getKpiProjetos, getSyncStatus,
-  getMinhaPizzaMensal, getPizzaMensal, getUsuarios, getKpiTimelineDiario,
+  getMeuDashboard, getDashboardUsuario, executarSync, getKpiDashboard, getKpiProjetos, getSyncStatus,
+  getMinhaPizzaMensal, getPizzaMensal, getUsuarios, getKpiTimelineDiario, getAgendaUsuario,
 } from "@/api/endpoints"
 import { useAuth } from "@/context/AuthContext"
 import type {
   AlertaNotaAusente, BlocoDetalheUsuario, BlocoDestaque, DiaHorasResposta,
-  DistribuicaoCiclo, MesTrilha, PizzaFatia, PontosSubfaseResposta,
+  DistribuicaoCiclo, MesTrilha, MeuDashboardResponse, PizzaFatia, PontosSubfaseResposta,
   RankingOperador, SemanaVelocidade, SubfaseDisponivel,
 } from "@/types"
+import type { ApontamentoResumo } from "@/types/agenda"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { format, formatDistanceToNow, parseISO, subMonths, startOfMonth } from "date-fns"
+import { format, formatDistanceToNow, parseISO, subMonths, startOfMonth, endOfMonth, parse } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useMemo, useState } from "react"
 import styles from "./Dashboard.module.css"
@@ -706,9 +707,10 @@ interface RankingPanelProps {
   subfaseFiltro: number | null
   blocoFiltro: number | null
   onSubfaseFiltro: (subfaseId: number | null, blocoId?: number | null) => void
+  onVerDetalhe?: (op: RankingOperador) => void
 }
 
-function RankingPanel({ operadores, subfases, subfaseFiltro, blocoFiltro, onSubfaseFiltro }: RankingPanelProps) {
+function RankingPanel({ operadores, subfases, subfaseFiltro, blocoFiltro, onSubfaseFiltro, onVerDetalhe }: RankingPanelProps) {
   const [funcao, setFuncao] = useState<FuncaoFiltro>("todos")
   const [sortCol, setSortCol] = useState<SortCol>("total")
   const [sortAsc, setSortAsc] = useState(false)
@@ -854,7 +856,12 @@ function RankingPanel({ operadores, subfases, subfaseFiltro, blocoFiltro, onSubf
           const barExec = Math.round((op.pontos_executor / safeTot) * 100)
           const barRev  = Math.round((op.pontos_revisor  / safeTot) * 100)
           return (
-            <div key={op.usuario_id} className={styles.rankingRow}>
+            <div
+              key={op.usuario_id}
+              className={`${styles.rankingRow} ${onVerDetalhe ? styles.rankingRowClickable : ""}`}
+              onClick={() => onVerDetalhe?.(op)}
+              title={onVerDetalhe ? `Ver detalhes de ${op.nome_guerra}` : undefined}
+            >
               <span className={styles.rankingCellPos}>{idx + 1}</span>
               <span className={styles.rankingCellNome}>{op.nome_guerra}</span>
               {(funcao === "todos" || funcao === "executor") && (
@@ -1255,6 +1262,218 @@ function OperadorDashboard() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Painel de detalhe de pontos de um usuário (admin)
+// ─────────────────────────────────────────────────────────────
+
+function BlocoDetalhePanel({ bloco }: { bloco: BlocoDetalheUsuario }) {
+  const totsub = bloco.pontos_usuario_bloco || 1
+  return (
+    <div className={styles.detalheBloco}>
+      <div className={styles.detalheBlocoHeader}>
+        <span className={styles.detalheBlocoNome}>{bloco.bloco_nome}</span>
+        <span className={styles.detalheBlocoProjeto}>{bloco.projeto_nome}</span>
+        <span className={styles.detalheBlocoPts}>{fmtPts(bloco.pontos_usuario_bloco)} pts</span>
+      </div>
+      {bloco.como_executor.length > 0 && (
+        <div className={styles.detalhePapel}>
+          <span className={styles.detalhePapelLabel}>Execução</span>
+          {bloco.como_executor.map((sf) => (
+            <div key={sf.subfase_id} className={styles.detalheSubfase}>
+              <span className={styles.detalheSubfaseNome}>{sf.subfase_nome}</span>
+              <span className={styles.detalheSubfasePts}>{fmtPts(sf.pontos)}</span>
+              <span className={styles.detalheSubfaseBar}>
+                <span className={`${styles.detalheSubfaseBarFill} ${styles.detalheBarExec}`}
+                  style={{ width: `${Math.round((sf.pontos / totsub) * 100)}%` }} />
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {bloco.como_revisor.length > 0 && (
+        <div className={styles.detalhePapel}>
+          <span className={styles.detalhePapelLabel}>Revisão</span>
+          {bloco.como_revisor.map((sf) => (
+            <div key={sf.subfase_id} className={styles.detalheSubfase}>
+              <span className={styles.detalheSubfaseNome}>{sf.subfase_nome}</span>
+              <span className={styles.detalheSubfasePts}>{fmtPts(sf.pontos)}</span>
+              <span className={styles.detalheSubfaseBar}>
+                <span className={`${styles.detalheSubfaseBarFill} ${styles.detalheBarRev}`}
+                  style={{ width: `${Math.round((sf.pontos / totsub) * 100)}%` }} />
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {bloco.como_corretor.length > 0 && (
+        <div className={styles.detalhePapel}>
+          <span className={styles.detalhePapelLabel}>Correção</span>
+          {bloco.como_corretor.map((sf) => (
+            <div key={sf.subfase_id} className={styles.detalheSubfase}>
+              <span className={styles.detalheSubfaseNome}>{sf.subfase_nome}</span>
+              <span className={styles.detalheSubfasePts}>{fmtPts(sf.pontos)}</span>
+              <span className={styles.detalheSubfaseBar}>
+                <span className={`${styles.detalheSubfaseBarFill} ${styles.detalheBarCor}`}
+                  style={{ width: `${Math.round((sf.pontos / totsub) * 100)}%` }} />
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function UsuarioDetalheDrawer({
+  nome,
+  usuarioId,
+  dados,
+  onFechar,
+}: {
+  nome: string
+  usuarioId: number
+  dados: MeuDashboardResponse | undefined
+  onFechar: () => void
+}) {
+  const [aba, setAba] = useState<'pontos' | 'lancamentos'>('pontos')
+  const [mesSel, setMesSel] = useState(() => format(new Date(), 'yyyy-MM'))
+
+  const dataInicio = `${mesSel}-01`
+  const dataFim = format(endOfMonth(parse(mesSel, 'yyyy-MM', new Date())), 'yyyy-MM-dd')
+
+  const { data: agenda, isLoading: agendaLoading } = useQuery({
+    queryKey: ['agendaUsuario', usuarioId, mesSel],
+    queryFn: () => getAgendaUsuario(usuarioId, dataInicio, dataFim),
+    enabled: aba === 'lancamentos',
+    staleTime: 60_000,
+  })
+
+  const lancamentos = useMemo<(ApontamentoResumo & { data: string })[]>(() => {
+    if (!agenda) return []
+    return agenda.dias
+      .filter((d) => d.lancamentos.length > 0)
+      .flatMap((d) => d.lancamentos.map((l) => ({ ...l, data: d.data })))
+  }, [agenda])
+
+  return (
+    <div className={styles.detalheOverlay} onClick={onFechar}>
+      <div className={styles.detalheDrawer} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.detalheDrawerHeader}>
+          <div>
+            <h2 className={styles.detalheDrawerNome}>{nome}</h2>
+            {dados && (
+              <p className={styles.detalheDrawerSub}>
+                {fmtPts(dados.pontos_usuario_geral)} pts &mdash;&nbsp;
+                {fmtMin(dados.horas_lancadas_producao_min)} lançadas em produção
+              </p>
+            )}
+          </div>
+          <button type="button" className={styles.detalheFechar} onClick={onFechar}>✕</button>
+        </div>
+
+        {/* Abas */}
+        <div className={styles.detalheAbas}>
+          <button
+            type="button"
+            className={`${styles.detalheAba} ${aba === 'pontos' ? styles.detalheAbaAtiva : ''}`}
+            onClick={() => setAba('pontos')}
+          >
+            Pontos por bloco
+          </button>
+          <button
+            type="button"
+            className={`${styles.detalheAba} ${aba === 'lancamentos' ? styles.detalheAbaAtiva : ''}`}
+            onClick={() => setAba('lancamentos')}
+          >
+            Lançamentos
+          </button>
+        </div>
+
+        {/* ── Aba Pontos ── */}
+        {aba === 'pontos' && (
+          <>
+            {!dados && <div className={styles.detalheLoading}>Carregando…</div>}
+            {dados && dados.blocos.length === 0 && (
+              <div className={styles.emptyState}>Nenhum ponto registrado para este operador.</div>
+            )}
+            {dados && dados.blocos.map((bloco) => (
+              <BlocoDetalhePanel key={bloco.bloco_id} bloco={bloco} />
+            ))}
+            {dados && (
+              <div className={styles.detalheHorasRow}>
+                <div className={styles.detalheHorasCard}>
+                  <span className={styles.detalheHorasLabel}>Previstas (produção)</span>
+                  <span className={styles.detalheHorasVal}>{fmtMin(dados.horas_previstas_producao_min)}</span>
+                </div>
+                <div className={styles.detalheHorasCard}>
+                  <span className={styles.detalheHorasLabel}>Lançadas (produção)</span>
+                  <span className={styles.detalheHorasVal}>{fmtMin(dados.horas_lancadas_producao_min)}</span>
+                </div>
+                <div className={styles.detalheHorasCard}>
+                  <span className={styles.detalheHorasLabel}>Lançadas (externas)</span>
+                  <span className={styles.detalheHorasVal}>{fmtMin(dados.horas_lancadas_externas_min)}</span>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Aba Lançamentos ── */}
+        {aba === 'lancamentos' && (
+          <div className={styles.lancamentosContainer}>
+            <div className={styles.lancamentosMesRow}>
+              <MesSeletor value={mesSel} onChange={setMesSel} className={styles.timelineMesPicker} />
+            </div>
+            {agendaLoading && <div className={styles.detalheLoading}>Carregando lançamentos…</div>}
+            {!agendaLoading && lancamentos.length === 0 && (
+              <div className={styles.emptyState}>Nenhum lançamento neste mês.</div>
+            )}
+            {!agendaLoading && lancamentos.length > 0 && (
+              <table className={styles.lancamentosTable}>
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Tipo / Bloco</th>
+                    <th>Min</th>
+                    <th>Faixa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lancamentos.map((l) => (
+                    <tr key={l.id} className={styles.lancamentosRow}>
+                      <td className={styles.lancamentosData}>{format(parseISO(l.data), 'dd/MM')}</td>
+                      <td>
+                        <span
+                          className={styles.lancamentoTipo}
+                          style={{ borderLeftColor: l.tipo_atividade_cor }}
+                        >
+                          {l.tipo_atividade_nome}
+                          {l.bloco_nome && (
+                            <span className={styles.lancamentoBloco}> · {l.bloco_nome}</span>
+                          )}
+                        </span>
+                        {l.descricao && (
+                          <span className={styles.lancamentoDesc}>{l.descricao}</span>
+                        )}
+                      </td>
+                      <td className={styles.lancamentosMin}>{l.minutos}m</td>
+                      <td>
+                        <span className={l.faixa === 'EXTRA' ? styles.faixaExtra : styles.faixaNormal}>
+                          {l.faixa === 'EXTRA' ? 'Extra' : 'Normal'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
 // View do Administrador
 // ─────────────────────────────────────────────────────────────
 
@@ -1262,6 +1481,7 @@ function AdminDashboard() {
   const queryClient = useQueryClient()
   const [blocoFiltro, setBlocoFiltro] = useState<number | null>(null)
   const [subfaseFiltro, setSubfaseFiltro] = useState<number | null>(null)
+  const [usuarioDetalhe, setUsuarioDetalhe] = useState<{ id: number; nome: string } | null>(null)
 
   const { data: kpiProjetos, isLoading: kpiLoading, error: kpiError } = useQuery({
     queryKey: ["kpiProjetos"],
@@ -1304,6 +1524,13 @@ function AdminDashboard() {
     queryFn: () => getPizzaMensal(mesPizza, usuarioPizza),
   })
 
+  const { data: dashboardUsuario } = useQuery({
+    queryKey: ["dashboardUsuario", usuarioDetalhe?.id],
+    queryFn: () => getDashboardUsuario(usuarioDetalhe!.id),
+    enabled: usuarioDetalhe !== null,
+    staleTime: 30_000,
+  })
+
   const sincMutation = useMutation({
     mutationFn: executarSync,
     onSuccess: async () => {
@@ -1323,6 +1550,14 @@ function AdminDashboard() {
 
   return (
     <>
+      {usuarioDetalhe && (
+        <UsuarioDetalheDrawer
+          nome={usuarioDetalhe.nome}
+          usuarioId={usuarioDetalhe.id}
+          dados={dashboardUsuario}
+          onFechar={() => setUsuarioDetalhe(null)}
+        />
+      )}
       <div className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>Dashboard</h1>
@@ -1466,15 +1701,38 @@ function AdminDashboard() {
 
       {/* ── Ranking global de operadores (full-width) ── */}
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>
-          Ranking de produção
-          {(dashboard?.ranking_operadores ?? []).length > 0 && (
-            <span className={styles.sectionCount}>{dashboard!.ranking_operadores.length}</span>
+        <div className={styles.rankingHeaderRow}>
+          <h2 className={styles.sectionTitle}>
+            Ranking de produção
+            {(dashboard?.ranking_operadores ?? []).length > 0 && (
+              <span className={styles.sectionCount}>{dashboard!.ranking_operadores.length}</span>
+            )}
+            {dashboard?.subfase_filtro_nome && (
+              <span className={styles.rankingContextBadge}>{dashboard.subfase_filtro_nome}</span>
+            )}
+          </h2>
+          {/* Seletor rápido de operador — abre o painel de detalhe diretamente */}
+          {(usuarios ?? []).length > 0 && (
+            <div className={styles.operadorSeletorBox}>
+              <label className={styles.operadorSeletorLabel}>Ver operador:</label>
+              <select
+                className={styles.operadorSeletorSelect}
+                value={usuarioDetalhe?.id ?? ''}
+                onChange={(e) => {
+                  if (!e.target.value) { setUsuarioDetalhe(null); return }
+                  const uid = Number(e.target.value)
+                  const u = (usuarios ?? []).find((u) => u.id === uid)
+                  if (u) setUsuarioDetalhe({ id: u.id, nome: u.nome_guerra ?? u.nome })
+                }}
+              >
+                <option value="">Selecionar operador…</option>
+                {(usuarios ?? []).map((u) => (
+                  <option key={u.id} value={u.id}>{u.nome_guerra ?? u.nome}</option>
+                ))}
+              </select>
+            </div>
           )}
-          {dashboard?.subfase_filtro_nome && (
-            <span className={styles.rankingContextBadge}>{dashboard.subfase_filtro_nome}</span>
-          )}
-        </h2>
+        </div>
         <RankingPanel
           operadores={dashboard?.ranking_operadores ?? []}
           subfases={dashboard?.subfases_disponiveis ?? []}
@@ -1484,6 +1742,7 @@ function AdminDashboard() {
             setSubfaseFiltro(sfId)
             if (bId !== undefined) setBlocoFiltro(bId)
           }}
+          onVerDetalhe={(op) => setUsuarioDetalhe({ id: op.usuario_id, nome: op.nome_guerra })}
         />
       </div>
 

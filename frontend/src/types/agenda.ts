@@ -169,6 +169,7 @@ export interface ApontamentoResumo {
   tipo_atividade_cor: string
   minutos: number
   faixa: FaixaMinuto
+  descricao?: string | null
 }
 
 // ── Dia da Agenda ────────────────────────────────────────────

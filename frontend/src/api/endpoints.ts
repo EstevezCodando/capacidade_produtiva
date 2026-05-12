@@ -12,6 +12,7 @@ import type {
     UsuarioMe,
     UsuarioResumo,
 } from "@/types";
+import type { AgendaCompleta } from "@/types/agenda";
 import { apiClient } from "./client";
 
 export async function getUsuarioMe(): Promise<UsuarioMe> {
@@ -71,6 +72,11 @@ export async function getMeuDashboard(): Promise<MeuDashboardResponse> {
   return res.data
 }
 
+export async function getDashboardUsuario(usuarioId: number): Promise<MeuDashboardResponse> {
+  const res = await apiClient.get<MeuDashboardResponse>(`/kpi/dashboard-usuario/${usuarioId}`)
+  return res.data
+}
+
 export async function getMinhaPizzaMensal(mes: string): Promise<PizzaDistribuicaoResponse> {
   const res = await apiClient.get<PizzaDistribuicaoResponse>("/kpi/minha-distribuicao", { params: { mes } })
   return res.data
@@ -85,5 +91,17 @@ export async function getPizzaMensal(mes: string, usuarioId = 0): Promise<PizzaD
 
 export async function getUsuarios(): Promise<UsuarioResumo[]> {
   const res = await apiClient.get<UsuarioResumo[]>("/usuarios")
+  return res.data
+}
+
+// ── Agenda ────────────────────────────────────────────────────
+export async function getAgendaUsuario(
+  usuarioId: number,
+  dataInicio: string,
+  dataFim: string,
+): Promise<AgendaCompleta> {
+  const res = await apiClient.get<AgendaCompleta>(`/agenda/usuario/${usuarioId}`, {
+    params: { data_inicio: dataInicio, data_fim: dataFim },
+  })
   return res.data
 }

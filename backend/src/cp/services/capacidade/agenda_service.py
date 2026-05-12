@@ -685,6 +685,7 @@ class AgendaService:
                         tipo_atividade_cor=tipo.cor if tipo else "",
                         minutos=lanc.minutos,
                         faixa=lanc.faixa_minuto,
+                        descricao=lanc.descricao,
                     )
                 )
 

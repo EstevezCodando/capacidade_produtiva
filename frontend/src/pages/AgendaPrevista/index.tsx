@@ -340,15 +340,6 @@ export default function AgendaPrevista() {
     [feriadosData],
   );
 
-  const diasComPlanejamento = useMemo(() => {
-    const set = new Set<string>();
-    if (agenda?.dias) {
-      for (const d of agenda.dias) {
-        if (d.planejamento.length > 0) set.add(d.data);
-      }
-    }
-    return set;
-  }, [agenda]);
 
   const intervaloSelecionado = useMemo(() => {
     if (calendar.selectedRange) return calendar.selectedRange;

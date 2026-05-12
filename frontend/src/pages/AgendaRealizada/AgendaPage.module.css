@@ -876,6 +876,18 @@
   line-height: 1.2;
 }
 
+.dayActivityDesc {
+  margin-top: 2px;
+  color: var(--tx-secondary);
+  font-size: 10px;
+  line-height: 1.3;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
 .dayActivityDuration {
   color: #d6fff2;
   font-size: 11px;

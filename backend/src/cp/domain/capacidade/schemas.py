@@ -273,6 +273,7 @@ class ApontamentoResumo(BaseModel):
     tipo_atividade_cor: str
     minutos: int
     faixa: FaixaMinuto
+    descricao: str | None = None
 
 
 class DiaDaAgendaCompleto(BaseModel):

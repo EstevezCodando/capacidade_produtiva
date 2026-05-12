@@ -1,19 +1,19 @@
 # docker-compose.yml — CapacidadeProdutiva
 #
-# Servicos:
-#   cp_db   — PostgreSQL do CP (banco auxiliar, schemas sap_snapshot + kpi)
-#   backend — API FastAPI + pipeline de inicializacao
+# Serviços:
+#   cp_db    — PostgreSQL do CP (schemas: capacidade, sap_snapshot, kpi)
+#   backend  — API FastAPI na porta 3050
+#   frontend — React/nginx na porta 5173
 #
-# O SAP (banco de origem) nao e gerenciado aqui — e externo e somente-leitura.
-# Suas credenciais sao fornecidas via variaveis de ambiente SAP_DB_*.
+# O banco SAP é externo e somente-leitura (credenciais via SAP_DB_*).
 #
-# Uso rapido:
-#   cp .env.example .env          # editar com suas credenciais
-#   docker compose up --build
+# Uso rápido:
+#   cp .env.example .env        # preencher credenciais reais
+#   docker compose up --build   # primeira vez (compila imagens)
+#   docker compose up           # execuções seguintes
 #
-# O servico backend aguarda o cp_db estar saudavel antes de iniciar
-# e entao executa o pipeline completo:
-#   check -> alembic upgrade head -> sincronizar-sap -> uvicorn
+# Ordem de inicialização garantida pelo Compose:
+#   cp_db (healthy) → backend (healthy) → frontend
 
 services:
 
@@ -30,17 +30,18 @@ services:
     volumes:
       - cp_db_data:/var/lib/postgresql/data
     ports:
-      # Expoe somente em loopback para nao abrir o banco para a rede
+      # Exposto somente em loopback — não abre o banco para a rede
       - "127.0.0.1:5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${CP_DB_USER:-cp_user} -d ${CP_DB_NAME:-capacidade_produtiva}"]
       interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 10s
+      retries: 12
+      start_period: 15s
 
   # ---------------------------------------------------------------------------
-  # Backend — API + pipeline de inicializacao
+  # Backend — FastAPI + Alembic + sync SAP
+  # Pipeline entrypoint.sh: alembic upgrade head → sincronizar-sap → uvicorn
   # ---------------------------------------------------------------------------
   backend:
     build:
@@ -51,15 +52,16 @@ services:
       cp_db:
         condition: service_healthy
     environment:
-      ENVIRONMENT: ${ENVIRONMENT:-production}
+      ENVIRONMENT:    ${ENVIRONMENT:-production}
 
-      # Banco CP — aponta para o servico cp_db desta stack
+      # Banco CP — aponta para o serviço cp_db desta stack
       CP_DB_HOST:     cp_db
       CP_DB_PORT:     5432
       CP_DB_NAME:     ${CP_DB_NAME:-capacidade_produtiva}
       CP_DB_USER:     ${CP_DB_USER:-cp_user}
       CP_DB_PASSWORD: ${CP_DB_PASSWORD}
       CP_API_PORT:    ${CP_API_PORT:-3050}
+      CP_SECRET_KEY:  ${CP_SECRET_KEY}
 
       # Banco SAP — externo, somente leitura
       SAP_DB_HOST:     ${SAP_DB_HOST}
@@ -69,16 +71,52 @@ services:
       SAP_DB_PASSWORD: ${SAP_DB_PASSWORD}
 
       # Auth
-      JWT_SECRET:           ${JWT_SECRET}
-      AUTH_URL:             ${AUTH_URL}
-      AUTH_ADMIN_USER:      ${AUTH_ADMIN_USER}
-      AUTH_ADMIN_PASSWORD:  ${AUTH_ADMIN_PASSWORD}
+      JWT_SECRET:          ${JWT_SECRET}
+      AUTH_URL:            ${AUTH_URL}
+      AUTH_ADMIN_USER:     ${AUTH_ADMIN_USER}
+      AUTH_ADMIN_PASSWORD: ${AUTH_ADMIN_PASSWORD}
 
     ports:
       - "${CP_API_PORT:-3050}:${CP_API_PORT:-3050}"
 
-    # Pipeline completo: qualidade -> migracoes -> sync -> API
-    command: ["uv", "run", "inicializar"]
+    healthcheck:
+      test:
+        - "CMD"
+        - "curl"
+        - "-fsS"
+        - "--max-time"
+        - "5"
+        - "http://localhost:${CP_API_PORT:-3050}/api/health"
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      # Aguarda o pipeline completo (migrate + sync + uvicorn start)
+      start_period: 60s
+
+  # ---------------------------------------------------------------------------
+  # Frontend — React buildado pelo Vite, servido pelo nginx
+  # nginx também faz proxy de /api → backend:3050
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    healthcheck:
+      test:
+        - "CMD"
+        - "wget"
+        - "-qO-"
+        - "http://localhost/index.html"
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   cp_db_data:

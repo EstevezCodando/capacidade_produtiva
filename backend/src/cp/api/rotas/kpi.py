@@ -1304,46 +1304,42 @@ def kpi_dashboard(
                     subfase_filtro_nome = str(row.subfase_nome or "")
 
             # 11. Ranking global de operadores
-            # Filtro de subfase via JOIN em estado_ut (independente de distribuicao_pontos.subfase_id)
-            _bloco_rank_cond = "AND d.bloco_id = :bloco_id" if bloco_id else ""
-            _subfase_rank_join = (
-                "JOIN kpi.estado_ut esf ON esf.ut_id = d.ut_id AND esf.subfase_id = :subfase_id"
-                if subfase_id else ""
-            )
+            # Usa distribuicao_pontos + estado_ut para incluir todas as instâncias
+            # de atuação (executor/revisor/corretor) independente de executor registrado.
+            _bloco_rank_cond = "AND dp.bloco_id = :bloco_id" if bloco_id else ""
+            _subfase_rank_cond = "AND dp.subfase_id = :subfase_id" if subfase_id else ""
             sql_ranking = text(f"""
                 SELECT
-                    ROW_NUMBER() OVER (
-                        ORDER BY
-                            COALESCE(SUM(d.pontos_executor), 0) +
-                            COALESCE(SUM(d.pontos_revisor),  0) +
-                            COALESCE(SUM(d.pontos_corretor), 0) DESC
-                    ) AS posicao,
+                    ROW_NUMBER() OVER (ORDER BY SUM(
+                        CASE WHEN dp.executor_id = u.id THEN dp.pontos_executor ELSE 0 END +
+                        CASE WHEN dp.revisor_id  = u.id THEN dp.pontos_revisor  ELSE 0 END +
+                        CASE WHEN dp.corretor_id = u.id THEN dp.pontos_corretor ELSE 0 END
+                    ) DESC) AS posicao,
                     u.id AS usuario_id,
                     COALESCE(u.nome_guerra, u.nome) AS nome_guerra,
-                    COALESCE(SUM(d.pontos_executor), 0)  AS pontos_executor,
-                    COALESCE(SUM(d.pontos_revisor),  0)  AS pontos_revisor,
-                    COALESCE(SUM(d.pontos_corretor), 0)  AS pontos_corretor,
-                    COALESCE(SUM(d.pontos_executor), 0) +
-                    COALESCE(SUM(d.pontos_revisor),  0) +
-                    COALESCE(SUM(d.pontos_corretor), 0)  AS pontos_total,
-                    COUNT(DISTINCT CASE
-                        WHEN d.executor_id = u.id AND d.pontos_executor > 0 THEN d.ut_id
-                    END) AS uts_executadas,
-                    COUNT(DISTINCT CASE
-                        WHEN d.revisor_id  = u.id AND d.pontos_revisor  > 0 THEN d.ut_id
-                    END) AS uts_revisadas
+                    SUM(CASE WHEN dp.executor_id = u.id THEN dp.pontos_executor ELSE 0 END) AS pontos_executor,
+                    SUM(CASE WHEN dp.revisor_id  = u.id THEN dp.pontos_revisor  ELSE 0 END) AS pontos_revisor,
+                    SUM(CASE WHEN dp.corretor_id = u.id THEN dp.pontos_corretor ELSE 0 END) AS pontos_corretor,
+                    SUM(
+                        CASE WHEN dp.executor_id = u.id THEN dp.pontos_executor ELSE 0 END +
+                        CASE WHEN dp.revisor_id  = u.id THEN dp.pontos_revisor  ELSE 0 END +
+                        CASE WHEN dp.corretor_id = u.id THEN dp.pontos_corretor ELSE 0 END
+                    ) AS pontos_total,
+                    COUNT(DISTINCT CASE WHEN dp.executor_id = u.id THEN dp.ut_id END) AS uts_executadas,
+                    COUNT(DISTINCT CASE WHEN dp.revisor_id  = u.id THEN dp.ut_id END) AS uts_revisadas
                 FROM sap_snapshot.dgeo_usuario u
-                JOIN kpi.distribuicao_pontos d
-                    ON (d.executor_id = u.id
-                    OR  d.revisor_id  = u.id
-                    OR  d.corretor_id = u.id)
-                    {_bloco_rank_cond}
-                {_subfase_rank_join}
+                JOIN kpi.distribuicao_pontos dp
+                    ON (dp.executor_id = u.id OR dp.revisor_id = u.id OR dp.corretor_id = u.id)
+                JOIN kpi.estado_ut eu ON eu.ut_id = dp.ut_id
+                WHERE (eu.data_fim_fluxo IS NOT NULL OR eu.concluida = TRUE)
+                  {_bloco_rank_cond}
+                  {_subfase_rank_cond}
                 GROUP BY u.id, u.nome, u.nome_guerra
-                HAVING
-                    COALESCE(SUM(d.pontos_executor), 0) +
-                    COALESCE(SUM(d.pontos_revisor),  0) +
-                    COALESCE(SUM(d.pontos_corretor), 0) > 0
+                HAVING SUM(
+                    CASE WHEN dp.executor_id = u.id THEN dp.pontos_executor ELSE 0 END +
+                    CASE WHEN dp.revisor_id  = u.id THEN dp.pontos_revisor  ELSE 0 END +
+                    CASE WHEN dp.corretor_id = u.id THEN dp.pontos_corretor ELSE 0 END
+                ) > 0
                 ORDER BY pontos_total DESC
                 LIMIT 50
             """)
@@ -1640,22 +1636,11 @@ class MeuDashboardResposta(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Rota /kpi/meu-dashboard
+# Helper — calcula dashboard de um usuario (meu-dashboard e dashboard-usuario)
 # ---------------------------------------------------------------------------
 
 
-@router.get("/meu-dashboard", summary="Dashboard do usuário autenticado")
-def meu_dashboard(usuario: UsuarioLogado, request: Request, response: Response) -> MeuDashboardResposta:
-    """Retorna KPI personalizado para o usuário logado.
-
-    Inclui:
-    - Blocos vinculados ao usuário (como executor, revisor ou corretor)
-    - Pontos por bloco e subfase por cada papel
-    - Horas previstas e lançadas em produção e externamente
-    - Timeline diária dos últimos 45 dias (minutos previstos × realizados)
-    """
-    engine_cp = request.app.state.engine_cp
-    uid = usuario.usuario_id
+def _calcular_dashboard_usuario(engine_cp, uid: int) -> MeuDashboardResposta:
     snapshot_ts, kpi_ts = _get_sync_timestamps(engine_cp)
 
     blocos_map: dict[int, BlocoDetalheUsuario] = {}
@@ -1668,39 +1653,26 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request, response: Response) 
     try:
         with engine_cp.connect() as conn:
             # ── 1. Pontos por bloco/subfase por papel ─────────────────────
-            # kpi.distribuicao_pontos tem ut_id mas não subfase_id diretamente.
-            # kpi.estado_ut NÃO possui subfase_id — apenas subfase_nome (text).
-            # A forma correta é ir via sap_snapshot.macrocontrole_unidade_trabalho
-            # que possui subfase_id como FK, da mesma forma que _CTE_UT_BASE faz.
+            # Usa distribuicao_pontos + estado_ut para capturar todas as instâncias
+            # em que o usuário atuou (executor/revisor/corretor), incluindo UTs onde
+            # não há executor registrado na mesma tabela.
             sql_pontos = text("""
                 WITH user_pontos AS (
                     SELECT
-                        b.id                AS bloco_id,
-                        b.nome              AS bloco_nome,
-                        p.nome              AS projeto_nome,
-                        sf.id               AS subfase_id,
-                        sf.nome             AS subfase_nome,
-                        COALESCE(SUM(CASE WHEN d.executor_id = :uid AND d.pontos_executor > 0
-                                          THEN d.pontos_executor ELSE 0 END), 0) AS pontos_executor,
-                        COALESCE(SUM(CASE WHEN d.revisor_id  = :uid AND d.pontos_revisor  > 0
-                                          THEN d.pontos_revisor  ELSE 0 END), 0) AS pontos_revisor,
-                        COALESCE(SUM(CASE WHEN d.corretor_id = :uid AND d.pontos_corretor > 0
-                                          THEN d.pontos_corretor ELSE 0 END), 0) AS pontos_corretor,
-                        COALESCE(SUM(d.pontos_executor + d.pontos_revisor + d.pontos_corretor), 0)
-                            AS pontos_total_subfase
-                    FROM kpi.distribuicao_pontos d
-                    JOIN sap_snapshot.macrocontrole_unidade_trabalho ut
-                        ON ut.id = d.ut_id
-                    JOIN sap_snapshot.macrocontrole_subfase sf
-                        ON sf.id = ut.subfase_id
-                    JOIN sap_snapshot.macrocontrole_bloco b
-                        ON b.id = ut.bloco_id
-                    JOIN sap_snapshot.macrocontrole_lote l
-                        ON l.id = b.lote_id
-                    JOIN sap_snapshot.macrocontrole_projeto p
-                        ON p.id = l.projeto_id
-                    WHERE (d.executor_id = :uid OR d.revisor_id = :uid OR d.corretor_id = :uid)
-                    GROUP BY b.id, b.nome, p.nome, sf.id, sf.nome
+                        dp.bloco_id,
+                        COALESCE(b.nome, 'Bloco ' || dp.bloco_id::text) AS bloco_nome,
+                        dp.projeto_nome,
+                        dp.subfase_id,
+                        dp.subfase_nome,
+                        SUM(CASE WHEN dp.executor_id = :uid THEN dp.pontos_executor ELSE 0 END) AS pontos_executor,
+                        SUM(CASE WHEN dp.revisor_id  = :uid THEN dp.pontos_revisor  ELSE 0 END) AS pontos_revisor,
+                        SUM(CASE WHEN dp.corretor_id = :uid THEN dp.pontos_corretor ELSE 0 END) AS pontos_corretor
+                    FROM kpi.distribuicao_pontos dp
+                    JOIN kpi.estado_ut eu ON eu.ut_id = dp.ut_id
+                    LEFT JOIN sap_snapshot.macrocontrole_bloco b ON b.id = dp.bloco_id
+                    WHERE (dp.executor_id = :uid OR dp.revisor_id = :uid OR dp.corretor_id = :uid)
+                      AND (eu.data_fim_fluxo IS NOT NULL OR eu.concluida = TRUE)
+                    GROUP BY dp.bloco_id, b.nome, dp.projeto_nome, dp.subfase_id, dp.subfase_nome
                 )
                 SELECT *
                 FROM user_pontos
@@ -1712,12 +1684,17 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request, response: Response) 
                 bloco_id = row.bloco_id
 
                 if bloco_id not in blocos_map:
-                    # Busca o total de pontos do bloco (todos os usuários) na 1ª vez
+                    # Total de pontos do bloco (todos os usuários) — via distribuicao_pontos
                     sql_total = text("""
-                        SELECT COALESCE(SUM(d.pontos_executor + d.pontos_revisor + d.pontos_corretor), 0)
-                        FROM kpi.distribuicao_pontos d
-                        JOIN sap_snapshot.macrocontrole_unidade_trabalho ut ON ut.id = d.ut_id
-                        WHERE ut.bloco_id = :bloco_id
+                        SELECT COALESCE(SUM(
+                            COALESCE(dp.pontos_executor, 0) +
+                            COALESCE(dp.pontos_revisor,  0) +
+                            COALESCE(dp.pontos_corretor, 0)
+                        ), 0)
+                        FROM kpi.distribuicao_pontos dp
+                        JOIN kpi.estado_ut eu ON eu.ut_id = dp.ut_id
+                        WHERE dp.bloco_id = :bloco_id
+                          AND (eu.data_fim_fluxo IS NOT NULL OR eu.concluida = TRUE)
                     """)
                     total_res = conn.execute(sql_total, {"bloco_id": bloco_id}).scalar() or 0.0
 
@@ -1947,14 +1924,13 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request, response: Response) 
                     minutos_lancados_total_acum=int(row.minutos_lancados_total_acum),
                 ))
     except Exception:
-        _logger.exception("Erro ao calcular meu-dashboard para usuario_id=%s", uid)
-        raise HTTPException(status_code=500, detail="Erro ao calcular seu dashboard")
+        _logger.exception("Erro ao calcular dashboard para usuario_id=%s", uid)
+        raise HTTPException(status_code=500, detail="Erro ao calcular dashboard do usuario")
 
     blocos_list = sorted(blocos_map.values(), key=lambda b: b.bloco_nome)
     pontos_total_geral   = sum(b.pontos_total_bloco   for b in blocos_list)
     pontos_usuario_geral = sum(b.pontos_usuario_bloco for b in blocos_list)
 
-    response.headers["Cache-Control"] = "private, max-age=60, stale-while-revalidate=30"
     return MeuDashboardResposta(
         sap_snapshot_atualizado_em=snapshot_ts,
         kpi_calculado_em=kpi_ts,
@@ -1967,6 +1943,36 @@ def meu_dashboard(usuario: UsuarioLogado, request: Request, response: Response) 
         timeline=timeline,
         timeline_mensal=timeline_mensal,
     )
+
+
+# ---------------------------------------------------------------------------
+# Rota /kpi/meu-dashboard
+# ---------------------------------------------------------------------------
+
+
+@router.get("/meu-dashboard", summary="Dashboard do usuario autenticado")
+def meu_dashboard(usuario: UsuarioLogado, request: Request, response: Response) -> MeuDashboardResposta:
+    """Retorna KPI personalizado para o usuario logado."""
+    engine_cp = request.app.state.engine_cp
+    resultado = _calcular_dashboard_usuario(engine_cp, usuario.usuario_id)
+    response.headers["Cache-Control"] = "private, max-age=60, stale-while-revalidate=30"
+    return resultado
+
+
+# ---------------------------------------------------------------------------
+# Rota /kpi/dashboard-usuario/{usuario_id} — admin
+# ---------------------------------------------------------------------------
+
+
+@router.get("/dashboard-usuario/{usuario_id}", summary="Dashboard de um operador especifico (admin)")
+def dashboard_usuario(
+    _: SomenteAdmin,
+    request: Request,
+    usuario_id: int,
+) -> MeuDashboardResposta:
+    """Retorna o dashboard de KPI de um operador. Somente administradores."""
+    engine_cp = request.app.state.engine_cp
+    return _calcular_dashboard_usuario(engine_cp, usuario_id)
 
 
 # ---------------------------------------------------------------------------

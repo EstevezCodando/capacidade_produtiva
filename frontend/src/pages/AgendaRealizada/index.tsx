@@ -71,6 +71,7 @@ interface LancamentoDetalheDia {
     faixa: FaixaMinuto;
     minutos: number;
     cor: string;
+    descricao: string | null;
 }
 
 interface ResumoDiaRealizado {
@@ -287,15 +288,6 @@ export default function AgendaRealizada() {
         [feriadosData],
     );
 
-    const diasComLancamento = useMemo(() => {
-        const set = new Set<string>();
-        if (agenda?.dias) {
-            for (const d of agenda.dias) {
-                if (d.lancamentos.length > 0) set.add(d.data);
-            }
-        }
-        return set;
-    }, [agenda]);
 
     // ── Derivações ────────────────────────────────────────────
 
@@ -339,14 +331,14 @@ export default function AgendaRealizada() {
 
     function podeAdicionarLancamento(date: Date): boolean {
         if (isDiaFuturo(date)) return false;
-        if (isDiaConsolidado(date)) return false;
+        if (!ehAdmin && isDiaConsolidado(date)) return false;
         return true;
     }
 
     function motivoBloqueioLancamento(date: Date): string | null {
         if (isDiaFuturo(date))
             return "Não é possível lançar atividades em dias futuros.";
-        if (isDiaConsolidado(date))
+        if (!ehAdmin && isDiaConsolidado(date))
             return "Este dia foi consolidado pelo administrador e não aceita mais lançamentos.";
         return null;
     }
@@ -376,6 +368,7 @@ export default function AgendaRealizada() {
                     faixa: l.faixa,
                     minutos: l.minutos,
                     cor: obterCorLancamento(l),
+                    descricao: l.descricao ?? null,
                 }),
             );
 
@@ -546,6 +539,7 @@ export default function AgendaRealizada() {
             }
 
             if (
+                !ehAdmin &&
                 lancamentoEmEdicao.faixa === "NORMAL" &&
                 Number.isFinite(minutos) &&
                 minutos > 0
@@ -677,12 +671,12 @@ export default function AgendaRealizada() {
             tipoAtividadeNome: lancamento.tipoAtividadeNome,
             faixa: lancamento.faixa,
             minutos: lancamento.minutos,
-            descricao: "",
+            descricao: lancamento.descricao ?? "",
             tetoNormalMin: resumoDia.tetoNormalMin,
             totalNormalDia: resumoDia.totalNormalMin,
         });
         setEdicaoMinutos(String(lancamento.minutos));
-        setEdicaoDescricao("");
+        setEdicaoDescricao(lancamento.descricao ?? "");
     }
 
     function abrirNovoLancamento() {
@@ -1421,6 +1415,16 @@ export default function AgendaRealizada() {
                                                                             lancamento.minutos,
                                                                         )}
                                                                     </div>
+                                                                    {lancamento.descricao && (
+                                                                        <div
+                                                                            className={
+                                                                                styles.dayActivityDesc
+                                                                            }
+                                                                            title={lancamento.descricao}
+                                                                        >
+                                                                            {lancamento.descricao}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                                 {diaAberto && (
                                                                     <span
