@@ -54,7 +54,8 @@ class TipoAtividadeResponse(BaseSchema):
 class ParametroCapacidadeInput(BaseModel):
     """Entrada para criação/atualização de parâmetro de capacidade."""
 
-    minutos_dia_util_default: int = Field(..., gt=0, description="Minutos de capacidade normal por dia útil")
+    minutos_dia_util_default: int = Field(..., gt=0, description="Minutos normais por dia útil (seg–qui)")
+    minutos_sexta_default: int = Field(..., gt=0, description="Minutos normais para sexta-feira")
     minutos_extra_maximo_default: int = Field(..., ge=0, description="Máximo de minutos extras permitidos")
     data_inicio_vigencia: date = Field(..., description="Data de início da vigência")
     data_fim_vigencia: date | None = Field(None, description="Data de fim da vigência (null = indefinido)")
@@ -71,6 +72,7 @@ class ParametroCapacidadeResponse(BaseSchema):
 
     id: int
     minutos_dia_util_default: int
+    minutos_sexta_default: int
     minutos_extra_maximo_default: int
     data_inicio_vigencia: date
     data_fim_vigencia: date | None
@@ -82,6 +84,7 @@ class ConfigTetoResponse(BaseModel):
     """Configuração atual do teto diário."""
 
     teto_normal_min: int
+    teto_sexta_min: int
     teto_extra_min: int
     vigencia_inicio: date
     vigencia_fim: date | None

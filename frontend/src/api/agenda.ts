@@ -152,7 +152,8 @@ export async function getConfigTeto(): Promise<ConfigTeto> {
   } catch {
     return {
       teto_normal_min: 360,
-      teto_extra_min: 240,
+      teto_sexta_min: 240,
+      teto_extra_min: 600,
       vigencia_inicio: '',
       vigencia_fim: null,
       configurado_em: null,

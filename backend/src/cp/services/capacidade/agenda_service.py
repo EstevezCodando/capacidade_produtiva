@@ -394,22 +394,6 @@ class AgendaService:
         # Validar propriedade
         self._validar_proprietario_lancamento(antes, atualizado_por, eh_admin)
 
-        # Validar dia aberto
-        self._validar_dia_aberto(
-            antes.usuario_id, antes.data_lancamento, antes.faixa_minuto, eh_admin
-        )
-
-        # Validar capacidade se alterando minutos na faixa normal
-        if minutos and antes.faixa_minuto == FaixaMinuto.NORMAL:
-            self._validar_capacidade_normal(
-                antes.usuario_id, antes.data_lancamento, minutos, excluir_lancamento_id=id
-            )
-
-        # Verificar dia consolidado
-        capacidade = self._capacidade_repo.buscar(antes.usuario_id, antes.data_lancamento)
-        if capacidade and capacidade.status_dia == StatusDia.CONSOLIDADO:
-            alertas.append("Alteração em dia consolidado - auditoria reforçada")
-
         depois = self._lancamento_repo.atualizar(
             id=id,
             minutos=minutos,
@@ -436,14 +420,6 @@ class AgendaService:
         # Validar propriedade
         self._validar_proprietario_lancamento(lancamento, removido_por, eh_admin)
 
-        # Validar dia aberto (admin pode remover em dia consolidado)
-        self._validar_dia_aberto(
-            lancamento.usuario_id,
-            lancamento.data_lancamento,
-            lancamento.faixa_minuto,
-            eh_admin,
-        )
-
         self._audit.auditar_lancamento_removido(lancamento, removido_por)
         return self._lancamento_repo.remover(id)
 
@@ -466,23 +442,31 @@ class AgendaService:
     def criar_feriado(
         self, data: date, descricao: str, criado_por: int
     ) -> Feriado:
-        """Cria novo feriado."""
+        """Cria novo feriado e atualiza todos os dias materializados da data."""
         existente = self._feriado_repo.buscar_por_data(data)
         if existente:
             raise FeriadoDuplicadoError(data)
 
         feriado = self._feriado_repo.criar(data, descricao, criado_por)
+        self._capacidade_repo.marcar_feriado_todos(data)
         self._audit.auditar_feriado_criado(feriado, criado_por)
         return feriado
 
     def remover_feriado(self, id: int, removido_por: int) -> bool:
-        """Remove feriado."""
+        """Remove feriado e reverte flags de capacidade para a data."""
         feriado = self._feriado_repo.buscar_por_id(id)
         if not feriado:
             raise RegistroNaoEncontradoError("Feriado", id)
 
+        parametro = self._capacidade_service.obter_parametro_vigente(feriado.data)
+        from cp.domain.capacidade.constants import MINUTOS_DIA_UTIL_DEFAULT, MINUTOS_SEXTA_DEFAULT
+        minutos_dia_util = parametro.minutos_dia_util_default if parametro else MINUTOS_DIA_UTIL_DEFAULT
+        minutos_sexta = parametro.minutos_sexta_default if parametro else MINUTOS_SEXTA_DEFAULT
+
         self._audit.auditar_feriado_removido(feriado, removido_por)
-        return self._feriado_repo.remover(id)
+        resultado = self._feriado_repo.remover(id)
+        self._capacidade_repo.desmarcar_feriado_todos(feriado.data, minutos_dia_util, minutos_sexta)
+        return resultado
 
     def listar_feriados(self) -> Sequence[Feriado]:
         """Lista todos os feriados."""

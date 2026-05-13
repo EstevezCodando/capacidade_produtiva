@@ -166,7 +166,8 @@ class TestCapacidadeServiceParametros:
 
         resultado = service.criar_parametro(
             minutos_dia_util=360,
-            minutos_extra_max=240,
+            minutos_sexta=240,
+            minutos_extra_max=600,
             data_inicio=date(2026, 1, 1),
             data_fim=None,
             criado_por=1,
@@ -182,7 +183,8 @@ class TestCapacidadeServiceParametros:
         with pytest.raises(VigenciaConflitanteError):
             service.criar_parametro(
                 minutos_dia_util=360,
-                minutos_extra_max=240,
+                minutos_sexta=240,
+                minutos_extra_max=600,
                 data_inicio=date(2026, 1, 1),
                 data_fim=None,
                 criado_por=1,
@@ -192,13 +194,14 @@ class TestCapacidadeServiceParametros:
         """Atualiza parâmetro existente."""
         antes = mock_parametro(minutos_dia=360)
         depois = mock_parametro(minutos_dia=480)
-        
+
         service._param_repo.buscar_por_id.return_value = antes
         service._param_repo.atualizar.return_value = depois
 
         resultado = service.atualizar_parametro(
             id=1,
             minutos_dia_util=480,
+            minutos_sexta=None,
             minutos_extra_max=None,
             data_fim=None,
             atualizado_por=1,
@@ -215,6 +218,7 @@ class TestCapacidadeServiceParametros:
             service.atualizar_parametro(
                 id=999,
                 minutos_dia_util=480,
+                minutos_sexta=None,
                 minutos_extra_max=None,
                 data_fim=None,
                 atualizado_por=1,
@@ -371,8 +375,8 @@ class TestCapacidadeServiceMaterializacao:
         service.materializar_capacidade_dia(2, date(2026, 3, 10), 1)
 
         call_args = service._capacidade_repo.criar_ou_atualizar.call_args
-        assert call_args.kwargs["minutos_normal"] == 360  # Padrão
-        assert call_args.kwargs["minutos_extra"] == 240  # Padrão
+        assert call_args.kwargs["minutos_normal"] == 360  # Padrão seg–qui
+        assert call_args.kwargs["minutos_extra"] == 600  # Padrão extra (10h)
 
     def test_materializar_feriado(self, service):
         """Feriado tem capacidade normal zero."""

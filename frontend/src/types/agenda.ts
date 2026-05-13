@@ -43,6 +43,7 @@ export interface TipoAtividade {
 
 export interface ConfigTeto {
   teto_normal_min: number
+  teto_sexta_min: number
   teto_extra_min: number
   vigencia_inicio: string
   vigencia_fim: string | null
@@ -52,6 +53,7 @@ export interface ConfigTeto {
 
 export interface ConfigTetoInput {
   teto_normal_min: number
+  teto_sexta_min: number
   teto_extra_min: number
 }
 

@@ -29,6 +29,21 @@ from cp.domain.capacidade.models import (
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def mock_sqlalchemy_modelo(**kwargs: object) -> Mock:
+    """Mock que simula um modelo SQLAlchemy com __table__.columns."""
+    m = Mock()
+    for k, v in kwargs.items():
+        setattr(m, k, v)
+    cols = []
+    for k in kwargs:
+        col = Mock()
+        col.name = k
+        cols.append(col)
+    m.__table__ = Mock()
+    m.__table__.columns = cols
+    return m
+
+
 def mock_capacidade_dia(
     id: int = 1,
     usuario_id: int = 2,
@@ -435,13 +450,22 @@ class TestAuditService:
 
     def test_serializar_modelo(self, service):
         """Serializa modelo para JSON."""
+        col_id = Mock()
+        col_id.name = "id"
+        col_nome = Mock()
+        col_nome.name = "nome"
+
         modelo = Mock()
         modelo.id = 1
         modelo.nome = "teste"
+        modelo.__table__ = Mock()
+        modelo.__table__.columns = [col_id, col_nome]
 
         resultado = service._serializar_modelo(modelo)
 
         assert isinstance(resultado, dict)
+        assert resultado["id"] == 1
+        assert resultado["nome"] == "teste"
 
     def test_serializar_modelo_none(self, service):
         """Serializa None retorna dict vazio."""
@@ -451,8 +475,7 @@ class TestAuditService:
 
     def test_registrar_criacao(self, service):
         """Registra criação de entidade."""
-        modelo = Mock()
-        modelo.id = 1
+        modelo = mock_sqlalchemy_modelo(id=1)
 
         service.registrar_criacao(
             entidade="teste",
@@ -468,8 +491,8 @@ class TestAuditService:
 
     def test_registrar_atualizacao(self, service):
         """Registra atualização de entidade."""
-        antes = Mock()
-        depois = Mock()
+        antes = mock_sqlalchemy_modelo(id=1)
+        depois = mock_sqlalchemy_modelo(id=1)
 
         service.registrar_atualizacao(
             entidade="teste",
@@ -485,7 +508,7 @@ class TestAuditService:
 
     def test_registrar_exclusao(self, service):
         """Registra exclusão de entidade."""
-        modelo = Mock()
+        modelo = mock_sqlalchemy_modelo(id=1)
 
         service.registrar_exclusao(
             entidade="teste",
@@ -514,134 +537,70 @@ class TestAuditService:
 
     def test_auditar_parametro_criado(self, service):
         """Audita criação de parâmetro."""
-        param = Mock()
-        param.id = 1
-
-        service.auditar_parametro_criado(param, 1)
-
+        service.auditar_parametro_criado(mock_sqlalchemy_modelo(id=1), 1)
         service._repo.registrar.assert_called_once()
 
     def test_auditar_parametro_atualizado(self, service):
         """Audita atualização de parâmetro."""
-        antes = Mock()
-        antes.id = 1
-        depois = Mock()
-        depois.id = 1
-
-        service.auditar_parametro_atualizado(antes, depois, 1)
-
+        service.auditar_parametro_atualizado(mock_sqlalchemy_modelo(id=1), mock_sqlalchemy_modelo(id=1), 1)
         service._repo.registrar.assert_called_once()
 
     def test_auditar_planejamento_criado(self, service):
         """Audita criação de planejamento."""
-        plan = Mock()
-        plan.id = 1
-
-        service.auditar_planejamento_criado(plan, 1)
-
+        service.auditar_planejamento_criado(mock_sqlalchemy_modelo(id=1), 1)
         service._repo.registrar.assert_called_once()
 
     def test_auditar_planejamento_atualizado(self, service):
         """Audita atualização de planejamento."""
-        antes = Mock()
-        antes.id = 1
-        depois = Mock()
-        depois.id = 1
-
-        service.auditar_planejamento_atualizado(antes, depois, 1)
-
+        service.auditar_planejamento_atualizado(mock_sqlalchemy_modelo(id=1), mock_sqlalchemy_modelo(id=1), 1)
         service._repo.registrar.assert_called_once()
 
     def test_auditar_planejamento_removido(self, service):
         """Audita remoção de planejamento."""
-        plan = Mock()
-        plan.id = 1
-
-        service.auditar_planejamento_removido(plan, 1)
-
+        service.auditar_planejamento_removido(mock_sqlalchemy_modelo(id=1), 1)
         service._repo.registrar.assert_called_once()
 
     def test_auditar_lancamento_criado(self, service):
         """Audita criação de lançamento."""
-        lanc = Mock()
-        lanc.id = 1
-
-        service.auditar_lancamento_criado(lanc, 1)
-
+        service.auditar_lancamento_criado(mock_sqlalchemy_modelo(id=1), 1)
         service._repo.registrar.assert_called_once()
 
     def test_auditar_lancamento_atualizado(self, service):
         """Audita atualização de lançamento."""
-        antes = Mock()
-        antes.id = 1
-        depois = Mock()
-        depois.id = 1
-
-        service.auditar_lancamento_atualizado(antes, depois, 1)
-
+        service.auditar_lancamento_atualizado(mock_sqlalchemy_modelo(id=1), mock_sqlalchemy_modelo(id=1), 1)
         service._repo.registrar.assert_called_once()
 
     def test_auditar_lancamento_removido(self, service):
         """Audita remoção de lançamento."""
-        lanc = Mock()
-        lanc.id = 1
-
-        service.auditar_lancamento_removido(lanc, 1)
-
+        service.auditar_lancamento_removido(mock_sqlalchemy_modelo(id=1), 1)
         service._repo.registrar.assert_called_once()
 
     def test_auditar_feriado_criado(self, service):
         """Audita criação de feriado."""
-        feriado = Mock()
-        feriado.id = 1
-
-        service.auditar_feriado_criado(feriado, 1)
-
+        service.auditar_feriado_criado(mock_sqlalchemy_modelo(id=1), 1)
         service._repo.registrar.assert_called_once()
 
     def test_auditar_feriado_removido(self, service):
         """Audita remoção de feriado."""
-        feriado = Mock()
-        feriado.id = 1
-
-        service.auditar_feriado_removido(feriado, 1)
-
+        service.auditar_feriado_removido(mock_sqlalchemy_modelo(id=1), 1)
         service._repo.registrar.assert_called_once()
 
     def test_auditar_indisponibilidade_criada(self, service):
         """Audita criação de indisponibilidade."""
-        indisp = Mock()
-        indisp.id = 1
-
-        service.auditar_indisponibilidade_criada(indisp, 1)
-
+        service.auditar_indisponibilidade_criada(mock_sqlalchemy_modelo(id=1), 1)
         service._repo.registrar.assert_called_once()
 
     def test_auditar_indisponibilidade_removida(self, service):
         """Audita remoção de indisponibilidade."""
-        indisp = Mock()
-        indisp.id = 1
-
-        service.auditar_indisponibilidade_removida(indisp, 1)
-
+        service.auditar_indisponibilidade_removida(mock_sqlalchemy_modelo(id=1), 1)
         service._repo.registrar.assert_called_once()
 
     def test_auditar_capacidade_dia_atualizada_nova(self, service):
         """Audita criação de capacidade dia."""
-        depois = Mock()
-        depois.id = 1
-
-        service.auditar_capacidade_dia_atualizada(None, depois, 1)
-
+        service.auditar_capacidade_dia_atualizada(None, mock_sqlalchemy_modelo(id=1), 1)
         service._repo.registrar.assert_called_once()
 
     def test_auditar_capacidade_dia_atualizada_existente(self, service):
         """Audita atualização de capacidade dia."""
-        antes = Mock()
-        antes.id = 1
-        depois = Mock()
-        depois.id = 1
-
-        service.auditar_capacidade_dia_atualizada(antes, depois, 1)
-
+        service.auditar_capacidade_dia_atualizada(mock_sqlalchemy_modelo(id=1), mock_sqlalchemy_modelo(id=1), 1)
         service._repo.registrar.assert_called_once()

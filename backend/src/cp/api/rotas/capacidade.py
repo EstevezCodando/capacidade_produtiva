@@ -21,10 +21,9 @@ Política de autorização:
 
 from __future__ import annotations
 
-from datetime import date
-
 import csv
 import io
+from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
@@ -32,7 +31,7 @@ from pydantic import BaseModel, Field
 
 from cp.api.deps import SomenteAdmin, UsuarioLogado
 from cp.api.exception_handlers import handle_domain_exception
-from cp.domain.capacidade.constants import MINUTOS_DIA_UTIL_DEFAULT, MINUTOS_EXTRA_MAXIMO_DEFAULT
+from cp.domain.capacidade.constants import MINUTOS_DIA_UTIL_DEFAULT, MINUTOS_EXTRA_MAXIMO_DEFAULT, MINUTOS_SEXTA_DEFAULT
 from cp.domain.capacidade.models import TipoAtividade
 from cp.domain.capacidade.schemas import (
     CapacidadePeriodoResponse,
@@ -40,7 +39,6 @@ from cp.domain.capacidade.schemas import (
     ConsolidacaoInput,
     ConsolidacaoResponse,
     DesconsolidacaoResponse,
-    ExportacaoInconsistenciasResponse,
     FeriadoInput,
     FeriadoResponse,
     FeriadosListResponse,
@@ -72,14 +70,16 @@ class TipoAtividadeCorInput(BaseModel):
 class ConfigTetoInput(BaseModel):
     """Entrada para atualização rápida do teto."""
 
-    teto_normal_min: int = Field(..., gt=0)
-    teto_extra_min: int = Field(..., ge=0)
+    teto_normal_min: int = Field(..., gt=0, description="Minutos normais por dia útil (seg–qui)")
+    teto_sexta_min: int = Field(..., gt=0, description="Minutos normais para sexta-feira")
+    teto_extra_min: int = Field(..., ge=0, description="Máximo de minutos extras")
 
 
 class ParametroCapacidadeUpdateInput(BaseModel):
     """Entrada para atualização de parâmetro."""
 
     minutos_dia_util_default: int | None = Field(None, gt=0)
+    minutos_sexta_default: int | None = Field(None, gt=0)
     minutos_extra_maximo_default: int | None = Field(None, ge=0)
     data_fim_vigencia: date | None = None
 
@@ -165,6 +165,7 @@ def config_teto(request: Request, _: SomenteAdmin) -> ConfigTetoResponse:
     if not parametro:
         return ConfigTetoResponse(
             teto_normal_min=MINUTOS_DIA_UTIL_DEFAULT,
+            teto_sexta_min=MINUTOS_SEXTA_DEFAULT,
             teto_extra_min=MINUTOS_EXTRA_MAXIMO_DEFAULT,
             vigencia_inicio=date(2026, 1, 1),
             vigencia_fim=None,
@@ -174,6 +175,7 @@ def config_teto(request: Request, _: SomenteAdmin) -> ConfigTetoResponse:
 
     return ConfigTetoResponse(
         teto_normal_min=parametro.minutos_dia_util_default,
+        teto_sexta_min=parametro.minutos_sexta_default,
         teto_extra_min=parametro.minutos_extra_maximo_default,
         vigencia_inicio=parametro.data_inicio_vigencia,
         vigencia_fim=parametro.data_fim_vigencia,
@@ -196,6 +198,7 @@ def atualizar_config_teto(
         if not parametro:
             parametro = service.criar_parametro(
                 minutos_dia_util=body.teto_normal_min,
+                minutos_sexta=body.teto_sexta_min,
                 minutos_extra_max=body.teto_extra_min,
                 data_inicio=date.today(),
                 data_fim=None,
@@ -205,6 +208,7 @@ def atualizar_config_teto(
             parametro = service.atualizar_parametro(
                 id=parametro.id,
                 minutos_dia_util=body.teto_normal_min,
+                minutos_sexta=body.teto_sexta_min,
                 minutos_extra_max=body.teto_extra_min,
                 data_fim=None,
                 atualizado_por=admin.usuario_id,
@@ -212,6 +216,7 @@ def atualizar_config_teto(
 
         return ConfigTetoResponse(
             teto_normal_min=parametro.minutos_dia_util_default,
+            teto_sexta_min=parametro.minutos_sexta_default,
             teto_extra_min=parametro.minutos_extra_maximo_default,
             vigencia_inicio=parametro.data_inicio_vigencia,
             vigencia_fim=parametro.data_fim_vigencia,
@@ -234,6 +239,7 @@ def criar_parametro(
     try:
         parametro = service.criar_parametro(
             minutos_dia_util=body.minutos_dia_util_default,
+            minutos_sexta=body.minutos_sexta_default,
             minutos_extra_max=body.minutos_extra_maximo_default,
             data_inicio=body.data_inicio_vigencia,
             data_fim=body.data_fim_vigencia,
@@ -242,6 +248,7 @@ def criar_parametro(
         return ParametroCapacidadeResponse(
             id=parametro.id,
             minutos_dia_util_default=parametro.minutos_dia_util_default,
+            minutos_sexta_default=parametro.minutos_sexta_default,
             minutos_extra_maximo_default=parametro.minutos_extra_maximo_default,
             data_inicio_vigencia=parametro.data_inicio_vigencia,
             data_fim_vigencia=parametro.data_fim_vigencia,
@@ -266,6 +273,7 @@ def atualizar_parametro(
         parametro = service.atualizar_parametro(
             id=parametro_id,
             minutos_dia_util=body.minutos_dia_util_default,
+            minutos_sexta=body.minutos_sexta_default,
             minutos_extra_max=body.minutos_extra_maximo_default,
             data_fim=body.data_fim_vigencia,
             atualizado_por=admin.usuario_id,
@@ -273,6 +281,7 @@ def atualizar_parametro(
         return ParametroCapacidadeResponse(
             id=parametro.id,
             minutos_dia_util_default=parametro.minutos_dia_util_default,
+            minutos_sexta_default=parametro.minutos_sexta_default,
             minutos_extra_maximo_default=parametro.minutos_extra_maximo_default,
             data_inicio_vigencia=parametro.data_inicio_vigencia,
             data_fim_vigencia=parametro.data_fim_vigencia,

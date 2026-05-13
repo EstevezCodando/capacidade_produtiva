@@ -146,6 +146,35 @@ class CapacidadeDiaRepository:
             session.commit()
             return result.rowcount  # type: ignore[attr-defined, no-any-return]
 
+    def marcar_feriado_todos(self, data: date) -> int:
+        """Marca todas as linhas de CapacidadeDia na data como feriado."""
+        with Session(self._engine) as session:
+            rows = session.execute(
+                select(CapacidadeDia).where(CapacidadeDia.data == data)
+            ).scalars().all()
+            for row in rows:
+                row.eh_feriado = True
+                row.eh_dia_util = False
+                row.minutos_capacidade_normal_prevista = 0
+            session.commit()
+            return len(rows)
+
+    def desmarcar_feriado_todos(self, data: date, minutos_dia_util: int, minutos_sexta: int) -> int:
+        """Reverte flag de feriado para todas as linhas de CapacidadeDia na data."""
+        with Session(self._engine) as session:
+            rows = session.execute(
+                select(CapacidadeDia).where(CapacidadeDia.data == data)
+            ).scalars().all()
+            for row in rows:
+                row.eh_feriado = False
+                row.eh_dia_util = data.weekday() < 5
+                if row.eh_dia_util and not row.eh_indisponivel:
+                    row.minutos_capacidade_normal_prevista = (
+                        minutos_sexta if data.weekday() == 4 else minutos_dia_util
+                    )
+            session.commit()
+            return len(rows)
+
     def listar_por_status(
         self, data_inicio: date, data_fim: date, status: StatusDia | None = None
     ) -> Sequence[CapacidadeDia]:

@@ -1,5 +1,6 @@
 import {
     consolidarPeriodo,
+    criarFeriado,
     criarPlanejamentoLote,
     editarPlanejamento,
     getAgendaUsuario,
@@ -7,6 +8,7 @@ import {
     getFeriados,
     getTiposAtividade,
     getUsuarios,
+    removerFeriado,
     removerPlanejamento,
     removerPlanejamentoLote,
 } from "@/api/agenda";
@@ -216,6 +218,9 @@ export default function AgendaPrevista() {
   const [edicaoMinutos, setEdicaoMinutos] = useState("");
   const [edicaoDescricao, setEdicaoDescricao] = useState("");
   const [edicaoErrors, setEdicaoErrors] = useState<Record<string, string>>({});
+  const [feriadoModalOpen, setFeriadoModalOpen] = useState(false);
+  const [feriadoDescricao, setFeriadoDescricao] = useState("");
+  const [feriadoErro, setFeriadoErro] = useState("");
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   const { data: usuarios = [], isLoading: loadingUsuarios } = useQuery({
@@ -339,6 +344,12 @@ export default function AgendaPrevista() {
     () => feriadosData?.feriados.map((f) => f.data) ?? [],
     [feriadosData],
   );
+
+  const feriadoDiaDetalheSelecionado = useMemo(() => {
+    if (!diaDetalheSelecionado) return null;
+    const chave = format(diaDetalheSelecionado, "yyyy-MM-dd");
+    return feriadosData?.feriados.find((f) => f.data === chave) ?? null;
+  }, [diaDetalheSelecionado, feriadosData]);
 
 
   const intervaloSelecionado = useMemo(() => {
@@ -908,6 +919,33 @@ export default function AgendaPrevista() {
     },
   });
 
+  const criarFeriadoMutation = useMutation({
+    mutationFn: (input: { data: string; descricao: string }) =>
+      criarFeriado(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["feriados"] });
+      await queryClient.invalidateQueries({ queryKey: ["agenda"] });
+      await queryClient.invalidateQueries({ queryKey: ["capacidade"] });
+      invalidate();
+      setFeriadoModalOpen(false);
+      setFeriadoDescricao("");
+      setFeriadoErro("");
+    },
+    onError: (error) => {
+      setFeriadoErro(error instanceof Error ? error.message : "Erro ao criar feriado.");
+    },
+  });
+
+  const removerFeriadoMutation = useMutation({
+    mutationFn: (id: number) => removerFeriado(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["feriados"] });
+      await queryClient.invalidateQueries({ queryKey: ["agenda"] });
+      await queryClient.invalidateQueries({ queryKey: ["capacidade"] });
+      invalidate();
+    },
+  });
+
   return (
     <div className={styles.page}>
       <aside className={styles.sidebar}>
@@ -1346,6 +1384,26 @@ export default function AgendaPrevista() {
                   ? "Resumo compacto dos usuários e atividades do dia."
                   : "Clique em uma célula da agenda para abrir o detalhamento lateral."}
               </p>
+              {ehAdmin && diaDetalheSelecionado && (
+                feriadoDiaDetalheSelecionado ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removerFeriadoMutation.mutate(feriadoDiaDetalheSelecionado.id)}
+                    loading={removerFeriadoMutation.isPending}
+                  >
+                    Remover Feriado
+                  </Button>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => { setFeriadoModalOpen(true); setFeriadoDescricao(""); setFeriadoErro(""); }}
+                  >
+                    Marcar Feriado
+                  </Button>
+                )
+              )}
             </div>
 
             {diaDetalheSelecionado ? (
@@ -1737,7 +1795,7 @@ export default function AgendaPrevista() {
                 label="Minutos planejados"
                 type="number"
                 min="1"
-                step="5"
+                step="1"
                 value={edicaoMinutos}
                 onChange={(evento) => setEdicaoMinutos(evento.target.value)}
                 error={edicaoErrors.minutos}
@@ -1796,6 +1854,43 @@ export default function AgendaPrevista() {
         dateRange={intervaloSelecionado}
         usuarioIds={selectedUsuarioIds}
       />
+
+      <Modal
+        open={feriadoModalOpen}
+        onClose={() => setFeriadoModalOpen(false)}
+        title="Marcar como Feriado"
+        size="sm"
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <p style={{ margin: 0, fontSize: "0.875rem" }}>
+            O dia <strong>{diaDetalheSelecionado ? format(diaDetalheSelecionado, "dd/MM/yyyy") : ""}</strong> será marcado como feriado para <strong>todos os usuários</strong>. Capacidade do dia = 0h.
+          </p>
+          <Input
+            label="Descrição"
+            placeholder="Ex.: Corpus Christi, Feriado Municipal..."
+            value={feriadoDescricao}
+            onChange={(e) => setFeriadoDescricao(e.target.value)}
+          />
+          {feriadoErro && (
+            <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--color-danger)" }}>{feriadoErro}</p>
+          )}
+        </div>
+        <Modal.Footer>
+          <Button variant="ghost" size="sm" onClick={() => setFeriadoModalOpen(false)}>Cancelar</Button>
+          <Button
+            variant="primary"
+            size="sm"
+            loading={criarFeriadoMutation.isPending}
+            onClick={() => {
+              if (!feriadoDescricao.trim()) { setFeriadoErro("Informe uma descrição."); return; }
+              if (!diaDetalheSelecionado) return;
+              criarFeriadoMutation.mutate({ data: format(diaDetalheSelecionado, "yyyy-MM-dd"), descricao: feriadoDescricao.trim() });
+            }}
+          >
+            Confirmar Feriado
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }

@@ -96,6 +96,7 @@ def mock_tipo_atividade(
     codigo: CodigoAtividade = CodigoAtividade.BLOCO,
     nome: str = "Trabalho em Bloco",
     grupo: GrupoAtividade = GrupoAtividade.PRODUCAO,
+    cor: str = "#4A90D9",
 ) -> Mock:
     """Cria mock de TipoAtividade."""
     m = Mock(spec=TipoAtividade)
@@ -103,6 +104,7 @@ def mock_tipo_atividade(
     m.codigo = codigo
     m.nome = nome
     m.grupo = grupo
+    m.cor = cor
     return m
 
 
@@ -368,6 +370,8 @@ class TestAgendaServicePlanejamento:
         plan = mock_planejamento()
         service._planejamento_repo.buscar_existente.return_value = None
         service._planejamento_repo.criar.return_value = plan
+        service._planejamento_repo.soma_minutos_planejados_dia.return_value = 0
+        service._capacidade_repo.buscar.return_value = None
 
         resultado = service.criar_planejamento(
             usuario_id=2, data=date(2026, 3, 10), bloco_id=1,
@@ -379,14 +383,12 @@ class TestAgendaServicePlanejamento:
         service._planejamento_repo.criar.assert_called_once()
         service._audit.auditar_planejamento_criado.assert_called_once()
 
-    def test_criar_planejamento_existente_atualiza(self, service):
-        """Se já existe, atualiza ao invés de criar."""
-        existente = mock_planejamento(id=1)
-        atualizado = mock_planejamento(id=1, minutos_normais=180)
-        
-        service._planejamento_repo.buscar_existente.return_value = existente
-        service._planejamento_repo.buscar_por_id.return_value = existente
-        service._planejamento_repo.atualizar.return_value = atualizado
+    def test_criar_planejamento_chama_criar_repo(self, service):
+        """criar_planejamento sempre delega ao repositório criar."""
+        plan = mock_planejamento(id=1, minutos_normais=180)
+        service._planejamento_repo.criar.return_value = plan
+        service._planejamento_repo.soma_minutos_planejados_dia.return_value = 0
+        service._capacidade_repo.buscar.return_value = None
 
         resultado = service.criar_planejamento(
             usuario_id=2, data=date(2026, 3, 10), bloco_id=1,
@@ -394,16 +396,19 @@ class TestAgendaServicePlanejamento:
             descricao=None, criado_por=1
         )
 
-        assert resultado.minutos_planejados_normais == 180
-        service._planejamento_repo.criar.assert_not_called()
+        assert resultado == plan
+        service._planejamento_repo.criar.assert_called_once()
 
     def test_atualizar_planejamento_sucesso(self, service):
         """Atualiza planejamento existente."""
         antes = mock_planejamento(id=1, minutos_normais=120)
+        antes.em_uso = True
         depois = mock_planejamento(id=1, minutos_normais=180)
-        
+
         service._planejamento_repo.buscar_por_id.return_value = antes
         service._planejamento_repo.atualizar.return_value = depois
+        service._planejamento_repo.soma_minutos_planejados_dia.return_value = 0
+        service._capacidade_repo.buscar.return_value = None
 
         resultado = service.atualizar_planejamento(
             id=1, minutos_normais=180, minutos_extras=None,
@@ -449,16 +454,6 @@ class TestAgendaServicePlanejamento:
         resultado = service.listar_planejamento_usuario(2, date(2026, 3, 1), date(2026, 3, 31))
 
         assert len(resultado) == 2
-
-    def test_listar_planejamento_geral(self, service):
-        """Lista todos os planejamentos."""
-        plans = [mock_planejamento(id=1), mock_planejamento(id=2)]
-        service._planejamento_repo.listar_todos_periodo.return_value = plans
-
-        resultado = service.listar_planejamento_geral(date(2026, 3, 1), date(2026, 3, 31))
-
-        assert len(resultado) == 2
-
 
 class TestAgendaServiceLancamentos:
     """Testes das operações de lançamento."""
@@ -528,10 +523,10 @@ class TestAgendaServiceLancamentos:
         assert resultado == lanc
 
     def test_criar_lancamento_tipo_nao_encontrado_erro(self, service):
-        """Erro se tipo de atividade não existe."""
+        """Erro se tipo de atividade (bloco) não existe."""
         service._capacidade_repo.buscar.return_value = mock_capacidade_dia()
         service._lancamento_repo.soma_minutos_dia.return_value = 0
-        service._tipo_atividade_repo.buscar_por_codigo.return_value = None
+        service._tipo_atividade_repo.buscar_por_bloco_id.return_value = None
 
         with pytest.raises(RegistroNaoEncontradoError):
             service.criar_lancamento(

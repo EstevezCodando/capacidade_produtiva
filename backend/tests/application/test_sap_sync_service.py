@@ -20,6 +20,14 @@ def test_executar_sync_sap_chama_pipeline(monkeypatch: object) -> None:
         "cp.application.sap_sync_service.sincronizar_sap_para_snapshot",
         lambda _sap, _cp: esperado,
     )
+    monkeypatch.setattr(
+        "cp.application.sap_sync_service.registrar_inicio_sync",
+        lambda _engine, _origem: 1,
+    )
+    monkeypatch.setattr(
+        "cp.application.sap_sync_service.finalizar_sync",
+        lambda _engine, _id, status, mensagem: None,
+    )
 
     res = executar_sync_sap(settings_fake)
     assert res == esperado

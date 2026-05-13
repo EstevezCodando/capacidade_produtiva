@@ -43,6 +43,7 @@ class ParametroCapacidadeRepository:
     def criar(
         self,
         minutos_dia_util: int,
+        minutos_sexta: int,
         minutos_extra_max: int,
         data_inicio: date,
         data_fim: date | None,
@@ -52,6 +53,7 @@ class ParametroCapacidadeRepository:
         with Session(self._engine) as session:
             param = ParametroCapacidade(
                 minutos_dia_util_default=minutos_dia_util,
+                minutos_sexta_default=minutos_sexta,
                 minutos_extra_maximo_default=minutos_extra_max,
                 data_inicio_vigencia=data_inicio,
                 data_fim_vigencia=data_fim,
@@ -66,6 +68,7 @@ class ParametroCapacidadeRepository:
         self,
         id: int,
         minutos_dia_util: int | None = None,
+        minutos_sexta: int | None = None,
         minutos_extra_max: int | None = None,
         data_fim: date | None = None,
     ) -> ParametroCapacidade | None:
@@ -76,6 +79,8 @@ class ParametroCapacidadeRepository:
                 return None
             if minutos_dia_util is not None:
                 param.minutos_dia_util_default = minutos_dia_util
+            if minutos_sexta is not None:
+                param.minutos_sexta_default = minutos_sexta
             if minutos_extra_max is not None:
                 param.minutos_extra_maximo_default = minutos_extra_max
             if data_fim is not None:

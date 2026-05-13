@@ -10,6 +10,7 @@ import styles from './Configuracoes.module.css'
 export default function ConfiguracoesAdmin() {
   const queryClient = useQueryClient()
   const [tetoNormal, setTetoNormal] = useState('')
+  const [tetoSexta, setTetoSexta] = useState('')
   const [tetoExtra, setTetoExtra] = useState('')
   const [editando, setEditando] = useState(false)
   const [erro, setErro] = useState('')
@@ -23,6 +24,7 @@ export default function ConfiguracoesAdmin() {
   useEffect(() => {
     if (config) {
       setTetoNormal(config.teto_normal_min.toString())
+      setTetoSexta(config.teto_sexta_min.toString())
       setTetoExtra(config.teto_extra_min.toString())
     }
   }, [config])
@@ -43,10 +45,15 @@ export default function ConfiguracoesAdmin() {
 
   const handleSalvar = () => {
     const normalMin = parseInt(tetoNormal, 10)
+    const sextaMin = parseInt(tetoSexta, 10)
     const extraMin = parseInt(tetoExtra, 10)
 
     if (isNaN(normalMin) || normalMin <= 0) {
-      setErro('Teto normal deve ser maior que zero')
+      setErro('Teto Seg–Qui deve ser maior que zero')
+      return
+    }
+    if (isNaN(sextaMin) || sextaMin <= 0) {
+      setErro('Teto Sexta deve ser maior que zero')
       return
     }
     if (isNaN(extraMin) || extraMin < 0) {
@@ -54,12 +61,13 @@ export default function ConfiguracoesAdmin() {
       return
     }
 
-    mutation.mutate({ teto_normal_min: normalMin, teto_extra_min: extraMin })
+    mutation.mutate({ teto_normal_min: normalMin, teto_sexta_min: sextaMin, teto_extra_min: extraMin })
   }
 
   const handleCancelar = () => {
     if (config) {
       setTetoNormal(config.teto_normal_min.toString())
+      setTetoSexta(config.teto_sexta_min.toString())
       setTetoExtra(config.teto_extra_min.toString())
     }
     setEditando(false)
@@ -79,6 +87,7 @@ export default function ConfiguracoesAdmin() {
         <div className={styles.loading}>
           <Skeleton height={80} />
           <Skeleton height={80} />
+          <Skeleton height={80} />
         </div>
       </Card>
     )
@@ -87,7 +96,7 @@ export default function ConfiguracoesAdmin() {
   return (
     <Card
       title="Configurações de Capacidade"
-      subtitle="Parâmetros do teto diário"
+      subtitle="Teto diário por tipo de dia"
       action={
         !editando ? (
           <Button variant="secondary" size="sm" onClick={() => setEditando(true)}>Editar</Button>
@@ -100,7 +109,7 @@ export default function ConfiguracoesAdmin() {
             <>
               <div className={styles.field}>
                 <Input
-                  label="Teto Normal (minutos/dia)"
+                  label="Seg–Qui — Normal (minutos/dia)"
                   type="number"
                   min="1"
                   max="720"
@@ -111,10 +120,21 @@ export default function ConfiguracoesAdmin() {
               </div>
               <div className={styles.field}>
                 <Input
-                  label="Teto Extra (minutos/dia)"
+                  label="Sexta — Normal (minutos/dia)"
+                  type="number"
+                  min="1"
+                  max="720"
+                  value={tetoSexta}
+                  onChange={(e) => setTetoSexta(e.target.value)}
+                  hint={`= ${formatMinutosHoras(parseInt(tetoSexta) || 0)}`}
+                />
+              </div>
+              <div className={styles.field}>
+                <Input
+                  label="Hora Extra — Máximo (minutos/dia)"
                   type="number"
                   min="0"
-                  max="480"
+                  max="720"
                   value={tetoExtra}
                   onChange={(e) => setTetoExtra(e.target.value)}
                   hint={`= ${formatMinutosHoras(parseInt(tetoExtra) || 0)}`}
@@ -125,21 +145,30 @@ export default function ConfiguracoesAdmin() {
             <>
               <div className={styles.statBox}>
                 <StatCard
-                  label="Teto Normal"
+                  label="Seg–Qui (normal)"
                   value={formatMinutosHoras(config?.teto_normal_min ?? 0)}
                   variant="accent"
                   size="md"
                 />
-                <span className={styles.statDetail}>{config?.teto_normal_min ?? 0} minutos/dia útil</span>
+                <span className={styles.statDetail}>{config?.teto_normal_min ?? 0} min/dia</span>
               </div>
               <div className={styles.statBox}>
                 <StatCard
-                  label="Teto Extra Máximo"
+                  label="Sexta (normal)"
+                  value={formatMinutosHoras(config?.teto_sexta_min ?? 0)}
+                  variant="accent"
+                  size="md"
+                />
+                <span className={styles.statDetail}>{config?.teto_sexta_min ?? 0} min/dia</span>
+              </div>
+              <div className={styles.statBox}>
+                <StatCard
+                  label="Hora Extra — Máximo"
                   value={formatMinutosHoras(config?.teto_extra_min ?? 0)}
                   variant="warning"
                   size="md"
                 />
-                <span className={styles.statDetail}>{config?.teto_extra_min ?? 0} minutos/dia</span>
+                <span className={styles.statDetail}>{config?.teto_extra_min ?? 0} min/dia</span>
               </div>
             </>
           )}
@@ -166,7 +195,7 @@ export default function ConfiguracoesAdmin() {
 
         <div className={styles.info}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-          <p>O teto normal define a capacidade diária de trabalho regular. O teto extra define o máximo de horas extras permitidas por dia. Alterações afetam novos cálculos de capacidade.</p>
+          <p>Seg–Qui e Sexta definem o teto normal por dia. Hora Extra define o máximo permitido por dia. Alterações afetam novos cálculos de capacidade.</p>
         </div>
       </div>
     </Card>

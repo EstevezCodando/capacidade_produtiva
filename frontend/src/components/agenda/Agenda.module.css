@@ -753,6 +753,12 @@
   background: var(--bg-overlay);
 }
 
+.inconsistenciaUsuarioSelected {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-left: 3px solid var(--accent);
+  padding-left: calc(12px - 3px);
+}
+
 .inconsistenciaAvatar {
   width: 28px;
   height: 28px;

@@ -2,7 +2,7 @@
 // ConsolidacaoModal — Consolidação, desconsolidação, exportação e
 //                     painel de inconsistências com navegação
 // ============================================================
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -83,8 +83,9 @@ export default function ConsolidacaoModal({
   const [diasReabertos, setDiasReabertos] = useState(0)
   const [msgDesconsolidacao, setMsgDesconsolidacao] = useState('')
 
-  // Hover no painel de inconsistências
+  // Hover e seleção no painel de inconsistências
   const [hovUsuario, setHovUsuario] = useState<number | null>(null)
+  const [selectedUsuario, setSelectedUsuario] = useState<number | null>(null)
 
   // CSV export
   const [exportando, setExportando] = useState(false)
@@ -159,6 +160,14 @@ export default function ConsolidacaoModal({
     navigate(`/agenda-realizada?usuario_id=${usuarioId}`)
   }
 
+  const handleSelectUsuario = (id: number) => {
+    setSelectedUsuario((prev) => (prev === id ? null : id))
+  }
+
+  useEffect(() => {
+    if (!open) setSelectedUsuario(null)
+  }, [open])
+
   const handleClose = () => {
     setPendencias([])
     setConsolidado(false)
@@ -167,6 +176,7 @@ export default function ConsolidacaoModal({
     setDiasReabertos(0)
     setMsgDesconsolidacao('')
     setHovUsuario(null)
+    setSelectedUsuario(null)
     setErroExport('')
     onClose()
   }
@@ -175,7 +185,9 @@ export default function ConsolidacaoModal({
 
   const hasPendencias = pendencias.length > 0
   const inconsistencias = useMemo(() => agruparPorUsuario(pendencias), [pendencias])
-  const usuarioHovered = inconsistencias.find((u) => u.usuario_id === hovUsuario)
+  const usuarioExibido = inconsistencias.find(
+    (u) => u.usuario_id === (selectedUsuario ?? hovUsuario),
+  )
 
   // ── render ────────────────────────────────────────────────
 
@@ -302,9 +314,15 @@ export default function ConsolidacaoModal({
                 {inconsistencias.map((u) => (
                   <div
                     key={u.usuario_id}
-                    className={`${styles.inconsistenciaUsuarioRow} ${hovUsuario === u.usuario_id ? styles.inconsistenciaUsuarioHov : ''}`}
+                    className={[
+                      styles.inconsistenciaUsuarioRow,
+                      hovUsuario === u.usuario_id ? styles.inconsistenciaUsuarioHov : '',
+                      selectedUsuario === u.usuario_id ? styles.inconsistenciaUsuarioSelected : '',
+                    ].join(' ')}
                     onMouseEnter={() => setHovUsuario(u.usuario_id)}
                     onMouseLeave={() => setHovUsuario(null)}
+                    onClick={() => handleSelectUsuario(u.usuario_id)}
+                    style={{ cursor: 'pointer' }}
                   >
                     <span className={styles.inconsistenciaAvatar}>
                       {u.usuario_nome.charAt(0).toUpperCase()}
@@ -329,15 +347,15 @@ export default function ConsolidacaoModal({
                 ))}
               </div>
 
-              {/* Coluna direita: dias do usuário hovered */}
+              {/* Coluna direita: dias do usuário exibido */}
               <div className={styles.inconsistenciaDetalhe}>
-                {usuarioHovered ? (
+                {usuarioExibido ? (
                   <>
                     <div className={styles.inconsistenciaDetalheHeader}>
-                      {usuarioHovered.usuario_nome} — dias pendentes
+                      {usuarioExibido.usuario_nome} — dias pendentes
                     </div>
                     <div className={styles.inconsistenciaDetalheScroll}>
-                      {usuarioHovered.dias
+                      {usuarioExibido.dias
                         .slice()
                         .sort((a, b) => a.data.localeCompare(b.data))
                         .map((dia, i) => (
@@ -359,7 +377,7 @@ export default function ConsolidacaoModal({
                   </>
                 ) : (
                   <div className={styles.inconsistenciaDetalheVazio}>
-                    Passe o mouse sobre um usuário para ver os dias pendentes
+                    Clique em um usuário para fixar os dias pendentes
                   </div>
                 )}
               </div>

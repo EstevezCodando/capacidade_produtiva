@@ -15,6 +15,7 @@ from cp.domain.capacidade.constants import (
     DIAS_UTEIS_SEMANA,
     MINUTOS_DIA_UTIL_DEFAULT,
     MINUTOS_EXTRA_MAXIMO_DEFAULT,
+    MINUTOS_SEXTA_DEFAULT,
 )
 from cp.domain.capacidade.enums import (
     CodigoAtividade,
@@ -71,6 +72,7 @@ class CapacidadeService:
     def criar_parametro(
         self,
         minutos_dia_util: int,
+        minutos_sexta: int,
         minutos_extra_max: int,
         data_inicio: date,
         data_fim: date | None,
@@ -86,6 +88,7 @@ class CapacidadeService:
 
         parametro = self._param_repo.criar(
             minutos_dia_util=minutos_dia_util,
+            minutos_sexta=minutos_sexta,
             minutos_extra_max=minutos_extra_max,
             data_inicio=data_inicio,
             data_fim=data_fim,
@@ -99,6 +102,7 @@ class CapacidadeService:
         self,
         id: int,
         minutos_dia_util: int | None,
+        minutos_sexta: int | None,
         minutos_extra_max: int | None,
         data_fim: date | None,
         atualizado_por: int,
@@ -115,6 +119,7 @@ class CapacidadeService:
         depois = self._param_repo.atualizar(
             id=id,
             minutos_dia_util=minutos_dia_util,
+            minutos_sexta=minutos_sexta,
             minutos_extra_max=minutos_extra_max,
             data_fim=data_fim,
         )
@@ -163,9 +168,17 @@ class CapacidadeService:
 
         # Obter parâmetro vigente
         parametro = self._param_repo.buscar_vigente(data)
-        minutos_normal = parametro.minutos_dia_util_default if parametro else MINUTOS_DIA_UTIL_DEFAULT
-        minutos_extra = parametro.minutos_extra_maximo_default if parametro else MINUTOS_EXTRA_MAXIMO_DEFAULT
-        origem_param = parametro.id if parametro else None
+        if parametro:
+            minutos_normal = (
+                parametro.minutos_sexta_default if data.weekday() == 4
+                else parametro.minutos_dia_util_default
+            )
+            minutos_extra = parametro.minutos_extra_maximo_default
+            origem_param: int | None = parametro.id
+        else:
+            minutos_normal = MINUTOS_SEXTA_DEFAULT if data.weekday() == 4 else MINUTOS_DIA_UTIL_DEFAULT
+            minutos_extra = MINUTOS_EXTRA_MAXIMO_DEFAULT
+            origem_param = None
 
         # Verificar se é dia útil
         eh_dia_util = self._eh_dia_util(data)

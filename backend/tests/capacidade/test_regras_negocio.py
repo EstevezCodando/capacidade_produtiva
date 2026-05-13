@@ -398,8 +398,7 @@ class TestPermissoes:
 
     def test_admin_pode_acessar_qualquer_usuario(self) -> None:
         """Admin pode acessar dados de qualquer usuário."""
-        eh_admin = True,
-        3
+        eh_admin = True
 
         # Admin não precisa validar acesso
         assert eh_admin is True

@@ -31,12 +31,14 @@ export default function Configuracoes() {
 
   // Estado do formulário de teto
   const [tetoNormal, setTetoNormal] = useState('')
+  const [tetoSexta, setTetoSexta] = useState('')
   const [tetoExtra, setTetoExtra] = useState('')
 
   // Preencher valores quando carregar
   useEffect(() => {
     if (configTeto) {
       setTetoNormal(configTeto.teto_normal_min.toString())
+      setTetoSexta(configTeto.teto_sexta_min.toString())
       setTetoExtra(configTeto.teto_extra_min.toString())
     }
   }, [configTeto])
@@ -45,6 +47,7 @@ export default function Configuracoes() {
   const updateTetoMutation = useMutation({
     mutationFn: () => atualizarConfigTeto({
       teto_normal_min: parseInt(tetoNormal),
+      teto_sexta_min: parseInt(tetoSexta),
       teto_extra_min: parseInt(tetoExtra),
     }),
     onSuccess: () => {
@@ -104,7 +107,7 @@ export default function Configuracoes() {
             <div className={styles.configRow}>
               <div className={styles.configField}>
                 <Input
-                  label="Minutos Normais (por dia)"
+                  label="Seg–Qui — Normal (min/dia)"
                   type="number"
                   value={tetoNormal}
                   onChange={(e) => setTetoNormal(e.target.value)}
@@ -117,11 +120,24 @@ export default function Configuracoes() {
               </div>
               <div className={styles.configField}>
                 <Input
-                  label="Minutos Extras (máximo por dia)"
+                  label="Sexta — Normal (min/dia)"
+                  type="number"
+                  value={tetoSexta}
+                  onChange={(e) => setTetoSexta(e.target.value)}
+                  placeholder="240"
+                  min={0}
+                />
+                <span className={styles.configHint}>
+                  Equivale a {tetoSexta ? Math.round(parseInt(tetoSexta) / 60) : 0} horas
+                </span>
+              </div>
+              <div className={styles.configField}>
+                <Input
+                  label="Hora Extra — Máximo (min/dia)"
                   type="number"
                   value={tetoExtra}
                   onChange={(e) => setTetoExtra(e.target.value)}
-                  placeholder="240"
+                  placeholder="600"
                   min={0}
                 />
                 <span className={styles.configHint}>
@@ -148,7 +164,7 @@ export default function Configuracoes() {
                 variant="primary"
                 onClick={() => updateTetoMutation.mutate()}
                 loading={updateTetoMutation.isPending}
-                disabled={!tetoNormal || !tetoExtra}
+                disabled={!tetoNormal || !tetoSexta || !tetoExtra}
               >
                 Salvar configurações
               </Button>

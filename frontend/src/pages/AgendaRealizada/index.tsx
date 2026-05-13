@@ -1796,7 +1796,7 @@ export default function AgendaRealizada() {
                                 label="Minutos realizados"
                                 type="number"
                                 min="1"
-                                step="5"
+                                step="1"
                                 value={edicaoMinutos}
                                 onChange={(e) =>
                                     setEdicaoMinutos(e.target.value)

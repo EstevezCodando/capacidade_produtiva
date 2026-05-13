@@ -35,7 +35,7 @@ class TestTipoAtividadeRepository:
 
     def test_buscar_por_codigo(self):
         """Busca tipo por código."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.tipo_atividade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -44,7 +44,7 @@ class TestTipoAtividadeRepository:
             tipo_mock.codigo = CodigoAtividade.BLOCO
             mock_session.execute.return_value.scalar_one_or_none.return_value = tipo_mock
 
-            from src.cp.repositories.capacidade.repositories import TipoAtividadeRepository
+            from cp.repositories.capacidade import TipoAtividadeRepository
             repo = TipoAtividadeRepository(MagicMock())
             resultado = repo.buscar_por_codigo(CodigoAtividade.BLOCO)
 
@@ -52,13 +52,13 @@ class TestTipoAtividadeRepository:
 
     def test_buscar_por_codigo_nao_encontrado(self):
         """Retorna None se não encontrado."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.tipo_atividade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
             mock_session.execute.return_value.scalar_one_or_none.return_value = None
 
-            from src.cp.repositories.capacidade.repositories import TipoAtividadeRepository
+            from cp.repositories.capacidade import TipoAtividadeRepository
             repo = TipoAtividadeRepository(MagicMock())
             resultado = repo.buscar_por_codigo(CodigoAtividade.BLOCO)
 
@@ -66,7 +66,7 @@ class TestTipoAtividadeRepository:
 
     def test_listar_todos(self):
         """Lista todos os tipos."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.tipo_atividade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -74,7 +74,7 @@ class TestTipoAtividadeRepository:
             tipos = [Mock(spec=TipoAtividade), Mock(spec=TipoAtividade)]
             mock_session.execute.return_value.scalars.return_value.all.return_value = tipos
 
-            from src.cp.repositories.capacidade.repositories import TipoAtividadeRepository
+            from cp.repositories.capacidade import TipoAtividadeRepository
             repo = TipoAtividadeRepository(MagicMock())
             resultado = repo.listar_todos()
 
@@ -82,7 +82,7 @@ class TestTipoAtividadeRepository:
 
     def test_buscar_por_id(self):
         """Busca tipo por ID."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.tipo_atividade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -91,7 +91,7 @@ class TestTipoAtividadeRepository:
             tipo_mock.id = 1
             mock_session.get.return_value = tipo_mock
 
-            from src.cp.repositories.capacidade.repositories import TipoAtividadeRepository
+            from cp.repositories.capacidade import TipoAtividadeRepository
             repo = TipoAtividadeRepository(MagicMock())
             resultado = repo.buscar_por_id(1)
 
@@ -108,7 +108,7 @@ class TestParametroCapacidadeRepository:
 
     def test_buscar_vigente(self):
         """Busca parâmetro vigente."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.parametro_capacidade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -116,7 +116,7 @@ class TestParametroCapacidadeRepository:
             param = Mock(spec=ParametroCapacidade)
             mock_session.execute.return_value.scalar_one_or_none.return_value = param
 
-            from src.cp.repositories.capacidade.repositories import ParametroCapacidadeRepository
+            from cp.repositories.capacidade import ParametroCapacidadeRepository
             repo = ParametroCapacidadeRepository(MagicMock())
             resultado = repo.buscar_vigente(date(2026, 3, 10))
 
@@ -124,7 +124,7 @@ class TestParametroCapacidadeRepository:
 
     def test_buscar_por_id(self):
         """Busca parâmetro por ID."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.parametro_capacidade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -133,7 +133,7 @@ class TestParametroCapacidadeRepository:
             param.id = 1
             mock_session.get.return_value = param
 
-            from src.cp.repositories.capacidade.repositories import ParametroCapacidadeRepository
+            from cp.repositories.capacidade import ParametroCapacidadeRepository
             repo = ParametroCapacidadeRepository(MagicMock())
             resultado = repo.buscar_por_id(1)
 
@@ -141,17 +141,18 @@ class TestParametroCapacidadeRepository:
 
     def test_criar(self):
         """Cria novo parâmetro."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.parametro_capacidade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
 
-            from src.cp.repositories.capacidade.repositories import ParametroCapacidadeRepository
+            from cp.repositories.capacidade import ParametroCapacidadeRepository
             repo = ParametroCapacidadeRepository(MagicMock())
             
             repo.criar(
                 minutos_dia_util=360,
-                minutos_extra_max=240,
+                minutos_sexta=240,
+                minutos_extra_max=600,
                 data_inicio=date(2026, 1, 1),
                 data_fim=None,
                 criado_por=1,
@@ -162,13 +163,13 @@ class TestParametroCapacidadeRepository:
 
     def test_verificar_conflito_vigencia_sem_conflito(self):
         """Sem conflito de vigência."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.parametro_capacidade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
             mock_session.execute.return_value.scalar_one_or_none.return_value = None
 
-            from src.cp.repositories.capacidade.repositories import ParametroCapacidadeRepository
+            from cp.repositories.capacidade import ParametroCapacidadeRepository
             repo = ParametroCapacidadeRepository(MagicMock())
             resultado = repo.verificar_conflito_vigencia(date(2026, 1, 1), None)
 
@@ -176,13 +177,13 @@ class TestParametroCapacidadeRepository:
 
     def test_verificar_conflito_vigencia_com_conflito(self):
         """Com conflito de vigência."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.parametro_capacidade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
             mock_session.execute.return_value.scalar_one_or_none.return_value = Mock()
 
-            from src.cp.repositories.capacidade.repositories import ParametroCapacidadeRepository
+            from cp.repositories.capacidade import ParametroCapacidadeRepository
             repo = ParametroCapacidadeRepository(MagicMock())
             resultado = repo.verificar_conflito_vigencia(date(2026, 1, 1), None)
 
@@ -190,7 +191,7 @@ class TestParametroCapacidadeRepository:
 
     def test_atualizar(self):
         """Atualiza parâmetro existente."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.parametro_capacidade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -200,7 +201,7 @@ class TestParametroCapacidadeRepository:
             param.minutos_dia_util_default = 360
             mock_session.get.return_value = param
 
-            from src.cp.repositories.capacidade.repositories import ParametroCapacidadeRepository
+            from cp.repositories.capacidade import ParametroCapacidadeRepository
             repo = ParametroCapacidadeRepository(MagicMock())
             repo.atualizar(id=1, minutos_dia_util=480, minutos_extra_max=None, data_fim=None)
 
@@ -217,7 +218,7 @@ class TestCapacidadeDiaRepository:
 
     def test_buscar(self):
         """Busca capacidade por usuário e data."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.capacidade_dia.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -225,7 +226,7 @@ class TestCapacidadeDiaRepository:
             cap = Mock(spec=CapacidadeDia)
             mock_session.execute.return_value.scalar_one_or_none.return_value = cap
 
-            from src.cp.repositories.capacidade.repositories import CapacidadeDiaRepository
+            from cp.repositories.capacidade import CapacidadeDiaRepository
             repo = CapacidadeDiaRepository(MagicMock())
             resultado = repo.buscar(2, date(2026, 3, 10))
 
@@ -233,7 +234,7 @@ class TestCapacidadeDiaRepository:
 
     def test_listar_periodo(self):
         """Lista capacidades do período."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.capacidade_dia.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -241,7 +242,7 @@ class TestCapacidadeDiaRepository:
             caps = [Mock(spec=CapacidadeDia), Mock(spec=CapacidadeDia)]
             mock_session.execute.return_value.scalars.return_value.all.return_value = caps
 
-            from src.cp.repositories.capacidade.repositories import CapacidadeDiaRepository
+            from cp.repositories.capacidade import CapacidadeDiaRepository
             repo = CapacidadeDiaRepository(MagicMock())
             resultado = repo.listar_periodo(2, date(2026, 3, 1), date(2026, 3, 31))
 
@@ -249,13 +250,13 @@ class TestCapacidadeDiaRepository:
 
     def test_criar_ou_atualizar_novo(self):
         """Cria nova capacidade."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.capacidade_dia.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
             mock_session.execute.return_value.scalar_one_or_none.return_value = None
 
-            from src.cp.repositories.capacidade.repositories import CapacidadeDiaRepository
+            from cp.repositories.capacidade import CapacidadeDiaRepository
             repo = CapacidadeDiaRepository(MagicMock())
             
             repo.criar_ou_atualizar(
@@ -276,13 +277,13 @@ class TestCapacidadeDiaRepository:
 
     def test_consolidar_periodo(self):
         """Consolida período."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.capacidade_dia.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
             mock_session.execute.return_value.rowcount = 5
 
-            from src.cp.repositories.capacidade.repositories import CapacidadeDiaRepository
+            from cp.repositories.capacidade import CapacidadeDiaRepository
             repo = CapacidadeDiaRepository(MagicMock())
             resultado = repo.consolidar_periodo(2, date(2026, 3, 1), date(2026, 3, 15))
 
@@ -299,7 +300,7 @@ class TestAgendaPrevistaRepository:
 
     def test_buscar_existente(self):
         """Busca planejamento existente."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.agenda_prevista.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -307,7 +308,7 @@ class TestAgendaPrevistaRepository:
             plan = Mock(spec=AgendaPrevistaAdmin)
             mock_session.execute.return_value.scalar_one_or_none.return_value = plan
 
-            from src.cp.repositories.capacidade.repositories import AgendaPrevistaRepository
+            from cp.repositories.capacidade import AgendaPrevistaRepository
             repo = AgendaPrevistaRepository(MagicMock())
             resultado = repo.buscar_existente(2, date(2026, 3, 10), 1)
 
@@ -315,12 +316,12 @@ class TestAgendaPrevistaRepository:
 
     def test_criar(self):
         """Cria novo planejamento."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.agenda_prevista.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
 
-            from src.cp.repositories.capacidade.repositories import AgendaPrevistaRepository
+            from cp.repositories.capacidade import AgendaPrevistaRepository
             repo = AgendaPrevistaRepository(MagicMock())
             
             repo.criar(
@@ -338,7 +339,7 @@ class TestAgendaPrevistaRepository:
 
     def test_buscar_por_id(self):
         """Busca planejamento por ID."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.agenda_prevista.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -347,7 +348,7 @@ class TestAgendaPrevistaRepository:
             plan.id = 1
             mock_session.get.return_value = plan
 
-            from src.cp.repositories.capacidade.repositories import AgendaPrevistaRepository
+            from cp.repositories.capacidade import AgendaPrevistaRepository
             repo = AgendaPrevistaRepository(MagicMock())
             resultado = repo.buscar_por_id(1)
 
@@ -355,7 +356,7 @@ class TestAgendaPrevistaRepository:
 
     def test_atualizar(self):
         """Atualiza planejamento."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.agenda_prevista.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -364,33 +365,34 @@ class TestAgendaPrevistaRepository:
             plan.id = 1
             mock_session.get.return_value = plan
 
-            from src.cp.repositories.capacidade.repositories import AgendaPrevistaRepository
+            from cp.repositories.capacidade import AgendaPrevistaRepository
             repo = AgendaPrevistaRepository(MagicMock())
             repo.atualizar(id=1, minutos_normais=180, minutos_extras=None, descricao=None)
 
             mock_session.commit.assert_called_once()
 
     def test_remover(self):
-        """Remove planejamento."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        """Remove planejamento (soft delete: em_uso = False)."""
+        with patch("cp.repositories.capacidade.agenda_prevista.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
-            
+
             plan = Mock(spec=AgendaPrevistaAdmin)
+            plan.em_uso = True
             mock_session.get.return_value = plan
 
-            from src.cp.repositories.capacidade.repositories import AgendaPrevistaRepository
+            from cp.repositories.capacidade import AgendaPrevistaRepository
             repo = AgendaPrevistaRepository(MagicMock())
             resultado = repo.remover(1)
 
-            mock_session.delete.assert_called_once()
+            assert plan.em_uso is False
             mock_session.commit.assert_called_once()
             assert resultado is True
 
     def test_listar_por_usuario_periodo(self):
         """Lista planejamentos do usuário."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.agenda_prevista.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -398,7 +400,7 @@ class TestAgendaPrevistaRepository:
             plans = [Mock(spec=AgendaPrevistaAdmin), Mock(spec=AgendaPrevistaAdmin)]
             mock_session.execute.return_value.scalars.return_value.all.return_value = plans
 
-            from src.cp.repositories.capacidade.repositories import AgendaPrevistaRepository
+            from cp.repositories.capacidade import AgendaPrevistaRepository
             repo = AgendaPrevistaRepository(MagicMock())
             resultado = repo.listar_por_usuario_periodo(2, date(2026, 3, 1), date(2026, 3, 31))
 
@@ -415,12 +417,12 @@ class TestAgendaLancamentoRepository:
 
     def test_criar(self):
         """Cria novo lançamento."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.agenda_lancamento.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
 
-            from src.cp.repositories.capacidade.repositories import AgendaLancamentoRepository
+            from cp.repositories.capacidade import AgendaLancamentoRepository
             repo = AgendaLancamentoRepository(MagicMock())
             
             repo.criar(
@@ -439,7 +441,7 @@ class TestAgendaLancamentoRepository:
 
     def test_buscar_por_id(self):
         """Busca lançamento por ID."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.agenda_lancamento.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -448,7 +450,7 @@ class TestAgendaLancamentoRepository:
             lanc.id = 1
             mock_session.get.return_value = lanc
 
-            from src.cp.repositories.capacidade.repositories import AgendaLancamentoRepository
+            from cp.repositories.capacidade import AgendaLancamentoRepository
             repo = AgendaLancamentoRepository(MagicMock())
             resultado = repo.buscar_por_id(1)
 
@@ -456,13 +458,13 @@ class TestAgendaLancamentoRepository:
 
     def test_soma_minutos_dia(self):
         """Soma minutos do dia."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.agenda_lancamento.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
-            mock_session.execute.return_value.scalar_one_or_none.return_value = 240
+            mock_session.execute.return_value.scalar.return_value = 240
 
-            from src.cp.repositories.capacidade.repositories import AgendaLancamentoRepository
+            from cp.repositories.capacidade import AgendaLancamentoRepository
             repo = AgendaLancamentoRepository(MagicMock())
             resultado = repo.soma_minutos_dia(2, date(2026, 3, 10), FaixaMinuto.NORMAL)
 
@@ -470,13 +472,13 @@ class TestAgendaLancamentoRepository:
 
     def test_soma_minutos_dia_none(self):
         """Retorna 0 se None."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.agenda_lancamento.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
-            mock_session.execute.return_value.scalar_one_or_none.return_value = None
+            mock_session.execute.return_value.scalar.return_value = None
 
-            from src.cp.repositories.capacidade.repositories import AgendaLancamentoRepository
+            from cp.repositories.capacidade import AgendaLancamentoRepository
             repo = AgendaLancamentoRepository(MagicMock())
             resultado = repo.soma_minutos_dia(2, date(2026, 3, 10), FaixaMinuto.NORMAL)
 
@@ -484,7 +486,7 @@ class TestAgendaLancamentoRepository:
 
     def test_atualizar(self):
         """Atualiza lançamento."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.agenda_lancamento.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -493,7 +495,7 @@ class TestAgendaLancamentoRepository:
             lanc.id = 1
             mock_session.get.return_value = lanc
 
-            from src.cp.repositories.capacidade.repositories import AgendaLancamentoRepository
+            from cp.repositories.capacidade import AgendaLancamentoRepository
             repo = AgendaLancamentoRepository(MagicMock())
             repo.atualizar(id=1, minutos=150, descricao=None, atualizado_por=2)
 
@@ -501,24 +503,26 @@ class TestAgendaLancamentoRepository:
 
     def test_remover(self):
         """Remove lançamento."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.agenda_lancamento.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
             
             lanc = Mock(spec=AgendaLancamento)
+            lanc.em_uso = True
             mock_session.get.return_value = lanc
 
-            from src.cp.repositories.capacidade.repositories import AgendaLancamentoRepository
+            from cp.repositories.capacidade import AgendaLancamentoRepository
             repo = AgendaLancamentoRepository(MagicMock())
             resultado = repo.remover(1)
 
-            mock_session.delete.assert_called_once()
+            assert lanc.em_uso is False
+            mock_session.commit.assert_called_once()
             assert resultado is True
 
     def test_listar_por_usuario_periodo(self):
         """Lista lançamentos do usuário."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.agenda_lancamento.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -526,7 +530,7 @@ class TestAgendaLancamentoRepository:
             lancs = [Mock(spec=AgendaLancamento), Mock(spec=AgendaLancamento)]
             mock_session.execute.return_value.scalars.return_value.all.return_value = lancs
 
-            from src.cp.repositories.capacidade.repositories import AgendaLancamentoRepository
+            from cp.repositories.capacidade import AgendaLancamentoRepository
             repo = AgendaLancamentoRepository(MagicMock())
             resultado = repo.listar_por_usuario_periodo(2, date(2026, 3, 1), date(2026, 3, 31))
 
@@ -534,7 +538,7 @@ class TestAgendaLancamentoRepository:
 
     def test_listar_por_dia(self):
         """Lista lançamentos do dia."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.agenda_lancamento.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -542,7 +546,7 @@ class TestAgendaLancamentoRepository:
             lancs = [Mock(spec=AgendaLancamento)]
             mock_session.execute.return_value.scalars.return_value.all.return_value = lancs
 
-            from src.cp.repositories.capacidade.repositories import AgendaLancamentoRepository
+            from cp.repositories.capacidade import AgendaLancamentoRepository
             repo = AgendaLancamentoRepository(MagicMock())
             resultado = repo.listar_por_dia(2, date(2026, 3, 10))
 
@@ -559,12 +563,12 @@ class TestFeriadoRepository:
 
     def test_criar(self):
         """Cria novo feriado."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.feriado.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
 
-            from src.cp.repositories.capacidade.repositories import FeriadoRepository
+            from cp.repositories.capacidade import FeriadoRepository
             repo = FeriadoRepository(MagicMock())
             
             repo.criar(date(2026, 4, 21), "Tiradentes", 1)
@@ -574,7 +578,7 @@ class TestFeriadoRepository:
 
     def test_buscar_por_data(self):
         """Busca feriado por data."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.feriado.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -582,7 +586,7 @@ class TestFeriadoRepository:
             feriado = Mock(spec=Feriado)
             mock_session.execute.return_value.scalar_one_or_none.return_value = feriado
 
-            from src.cp.repositories.capacidade.repositories import FeriadoRepository
+            from cp.repositories.capacidade import FeriadoRepository
             repo = FeriadoRepository(MagicMock())
             resultado = repo.buscar_por_data(date(2026, 4, 21))
 
@@ -590,13 +594,13 @@ class TestFeriadoRepository:
 
     def test_eh_feriado_true(self):
         """Retorna True se é feriado."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.feriado.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
             mock_session.execute.return_value.scalar_one_or_none.return_value = Mock()
 
-            from src.cp.repositories.capacidade.repositories import FeriadoRepository
+            from cp.repositories.capacidade import FeriadoRepository
             repo = FeriadoRepository(MagicMock())
             resultado = repo.eh_feriado(date(2026, 4, 21))
 
@@ -604,13 +608,13 @@ class TestFeriadoRepository:
 
     def test_eh_feriado_false(self):
         """Retorna False se não é feriado."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.feriado.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
             mock_session.execute.return_value.scalar_one_or_none.return_value = None
 
-            from src.cp.repositories.capacidade.repositories import FeriadoRepository
+            from cp.repositories.capacidade import FeriadoRepository
             repo = FeriadoRepository(MagicMock())
             resultado = repo.eh_feriado(date(2026, 3, 10))
 
@@ -618,7 +622,7 @@ class TestFeriadoRepository:
 
     def test_listar_todos(self):
         """Lista todos os feriados."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.feriado.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -626,7 +630,7 @@ class TestFeriadoRepository:
             feriados = [Mock(spec=Feriado), Mock(spec=Feriado)]
             mock_session.execute.return_value.scalars.return_value.all.return_value = feriados
 
-            from src.cp.repositories.capacidade.repositories import FeriadoRepository
+            from cp.repositories.capacidade import FeriadoRepository
             repo = FeriadoRepository(MagicMock())
             resultado = repo.listar_todos()
 
@@ -634,7 +638,7 @@ class TestFeriadoRepository:
 
     def test_remover(self):
         """Remove feriado."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.feriado.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -642,7 +646,7 @@ class TestFeriadoRepository:
             feriado = Mock(spec=Feriado)
             mock_session.get.return_value = feriado
 
-            from src.cp.repositories.capacidade.repositories import FeriadoRepository
+            from cp.repositories.capacidade import FeriadoRepository
             repo = FeriadoRepository(MagicMock())
             resultado = repo.remover(1)
 
@@ -660,12 +664,12 @@ class TestIndisponibilidadeRepository:
 
     def test_criar(self):
         """Cria nova indisponibilidade."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.indisponibilidade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
 
-            from src.cp.repositories.capacidade.repositories import IndisponibilidadeRepository
+            from cp.repositories.capacidade import IndisponibilidadeRepository
             repo = IndisponibilidadeRepository(MagicMock())
             
             repo.criar(
@@ -682,13 +686,13 @@ class TestIndisponibilidadeRepository:
 
     def test_verificar_sobreposicao_true(self):
         """Retorna True se há sobreposição."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.indisponibilidade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
             mock_session.execute.return_value.scalar_one_or_none.return_value = Mock()
 
-            from src.cp.repositories.capacidade.repositories import IndisponibilidadeRepository
+            from cp.repositories.capacidade import IndisponibilidadeRepository
             repo = IndisponibilidadeRepository(MagicMock())
             resultado = repo.verificar_sobreposicao(2, date(2026, 7, 1), date(2026, 7, 15))
 
@@ -696,13 +700,13 @@ class TestIndisponibilidadeRepository:
 
     def test_verificar_sobreposicao_false(self):
         """Retorna False se não há sobreposição."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.indisponibilidade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
             mock_session.execute.return_value.scalar_one_or_none.return_value = None
 
-            from src.cp.repositories.capacidade.repositories import IndisponibilidadeRepository
+            from cp.repositories.capacidade import IndisponibilidadeRepository
             repo = IndisponibilidadeRepository(MagicMock())
             resultado = repo.verificar_sobreposicao(2, date(2026, 7, 1), date(2026, 7, 15))
 
@@ -710,7 +714,7 @@ class TestIndisponibilidadeRepository:
 
     def test_buscar_para_data(self):
         """Busca indisponibilidade para data."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.indisponibilidade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -718,7 +722,7 @@ class TestIndisponibilidadeRepository:
             indisp = Mock(spec=IndisponibilidadeUsuario)
             mock_session.execute.return_value.scalar_one_or_none.return_value = indisp
 
-            from src.cp.repositories.capacidade.repositories import IndisponibilidadeRepository
+            from cp.repositories.capacidade import IndisponibilidadeRepository
             repo = IndisponibilidadeRepository(MagicMock())
             resultado = repo.buscar_para_data(2, date(2026, 7, 10))
 
@@ -726,7 +730,7 @@ class TestIndisponibilidadeRepository:
 
     def test_listar_por_usuario(self):
         """Lista indisponibilidades do usuário."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.indisponibilidade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -734,7 +738,7 @@ class TestIndisponibilidadeRepository:
             indisps = [Mock(spec=IndisponibilidadeUsuario)]
             mock_session.execute.return_value.scalars.return_value.all.return_value = indisps
 
-            from src.cp.repositories.capacidade.repositories import IndisponibilidadeRepository
+            from cp.repositories.capacidade import IndisponibilidadeRepository
             repo = IndisponibilidadeRepository(MagicMock())
             resultado = repo.listar_por_usuario(2)
 
@@ -742,7 +746,7 @@ class TestIndisponibilidadeRepository:
 
     def test_remover(self):
         """Remove indisponibilidade."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.indisponibilidade.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -750,7 +754,7 @@ class TestIndisponibilidadeRepository:
             indisp = Mock(spec=IndisponibilidadeUsuario)
             mock_session.get.return_value = indisp
 
-            from src.cp.repositories.capacidade.repositories import IndisponibilidadeRepository
+            from cp.repositories.capacidade import IndisponibilidadeRepository
             repo = IndisponibilidadeRepository(MagicMock())
             resultado = repo.remover(1)
 
@@ -768,12 +772,12 @@ class TestAuditLogRepository:
 
     def test_registrar(self):
         """Registra log de auditoria."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.audit_log.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
 
-            from src.cp.repositories.capacidade.repositories import AuditLogRepository
+            from cp.repositories.capacidade import AuditLogRepository
             repo = AuditLogRepository(MagicMock())
             
             repo.registrar(
@@ -790,7 +794,7 @@ class TestAuditLogRepository:
 
     def test_listar_por_entidade(self):
         """Lista logs por entidade."""
-        with patch("src.cp.repositories.capacidade.repositories.Session") as MockSession:
+        with patch("cp.repositories.capacidade.audit_log.Session") as MockSession:
             mock_session = MagicMock()
             MockSession.return_value.__enter__ = Mock(return_value=mock_session)
             MockSession.return_value.__exit__ = Mock(return_value=None)
@@ -798,7 +802,7 @@ class TestAuditLogRepository:
             logs = [Mock(spec=AuditLog), Mock(spec=AuditLog)]
             mock_session.execute.return_value.scalars.return_value.all.return_value = logs
 
-            from src.cp.repositories.capacidade.repositories import AuditLogRepository
+            from cp.repositories.capacidade import AuditLogRepository
             repo = AuditLogRepository(MagicMock())
             resultado = repo.listar_por_entidade("teste", 1)
 

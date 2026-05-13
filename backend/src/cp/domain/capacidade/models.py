@@ -120,7 +120,8 @@ class ParametroCapacidade(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     minutos_dia_util_default: Mapped[int] = mapped_column(Integer, nullable=False, default=360)
-    minutos_extra_maximo_default: Mapped[int] = mapped_column(Integer, nullable=False, default=240)
+    minutos_sexta_default: Mapped[int] = mapped_column(Integer, nullable=False, default=240)
+    minutos_extra_maximo_default: Mapped[int] = mapped_column(Integer, nullable=False, default=600)
     data_inicio_vigencia: Mapped[date] = mapped_column(Date, nullable=False)
     data_fim_vigencia: Mapped[date | None] = mapped_column(Date, nullable=True)
     criado_por: Mapped[int] = mapped_column(Integer, nullable=False)
