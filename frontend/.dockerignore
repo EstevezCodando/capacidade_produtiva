@@ -7,3 +7,12 @@ dist/
 .DS_Store
 .vscode/
 .idea/
+
+# Cache incremental do TypeScript (tsc -b com composite:true)
+# Contém caminhos absolutos da máquina local — invalida o build no container
+*.tsbuildinfo
+
+# Arquivos gerados pela compilação do tsconfig.node.json
+# (composite:true emite vite.config.js + vite.config.d.ts localmente)
+vite.config.js
+vite.config.d.ts
