@@ -367,12 +367,23 @@ def main() -> None:
             sap_test_db_user = _perguntar_texto("Usuário do SAP_TEST", sap_db_user)
             sap_test_db_password = getpass("Senha do SAP_TEST: ").strip()
 
-        # --- Gerar secrets ---
-        _print_ok("Gerando chaves de segurança...")
-        jwt_secret = _gerar_jwt_secret()
+        # --- JWT_SECRET do servico_autenticacao ---
+        print()
+        print("--- Chave de segurança JWT ---")
+        print(
+            "O JWT_SECRET deve ser IDÊNTICO ao configurado no servico_autenticacao.\n"
+            "Ele fica no arquivo config.env (ou .env) do serviço de autenticação,\n"
+            "na linha que começa com  JWT_SECRET=\n"
+        )
+        jwt_secret_input = getpass("JWT_SECRET do servico_autenticacao: ").strip()
+        if not jwt_secret_input:
+            raise RuntimeError("JWT_SECRET não pode ser vazio.")
+        jwt_secret = jwt_secret_input
+
+        # --- Gerar CP_SECRET_KEY ---
+        _print_ok("Gerando chave interna do CP...")
         cp_secret_key = _gerar_secret_key()
-        _print_ok("  ✓ JWT_SECRET gerado (128 caracteres hex)")
-        _print_ok("  ✓ CP_SECRET_KEY gerado")
+        _print_ok("  ✓ CP_SECRET_KEY gerado automaticamente")
 
         # --- Gravar config.env ---
         _print_ok("Gravando config.env...")
@@ -411,12 +422,8 @@ def main() -> None:
         _print_ok("Configuração concluída!")
         _print_ok("")
         _print_ok("Próximos passos:")
-        _print_ok("  1. uv run alembic upgrade head   # criar tabelas do CP")
-        _print_ok("  2. uv run uvicorn cp.main:app    # iniciar o servidor")
-        _print_ok("")
-        _print_ok("NOTA sobre SSO com SAP:")
-        _print_ok("  Para que tokens do SAP funcionem no CP, copie o")
-        _print_ok("  JWT_SECRET do config.env do SAP para o config.env do CP.")
+        _print_ok("  1. docker compose --env-file config.env up -d --build")
+        _print_ok("     (ou renomeie config.env para .env antes de subir)")
         _print_ok("=" * 60)
 
     except RuntimeError as exc:
