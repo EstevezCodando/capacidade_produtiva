@@ -1,6 +1,6 @@
-# setup.ps1 — Configuração inicial do Capacidade Produtiva
+# setup.ps1 - Configuracao inicial do Capacidade Produtiva
 # Execute este script ANTES de rodar o Docker.
-# Ele coleta as informações necessárias e gera o arquivo .env automaticamente.
+# Ele coleta as informacoes necessarias e gera o arquivo .env automaticamente.
 #
 # Uso:
 #   powershell -ExecutionPolicy Bypass -File setup.ps1
@@ -9,14 +9,17 @@ $ErrorActionPreference = "Stop"
 
 function Write-Ok   { param($msg) Write-Host "  OK  $msg" -ForegroundColor Cyan }
 function Write-Err  { param($msg) Write-Host "ERRO  $msg" -ForegroundColor Red }
-function Write-Step { param($msg) Write-Host "`n--- $msg ---" -ForegroundColor Yellow }
+function Write-Step { param($msg) Write-Host "" ; Write-Host "--- $msg ---" -ForegroundColor Yellow }
 
 function Perguntar {
-    param($pergunta, $default = $null, $senha = $false)
+    param($pergunta, $default = $null, [switch]$senha)
     $prompt = if ($default) { "$pergunta [$default]" } else { $pergunta }
     while ($true) {
         if ($senha) {
-            $valor = Read-Host "$prompt (oculto)"
+            $secureVal = Read-Host "$prompt (oculto)" -AsSecureString
+            $bstr  = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureVal)
+            $valor = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+            [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
         } else {
             $valor = Read-Host $prompt
         }
@@ -30,8 +33,7 @@ function Testar-Auth {
     param($url)
     try {
         $resp = Invoke-WebRequest -Uri "$url/api" -UseBasicParsing -TimeoutSec 5
-        $json = $resp.Content | ConvertFrom-Json
-        return $json.message -eq "Servico de autenticacao operacional" -or $resp.StatusCode -eq 200
+        return $resp.StatusCode -eq 200
     } catch {
         return $false
     }
@@ -60,6 +62,11 @@ function Gerar-SecretKey {
     return [System.Convert]::ToBase64String($bytes)
 }
 
+function Gerar-JwtSecret {
+    $bytes = [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(64)
+    return ([System.BitConverter]::ToString($bytes)).Replace("-", "").ToLower()
+}
+
 # =============================================================================
 # Inicio
 # =============================================================================
@@ -67,14 +74,13 @@ function Gerar-SecretKey {
 Clear-Host
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "   Capacidade Produtiva — Configuracao inicial" -ForegroundColor Cyan
+Write-Host "   Capacidade Produtiva - Configuracao inicial"             -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Este script vai coletar as informacoes necessarias e gerar"
+Write-Host "Este script coleta as informacoes necessarias e gera"
 Write-Host "o arquivo .env para voce executar o Docker em seguida."
 Write-Host ""
 
-# Verificar se .env ja existe
 if (Test-Path ".env") {
     $resp = Read-Host ".env ja existe. Deseja sobrescrever? (s/N)"
     if ($resp -notmatch "^[sS]") {
@@ -84,17 +90,16 @@ if (Test-Path ".env") {
 }
 
 # =============================================================================
-# Banco CP (interno — gerenciado pelo Docker)
+# Banco CP (interno - gerenciado pelo Docker)
 # =============================================================================
 
 Write-Step "Banco de dados do Capacidade Produtiva (interno)"
 Write-Host "  Este banco sera criado automaticamente pelo Docker."
 Write-Host "  Escolha um usuario e senha para ele."
-Write-Host ""
 
 $cpDbName     = Perguntar "Nome do banco" "capacidade_produtiva"
 $cpDbUser     = Perguntar "Usuario do banco" "cp_user"
-$cpDbPassword = Perguntar "Senha do banco (escolha uma senha forte)" -senha $true
+$cpDbPassword = Perguntar "Senha do banco (escolha uma senha forte)" -senha
 $cpApiPort    = Perguntar "Porta da API" "3050"
 $frontendPort = Perguntar "Porta do frontend" "5173"
 
@@ -108,7 +113,7 @@ $sapDbHost     = Perguntar "IP ou hostname do servidor SAP"
 $sapDbPort     = Perguntar "Porta do PostgreSQL SAP" "5432"
 $sapDbName     = Perguntar "Nome do banco SAP"
 $sapDbUser     = Perguntar "Usuario somente-leitura do banco SAP"
-$sapDbPassword = Perguntar "Senha do usuario SAP" -senha $true
+$sapDbPassword = Perguntar "Senha do usuario SAP" -senha
 
 Write-Host ""
 Write-Host "  Testando conexao com o banco SAP..." -NoNewline
@@ -117,8 +122,8 @@ if ($sapTest.TcpTestSucceeded) {
     Write-Ok "Banco SAP acessivel"
 } else {
     Write-Host ""
-    Write-Host "  AVISO: Nao foi possivel conectar em $sapDbHost`:$sapDbPort" -ForegroundColor Yellow
-    Write-Host "  Verifique o firewall. O setup continuara mesmo assim." -ForegroundColor Yellow
+    Write-Host "  AVISO: Nao foi possivel conectar em ${sapDbHost}:${sapDbPort}" -ForegroundColor Yellow
+    Write-Host "  Verifique o firewall. O setup continuara mesmo assim."         -ForegroundColor Yellow
 }
 
 # =============================================================================
@@ -129,7 +134,7 @@ Write-Step "Servico de Autenticacao"
 
 while ($true) {
     $authUrl = Perguntar "URL do servico de autenticacao (ex: http://192.168.1.50:3001)"
-    $authUrl  = $authUrl.TrimEnd("/")
+    $authUrl = $authUrl.TrimEnd("/")
 
     Write-Host "  Testando conexao..." -NoNewline
     if (Testar-Auth $authUrl) {
@@ -141,8 +146,8 @@ while ($true) {
     }
 }
 
-$authAdminUser = Perguntar "Usuario administrador do auth service"
-$authAdminPassword = Perguntar "Senha do administrador" -senha $true
+$authAdminUser     = Perguntar "Usuario administrador do auth service"
+$authAdminPassword = Perguntar "Senha do administrador" -senha
 
 Write-Host "  Autenticando..." -NoNewline
 try {
@@ -161,45 +166,40 @@ try {
 Write-Host ""
 Write-Host "  Gerando chaves de seguranca automaticamente..." -NoNewline
 $cpSecretKey = Gerar-SecretKey
-$jwtBytes    = [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(64)
-$jwtSecret   = [System.BitConverter]::ToString($jwtBytes).Replace("-","").ToLower()
+$jwtSecret   = Gerar-JwtSecret
 Write-Ok "Chaves geradas"
 
 # =============================================================================
-# Gravar .env
+# Gravar .env em UTF-8 sem BOM
 # =============================================================================
 
-$envContent = @"
-ENVIRONMENT=production
+$envContent = "ENVIRONMENT=production`r`n"
+$envContent += "`r`n"
+$envContent += "CP_DB_NAME=$cpDbName`r`n"
+$envContent += "CP_DB_USER=$cpDbUser`r`n"
+$envContent += "CP_DB_PASSWORD=$cpDbPassword`r`n"
+$envContent += "`r`n"
+$envContent += "CP_API_PORT=$cpApiPort`r`n"
+$envContent += "FRONTEND_PORT=$frontendPort`r`n"
+$envContent += "`r`n"
+$envContent += "CP_SECRET_KEY=$cpSecretKey`r`n"
+$envContent += "`r`n"
+$envContent += "SAP_DB_HOST=$sapDbHost`r`n"
+$envContent += "SAP_DB_PORT=$sapDbPort`r`n"
+$envContent += "SAP_DB_NAME=$sapDbName`r`n"
+$envContent += "SAP_DB_USER=$sapDbUser`r`n"
+$envContent += "SAP_DB_PASSWORD=$sapDbPassword`r`n"
+$envContent += "`r`n"
+$envContent += "JWT_SECRET=$jwtSecret`r`n"
+$envContent += "AUTH_URL=$authUrl`r`n"
+$envContent += "AUTH_ADMIN_USER=$authAdminUser`r`n"
+$envContent += "AUTH_ADMIN_PASSWORD=$authAdminPassword`r`n"
 
-# Banco do CP (interno — gerenciado pelo Docker)
-CP_DB_NAME=$cpDbName
-CP_DB_USER=$cpDbUser
-CP_DB_PASSWORD=$cpDbPassword
-
-# Portas expostas
-CP_API_PORT=$cpApiPort
-FRONTEND_PORT=$frontendPort
-
-# Chave interna do CP (gerada automaticamente)
-CP_SECRET_KEY=$cpSecretKey
-
-# Banco SAP (externo, somente leitura)
-SAP_DB_HOST=$sapDbHost
-SAP_DB_PORT=$sapDbPort
-SAP_DB_NAME=$sapDbName
-SAP_DB_USER=$sapDbUser
-SAP_DB_PASSWORD=$sapDbPassword
-
-# Servico de Autenticacao
-JWT_SECRET=$jwtSecret
-AUTH_URL=$authUrl
-AUTH_ADMIN_USER=$authAdminUser
-AUTH_ADMIN_PASSWORD=$authAdminPassword
-"@
-
-# Gravar em UTF-8 sem BOM (obrigatorio para o Docker Compose ler corretamente)
-[System.IO.File]::WriteAllText("$PWD\.env", $envContent, [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText(
+    "$PWD\.env",
+    $envContent,
+    [System.Text.UTF8Encoding]::new($false)
+)
 
 # =============================================================================
 # Conclusao
@@ -207,14 +207,14 @@ AUTH_ADMIN_PASSWORD=$authAdminPassword
 
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Green
-Write-Host "   Configuracao concluida! Arquivo .env gerado." -ForegroundColor Green
+Write-Host "   Configuracao concluida! Arquivo .env gerado."             -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "Proximo passo — subir o sistema:"
+Write-Host "Proximo passo - subir o sistema:"
 Write-Host ""
-Write-Host "   docker compose up -d --build" -ForegroundColor White
+Write-Host "   docker compose up -d --build"
 Write-Host ""
 Write-Host "Acompanhe a inicializacao com:"
 Write-Host ""
-Write-Host "   docker compose logs -f backend" -ForegroundColor White
+Write-Host "   docker compose logs -f backend"
 Write-Host ""
