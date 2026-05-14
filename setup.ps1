@@ -58,12 +58,18 @@ function Autenticar {
 }
 
 function Gerar-SecretKey {
-    $bytes = [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(48)
+    $rng   = New-Object System.Security.Cryptography.RNGCryptoServiceProvider
+    $bytes = New-Object byte[] 48
+    $rng.GetBytes($bytes)
+    $rng.Dispose()
     return [System.Convert]::ToBase64String($bytes)
 }
 
 function Gerar-JwtSecret {
-    $bytes = [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(64)
+    $rng   = New-Object System.Security.Cryptography.RNGCryptoServiceProvider
+    $bytes = New-Object byte[] 64
+    $rng.GetBytes($bytes)
+    $rng.Dispose()
     return ([System.BitConverter]::ToString($bytes)).Replace("-", "").ToLower()
 }
 
