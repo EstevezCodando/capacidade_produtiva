@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Sequence
 
-from sqlalchemy import and_, select, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -174,6 +174,43 @@ class CapacidadeDiaRepository:
                     )
             session.commit()
             return len(rows)
+
+    def propagar_parametro(
+        self,
+        minutos_dia_util: int,
+        minutos_sexta: int,
+        a_partir_de: date,
+    ) -> int:
+        """Atualiza minutos_capacidade_normal_prevista para todos os registros
+        a partir de a_partir_de, diferenciando sexta-feira (ISODOW=5) de seg-qui.
+        Não altera dias de feriado nem de indisponibilidade.
+        Chamado automaticamente quando o admin altera o parâmetro de capacidade.
+        """
+        with Session(self._engine) as session:
+            isodow = func.extract("isodow", CapacidadeDia.data)
+
+            r1 = session.execute(
+                update(CapacidadeDia)
+                .where(
+                    CapacidadeDia.data >= a_partir_de,
+                    isodow.in_([1, 2, 3, 4]),
+                    CapacidadeDia.eh_feriado == False,  # noqa: E712
+                    CapacidadeDia.eh_indisponivel == False,  # noqa: E712
+                )
+                .values(minutos_capacidade_normal_prevista=minutos_dia_util)
+            )
+            r2 = session.execute(
+                update(CapacidadeDia)
+                .where(
+                    CapacidadeDia.data >= a_partir_de,
+                    isodow == 5,
+                    CapacidadeDia.eh_feriado == False,  # noqa: E712
+                    CapacidadeDia.eh_indisponivel == False,  # noqa: E712
+                )
+                .values(minutos_capacidade_normal_prevista=minutos_sexta)
+            )
+            session.commit()
+            return (r1.rowcount or 0) + (r2.rowcount or 0)
 
     def listar_por_status(
         self, data_inicio: date, data_fim: date, status: StatusDia | None = None

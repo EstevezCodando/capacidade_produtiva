@@ -214,6 +214,15 @@ def atualizar_config_teto(
                 atualizado_por=admin.usuario_id,
             )
 
+        # Propagar mudança para todos os capacidade_dia existentes a partir de hoje.
+        # Garante que registros já materializados reflitam o novo parâmetro imediatamente,
+        # sem precisar re-materializar manualmente.
+        service.propagar_mudanca_parametro(
+            minutos_dia_util=body.teto_normal_min,
+            minutos_sexta=body.teto_sexta_min,
+            a_partir_de=date.today(),
+        )
+
         return ConfigTetoResponse(
             teto_normal_min=parametro.minutos_dia_util_default,
             teto_sexta_min=parametro.minutos_sexta_default,

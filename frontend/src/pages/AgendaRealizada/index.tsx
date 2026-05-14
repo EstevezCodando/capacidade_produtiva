@@ -40,7 +40,7 @@ import type {
     UsuarioResumo,
 } from "@/types/agenda";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, isAfter, startOfDay } from "date-fns";
+import { format, getDay, isAfter, parseISO, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -280,7 +280,13 @@ export default function AgendaRealizada() {
             enabled: !!usuarioIdParaCarregar,
         });
 
-    const capacidadePadraoMinutos = configTeto?.teto_normal_min ?? 360;
+    // Retorna o teto padrão para dias ainda não materializados, respeitando sexta-feira
+    function capacidadePadraoParaDia(dataStr: string): number {
+      return getDay(parseISO(dataStr)) === 5
+        ? (configTeto?.teto_sexta_min ?? 240)
+        : (configTeto?.teto_normal_min ?? 360);
+    }
+
     const resumoPeriodo = capacidade?.resumo;
 
     const feriadosDatas = useMemo(
@@ -385,7 +391,7 @@ export default function AgendaRealizada() {
             mapa.set(dia.data, {
                 totalNormalMin,
                 totalExtraMin,
-                tetoNormalMin: dia.teto_normal_min || capacidadePadraoMinutos,
+                tetoNormalMin: dia.teto_normal_min || capacidadePadraoParaDia(dia.data),
                 lancamentos,
                 segmentos,
             });

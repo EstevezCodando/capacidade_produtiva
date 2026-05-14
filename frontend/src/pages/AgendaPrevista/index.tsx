@@ -33,7 +33,7 @@ import type {
     UsuarioResumo,
 } from "@/types/agenda";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, getDay, parseISO } from "date-fns";
 import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./AgendaPage.module.css";
 
@@ -337,7 +337,13 @@ export default function AgendaPrevista() {
   });
 
   const resumoPeriodo = capacidade?.resumo;
-  const capacidadePadraoMinutos = configTeto?.teto_normal_min ?? 360;
+
+  // Retorna o teto padrão para dias ainda não materializados, respeitando sexta-feira
+  function capacidadePadraoParaDia(dataStr: string): number {
+    return getDay(parseISO(dataStr)) === 5
+      ? (configTeto?.teto_sexta_min ?? 240)
+      : (configTeto?.teto_normal_min ?? 360);
+  }
   const diasSelecionados = calendar.selectedDates.length;
 
   const feriadosDatas = useMemo(
@@ -470,13 +476,13 @@ export default function AgendaPrevista() {
           resumoUsuario = criarResumoUsuarioDia(
             agendaUsuario.usuario_id,
             nomeUsuario,
-            dia.teto_normal_min || capacidadePadraoMinutos,
+            dia.teto_normal_min || capacidadePadraoParaDia(dia.data),
           );
           listaDia.push(resumoUsuario);
         }
 
         resumoUsuario.capacidadeMaxima =
-          dia.teto_normal_min || capacidadePadraoMinutos;
+          dia.teto_normal_min || capacidadePadraoParaDia(dia.data);
 
         for (const planejamento of dia.planejamento) {
           const corPlanejamento = obterCorPlanejamento(

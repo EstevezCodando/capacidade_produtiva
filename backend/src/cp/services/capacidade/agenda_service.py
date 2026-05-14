@@ -179,8 +179,17 @@ class AgendaService:
         if minutos_normais <= 0:
             return
 
+        from cp.domain.capacidade.constants import MINUTOS_DIA_UTIL_DEFAULT, MINUTOS_SEXTA_DEFAULT
+        from cp.repositories.capacidade import ParametroCapacidadeRepository
         capacidade = self._capacidade_repo.buscar(usuario_id, data)
-        teto_normal = capacidade.minutos_capacidade_normal_prevista if capacidade else 360
+        if capacidade:
+            teto_normal = capacidade.minutos_capacidade_normal_prevista
+        else:
+            param = ParametroCapacidadeRepository(self._engine).buscar_vigente(data)
+            if param:
+                teto_normal = param.minutos_sexta_default if data.weekday() == 4 else param.minutos_dia_util_default
+            else:
+                teto_normal = MINUTOS_SEXTA_DEFAULT if data.weekday() == 4 else MINUTOS_DIA_UTIL_DEFAULT
         ja_planejado = self._planejamento_repo.soma_minutos_planejados_dia(usuario_id, data)
 
         if excluir_planejamento_id:

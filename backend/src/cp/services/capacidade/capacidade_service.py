@@ -250,6 +250,25 @@ class CapacidadeService:
 
         return resultado
 
+    def propagar_mudanca_parametro(
+        self,
+        minutos_dia_util: int,
+        minutos_sexta: int,
+        a_partir_de: date,
+    ) -> int:
+        """Propaga mudança de parâmetro para todos os capacidade_dia existentes.
+
+        Atualiza minutos_capacidade_normal_prevista de todos os registros
+        a partir de a_partir_de, diferenciando sexta-feira de seg-qui.
+        Não altera feriados nem indisponibilidades.
+        Deve ser chamado sempre que o admin altera o parâmetro de capacidade.
+        """
+        return self._capacidade_repo.propagar_parametro(
+            minutos_dia_util=minutos_dia_util,
+            minutos_sexta=minutos_sexta,
+            a_partir_de=a_partir_de,
+        )
+
     def obter_capacidade_dia(self, usuario_id: int, data: date) -> CapacidadeDia | None:
         """Obtém capacidade materializada do dia."""
         return self._capacidade_repo.buscar(usuario_id, data)
@@ -294,7 +313,10 @@ class CapacidadeService:
                 # Usar o parâmetro vigente para saber quanto seria
                 param = self._param_repo.buscar_vigente(cap.data)
                 if param and cap.eh_dia_util and not cap.eh_feriado:
-                    minutos_nao_alocados += param.minutos_dia_util_default
+                    if cap.data.weekday() == 4:
+                        minutos_nao_alocados += param.minutos_sexta_default
+                    else:
+                        minutos_nao_alocados += param.minutos_dia_util_default
             else:
                 minutos_previstos_normais += cap.minutos_capacidade_normal_prevista
 

@@ -2054,16 +2054,15 @@ def _pizza_query(
     # Isso garante que a base reflita 100% da capacidade teórica do mês,
     # independente de quantos registros foram materializados em capacidade_dia.
     _CTE_MINUTO_PADRAO = """
-        minuto_padrao AS (
-            SELECT COALESCE(
-                (SELECT minutos_dia_util_default
-                 FROM capacidade.parametro_capacidade
-                 WHERE data_inicio_vigencia <= :mes_inicio
-                   AND (data_fim_vigencia IS NULL OR data_fim_vigencia >= :mes_inicio)
-                 ORDER BY data_inicio_vigencia DESC
-                 LIMIT 1),
-                360
-            ) AS val
+        param_padrao AS (
+            SELECT
+                COALESCE(minutos_dia_util_default, 360) AS val_normal,
+                COALESCE(minutos_sexta_default, 240)    AS val_sexta
+            FROM capacidade.parametro_capacidade
+            WHERE data_inicio_vigencia <= :mes_inicio
+              AND (data_fim_vigencia IS NULL OR data_fim_vigencia >= :mes_inicio)
+            ORDER BY data_inicio_vigencia DESC
+            LIMIT 1
         ),
         dias_uteis AS (
             SELECT d AS dia
@@ -2075,18 +2074,31 @@ def _pizza_query(
             WHERE EXTRACT(ISODOW FROM d) BETWEEN 1 AND 5
         )
     """
-    _CASE_MINUTOS = """
+    # Versão single-user: referencia du.dia (coluna de dias_uteis)
+    _CASE_MINUTOS_DU = """
         CASE
             WHEN cd.id IS NOT NULL AND cd.eh_dia_util = FALSE THEN 0
             WHEN cd.id IS NOT NULL THEN cd.minutos_capacidade_normal_prevista
-            ELSE (SELECT val FROM minuto_padrao)
+            WHEN EXTRACT(ISODOW FROM du.dia) = 5
+                THEN COALESCE((SELECT val_sexta FROM param_padrao), 240)
+            ELSE COALESCE((SELECT val_normal FROM param_padrao), 360)
+        END
+    """
+    # Versão all-users: referencia g.dia (coluna de grade = usuarios x dias_uteis)
+    _CASE_MINUTOS_G = """
+        CASE
+            WHEN cd.id IS NOT NULL AND cd.eh_dia_util = FALSE THEN 0
+            WHEN cd.id IS NOT NULL THEN cd.minutos_capacidade_normal_prevista
+            WHEN EXTRACT(ISODOW FROM g.dia) = 5
+                THEN COALESCE((SELECT val_sexta FROM param_padrao), 240)
+            ELSE COALESCE((SELECT val_normal FROM param_padrao), 360)
         END
     """
 
     if usuario_id:
         sql_capacidade = text(f"""
             WITH {_CTE_MINUTO_PADRAO}
-            SELECT COALESCE(SUM({_CASE_MINUTOS}), 0) AS total
+            SELECT COALESCE(SUM({_CASE_MINUTOS_DU}), 0) AS total
             FROM dias_uteis du
             LEFT JOIN capacidade.capacidade_dia cd
                 ON cd.usuario_id = :uid AND cd.data = du.dia
@@ -2101,7 +2113,7 @@ def _pizza_query(
                 SELECT u.id AS usuario_id, du.dia
                 FROM usuarios_ativos u CROSS JOIN dias_uteis du
             )
-            SELECT COALESCE(SUM({_CASE_MINUTOS}), 0) AS total
+            SELECT COALESCE(SUM({_CASE_MINUTOS_G}), 0) AS total
             FROM grade g
             LEFT JOIN capacidade.capacidade_dia cd
                 ON cd.usuario_id = g.usuario_id AND cd.data = g.dia
