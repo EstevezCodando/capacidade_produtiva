@@ -29,9 +29,6 @@ services:
       POSTGRES_PASSWORD: ${CP_DB_PASSWORD}
     volumes:
       - cp_db_data:/var/lib/postgresql/data
-    ports:
-      # Exposto somente em loopback — não abre o banco para a rede
-      - "127.0.0.1:5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${CP_DB_USER:-cp_user} -d ${CP_DB_NAME:-capacidade_produtiva}"]
       interval: 5s
