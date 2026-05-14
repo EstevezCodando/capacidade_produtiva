@@ -345,8 +345,8 @@ export default function LancamentoLoteModal({
               <input
                 className={styles.fieldControl}
                 type="number"
-                min="1"
-                step={unidadeTempo === 'HORAS' ? '0.5' : '15'}
+                min="0"
+                step="any"
                 value={quantidade}
                 onChange={(e) => setQuantidade(e.target.value)}
               />
