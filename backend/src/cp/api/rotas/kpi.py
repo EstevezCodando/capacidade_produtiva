@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import calendar
 import logging
+from datetime import date
 from typing import Any
 
-from datetime import date
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -1031,7 +1031,7 @@ def kpi_dashboard(
             _prev_filter   = "AND ap.bloco_id = :bloco_id" if bloco_id else "AND ap.bloco_id IS NOT NULL"
             _norm_filter   = "AND al.bloco_id = :bloco_id" if bloco_id else "AND ta.codigo = 'BLOCO'"
             _total_filter  = "AND al.bloco_id = :bloco_id" if bloco_id else "AND ta.codigo = 'BLOCO'"
-            _div_cte = f"""
+            _div_cte = """
                 ,divergente_mensal AS (
                     SELECT date_trunc('month', al.data_lancamento)::date AS mes,
                            SUM(al.minutos) AS min_div
@@ -1048,7 +1048,11 @@ def kpi_dashboard(
                 )
             """ if bloco_id else ""
             _div_join  = "LEFT JOIN divergente_mensal dv ON dv.mes = m.mes" if bloco_id else ""
-            _div_col   = "SUM(COALESCE(dv.min_div, 0)) OVER (ORDER BY m.mes ROWS UNBOUNDED PRECEDING) AS minutos_divergente_acum" if bloco_id else "0 AS minutos_divergente_acum"
+            _div_col   = (
+                "SUM(COALESCE(dv.min_div, 0)) OVER (ORDER BY m.mes ROWS UNBOUNDED PRECEDING) AS minutos_divergente_acum"
+                if bloco_id
+                else "0 AS minutos_divergente_acum"
+            )
             _norm_join = "LEFT JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id" if not bloco_id else ""
             _norm_join2 = "LEFT JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id" if not bloco_id else ""
             sql_timeline_mensal = text(f"""
@@ -1215,7 +1219,7 @@ def kpi_dashboard(
                 if isinstance(raw_rev, str):
                     raw_rev = _json.loads(raw_rev)
 
-                def _to_contrib(items: list, total: float) -> list[ContribuidorBloco]:
+                def _to_contrib(items: list[dict[str, Any]], total: float) -> list[ContribuidorBloco]:
                     out = []
                     for it in (items or []):
                         pts = float(it.get("pontos") or 0)
@@ -1506,7 +1510,7 @@ def kpi_timeline_diario(
         _total_join  = "LEFT JOIN capacidade.tipo_atividade ta ON ta.id = al.tipo_atividade_id"
         _total_cond  = "AND ta.codigo = 'BLOCO'"
 
-    bp: dict = {"dia_ini": dia_ini, "dia_fim": dia_fim}
+    bp: dict[str, Any] = {"dia_ini": dia_ini, "dia_fim": dia_fim}
     if bloco_id:
         bp["bloco_id"] = bloco_id
 
@@ -1640,7 +1644,7 @@ class MeuDashboardResposta(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _calcular_dashboard_usuario(engine_cp, uid: int) -> MeuDashboardResposta:
+def _calcular_dashboard_usuario(engine_cp: Any, uid: int) -> MeuDashboardResposta:
     snapshot_ts, kpi_ts = _get_sync_timestamps(engine_cp)
 
     blocos_map: dict[int, BlocoDetalheUsuario] = {}

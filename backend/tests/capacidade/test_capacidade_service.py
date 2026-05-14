@@ -128,6 +128,7 @@ class TestCapacidadeServiceParametros:
     @pytest.fixture
     def service(self):
         """Cria CapacidadeService com mocks."""
+        from cp.services.capacidade.capacidade_service import CapacidadeService
         with patch("cp.services.capacidade.capacidade_service.ParametroCapacidadeRepository"), \
              patch("cp.services.capacidade.capacidade_service.CapacidadeDiaRepository"), \
              patch("cp.services.capacidade.capacidade_service.FeriadoRepository"), \
@@ -136,9 +137,7 @@ class TestCapacidadeServiceParametros:
              patch("cp.services.capacidade.capacidade_service.AgendaPrevistaRepository"), \
              patch("cp.services.capacidade.capacidade_service.TipoAtividadeRepository"), \
              patch("cp.services.capacidade.capacidade_service.AuditService"):
-            
-            from cp.services.capacidade.capacidade_service import CapacidadeService
-            return CapacidadeService(MagicMock())
+            yield CapacidadeService(MagicMock())
 
     def test_obter_parametro_vigente(self, service):
         """Obtém parâmetro vigente para a data."""
@@ -231,6 +230,7 @@ class TestCapacidadeServiceDiaUtil:
     @pytest.fixture
     def service(self):
         """Cria CapacidadeService com mocks."""
+        from cp.services.capacidade.capacidade_service import CapacidadeService
         with patch("cp.services.capacidade.capacidade_service.ParametroCapacidadeRepository"), \
              patch("cp.services.capacidade.capacidade_service.CapacidadeDiaRepository"), \
              patch("cp.services.capacidade.capacidade_service.FeriadoRepository"), \
@@ -239,9 +239,7 @@ class TestCapacidadeServiceDiaUtil:
              patch("cp.services.capacidade.capacidade_service.AgendaPrevistaRepository"), \
              patch("cp.services.capacidade.capacidade_service.TipoAtividadeRepository"), \
              patch("cp.services.capacidade.capacidade_service.AuditService"):
-            
-            from cp.services.capacidade.capacidade_service import CapacidadeService
-            return CapacidadeService(MagicMock())
+            yield CapacidadeService(MagicMock())
 
     def test_eh_dia_util_segunda(self, service):
         """Segunda-feira é dia útil."""
@@ -278,6 +276,7 @@ class TestCapacidadeServiceTipoIndisponibilidade:
     @pytest.fixture
     def service(self):
         """Cria CapacidadeService com mocks."""
+        from cp.services.capacidade.capacidade_service import CapacidadeService
         with patch("cp.services.capacidade.capacidade_service.ParametroCapacidadeRepository"), \
              patch("cp.services.capacidade.capacidade_service.CapacidadeDiaRepository"), \
              patch("cp.services.capacidade.capacidade_service.FeriadoRepository"), \
@@ -286,9 +285,7 @@ class TestCapacidadeServiceTipoIndisponibilidade:
              patch("cp.services.capacidade.capacidade_service.AgendaPrevistaRepository"), \
              patch("cp.services.capacidade.capacidade_service.TipoAtividadeRepository"), \
              patch("cp.services.capacidade.capacidade_service.AuditService"):
-            
-            from cp.services.capacidade.capacidade_service import CapacidadeService
-            return CapacidadeService(MagicMock())
+            yield CapacidadeService(MagicMock())
 
     def test_obter_tipo_indisponibilidade_ferias(self, service):
         """FERIAS mapeia para TipoIndisponibilidade.FERIAS."""
@@ -332,6 +329,7 @@ class TestCapacidadeServiceMaterializacao:
     @pytest.fixture
     def service(self):
         """Cria CapacidadeService com mocks."""
+        from cp.services.capacidade.capacidade_service import CapacidadeService
         with patch("cp.services.capacidade.capacidade_service.ParametroCapacidadeRepository"), \
              patch("cp.services.capacidade.capacidade_service.CapacidadeDiaRepository"), \
              patch("cp.services.capacidade.capacidade_service.FeriadoRepository"), \
@@ -340,9 +338,7 @@ class TestCapacidadeServiceMaterializacao:
              patch("cp.services.capacidade.capacidade_service.AgendaPrevistaRepository"), \
              patch("cp.services.capacidade.capacidade_service.TipoAtividadeRepository"), \
              patch("cp.services.capacidade.capacidade_service.AuditService"):
-            
-            from cp.services.capacidade.capacidade_service import CapacidadeService
-            return CapacidadeService(MagicMock())
+            yield CapacidadeService(MagicMock())
 
     def test_materializar_dia_util_normal(self, service):
         """Materializa dia útil normal com capacidade padrão."""
@@ -477,6 +473,7 @@ class TestCapacidadeServiceConsultas:
     @pytest.fixture
     def service(self):
         """Cria CapacidadeService com mocks."""
+        from cp.services.capacidade.capacidade_service import CapacidadeService
         with patch("cp.services.capacidade.capacidade_service.ParametroCapacidadeRepository"), \
              patch("cp.services.capacidade.capacidade_service.CapacidadeDiaRepository"), \
              patch("cp.services.capacidade.capacidade_service.FeriadoRepository"), \
@@ -485,9 +482,7 @@ class TestCapacidadeServiceConsultas:
              patch("cp.services.capacidade.capacidade_service.AgendaPrevistaRepository"), \
              patch("cp.services.capacidade.capacidade_service.TipoAtividadeRepository"), \
              patch("cp.services.capacidade.capacidade_service.AuditService"):
-            
-            from cp.services.capacidade.capacidade_service import CapacidadeService
-            return CapacidadeService(MagicMock())
+            yield CapacidadeService(MagicMock())
 
     def test_obter_capacidade_dia(self, service):
         """Obtém capacidade do dia."""
@@ -514,6 +509,7 @@ class TestCapacidadeServiceCalculos:
     @pytest.fixture
     def service(self):
         """Cria CapacidadeService com mocks."""
+        from cp.services.capacidade.capacidade_service import CapacidadeService
         with patch("cp.services.capacidade.capacidade_service.ParametroCapacidadeRepository"), \
              patch("cp.services.capacidade.capacidade_service.CapacidadeDiaRepository"), \
              patch("cp.services.capacidade.capacidade_service.FeriadoRepository"), \
@@ -522,9 +518,7 @@ class TestCapacidadeServiceCalculos:
              patch("cp.services.capacidade.capacidade_service.AgendaPrevistaRepository"), \
              patch("cp.services.capacidade.capacidade_service.TipoAtividadeRepository"), \
              patch("cp.services.capacidade.capacidade_service.AuditService"):
-            
-            from cp.services.capacidade.capacidade_service import CapacidadeService
-            return CapacidadeService(MagicMock())
+            yield CapacidadeService(MagicMock())
 
     def test_calcular_minutos_disponiveis_normal(self, service):
         """Calcula minutos disponíveis na faixa normal."""
