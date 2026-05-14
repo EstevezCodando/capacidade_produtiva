@@ -6,8 +6,15 @@
 #   1. Migrações Alembic  — falha crítica: banco deve estar ok
 #   2. Sincronização SAP  — falha suave: API sobe mesmo sem dados SAP frescos
 #   3. Uvicorn            — processo principal (exec substitui este shell)
+#
+# Se um comando for passado como argumento, executa diretamente sem o pipeline
+# (usado por: docker compose run backend uv run configurar)
 # =============================================================================
 set -e
+
+if [ $# -gt 0 ]; then
+  exec "$@"
+fi
 
 PORTA="${CP_API_PORT:-3050}"
 
