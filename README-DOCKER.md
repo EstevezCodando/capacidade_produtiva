@@ -39,20 +39,35 @@ utilizando banco de dados PostgreSQL externo para o SAP e serviço de autentica�
 
 ---
 
-## Resumo do fluxo (ordem obrigatória)
+## Fluxo obrigatório (ordem)
 
 ```
 1. Instalar Docker Desktop
 2. Baixar o projeto
-3. Rodar setup.ps1  →  gera o .env com todas as credenciais
+3. Executar setup.ps1   →  gera o .env automaticamente
 4. docker compose up -d --build  →  sobe o sistema
 ```
 
 ---
 
+## Informações necessárias antes de começar
+
+Reúna esses dados com as equipes responsáveis antes de iniciar:
+
+| Dado | Onde obter |
+|------|-----------|
+| IP ou hostname do servidor SAP | Equipe de infraestrutura |
+| Porta do PostgreSQL SAP | Normalmente `5432` |
+| Nome do banco SAP | Equipe SAP |
+| Usuário e senha (somente-leitura) do banco SAP | DBA / equipe SAP |
+| URL do serviço de autenticação | Ex: `http://192.168.1.50:3001` |
+| Usuário e senha do administrador no auth service | Responsável pelo auth service |
+
+---
+
 ## Pré-requisitos
 
-### 1. Docker Desktop instalado no Windows Server
+### Docker Desktop instalado no Windows Server
 
 Baixe em: https://www.docker.com/products/docker-desktop/
 
@@ -65,104 +80,177 @@ docker compose version
 
 Ambos devem retornar versão sem erro.
 
-### 2. Código do projeto disponível
+### Código do projeto disponível
 
 ```powershell
-# Via git
 git clone <url-do-repositorio> C:\Sistemas\capacidade_produtiva
 cd C:\Sistemas\capacidade_produtiva
-
-# Ou extraia o ZIP diretamente em C:\Sistemas\capacidade_produtiva
 ```
-
-### 3. Informações necessárias antes de começar
-
-Reúna esses dados com as equipes responsáveis **antes** de iniciar:
-
-| Dado | Onde obter |
-|------|-----------|
-| IP ou hostname do servidor PostgreSQL SAP | Equipe de infraestrutura |
-| Porta do PostgreSQL SAP | Normalmente `5432` |
-| Nome do banco SAP | Equipe SAP |
-| Usuário e senha (somente-leitura) do banco SAP | DBA / equipe SAP |
-| URL do serviço de autenticação | Ex: `http://192.168.1.50:3001` |
-| Usuário e senha do administrador no auth service | Responsável pelo auth service |
-| **`JWT_SECRET` do serviço de autenticação** | Ver instrução abaixo |
-
-#### Como obter o JWT_SECRET
-
-O `JWT_SECRET` está no arquivo `config.env` (ou `.env`) do serviço de autenticação,
-na linha que começa com `JWT_SECRET=`. Peça ao responsável pelo auth service para
-copiar esse valor e repassá-lo de forma segura antes de executar o setup.
 
 ---
 
-## Passo 1 — Gerar o `.env` com o script de setup
+## Simulação completa do deploy
 
-Abra o PowerShell como Administrador, vá até a pasta do projeto e execute:
+A seguir, uma simulação com dados de exemplo mostrando exatamente o que aparece na tela em cada etapa.
 
-```powershell
-cd C:\Sistemas\capacidade_produtiva
-powershell -ExecutionPolicy Bypass -File setup.ps1
-```
-
-O script vai perguntar, na ordem:
-
-1. **Banco CP** — nome, usuário e senha (você escolhe — o Docker cria o banco com esses dados)
-2. **Banco SAP** — IP, porta, nome, usuário e senha do banco externo (somente leitura)
-3. **Auth service** — URL, usuário e senha do administrador (o script testa a conexão e autentica)
-4. **JWT_SECRET** — valor copiado do config.env do auth service
-
-Ao final, o arquivo `.env` é criado automaticamente na pasta do projeto com encoding correto.
+> **Dados usados no exemplo:**
+> - Banco SAP: `192.168.10.50:5432` / banco `sap_producao` / usuário `cp_readonly`
+> - Auth service: `http://192.168.10.30:3001` / admin `joao.silva`
 
 ---
 
-## Passo 2 — Subir o sistema
+### PASSO 1 — Abrir o PowerShell como Administrador
 
-Com o `.env` pronto, suba todos os containers:
+Clique em **Iniciar** → pesquise **PowerShell** → botão direito → **Executar como administrador**.
 
-```powershell
-docker compose up -d --build
+```
+Windows PowerShell
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+PS C:\Windows\System32>
 ```
 
-Este comando:
-1. Compila a imagem do backend (Python + dependências)
-2. Compila a imagem do frontend (Node.js + Vite)
-3. Sobe os três containers (`cp_db`, `backend`, `frontend`)
-4. O backend executa as migrations Alembic automaticamente na primeira subida
+Navegue até a pasta do projeto:
 
-O primeiro build demora de **3 a 10 minutos** dependendo da conexão com a internet.
+```powershell
+PS C:\Windows\System32> cd C:\Sistemas\capacidade_produtiva
+PS C:\Sistemas\capacidade_produtiva>
+```
 
 ---
 
-## Passo 3 — Acompanhar a inicialização
+### PASSO 2 — Executar o script de setup
 
 ```powershell
-# Ver logs em tempo real (Ctrl+C para sair sem parar os containers)
-docker compose logs -f backend
+PS C:\Sistemas\capacidade_produtiva> powershell -ExecutionPolicy Bypass -File setup.ps1
 ```
 
-Sequência normal de inicialização:
+O script pergunta tudo interativamente. Pressione **Enter** para aceitar o valor padrão entre colchetes `[ ]`.
 
 ```
-backend  | Running Alembic migrations...
-backend  | INFO  [alembic.runtime.migration] Running upgrade ...
-backend  | Migrations complete.
-backend  | Running SAP sync...
-backend  | SAP sync complete.
+============================================================
+   Capacidade Produtiva — Configuracao inicial
+============================================================
+
+Este script vai coletar as informacoes necessarias e gerar
+o arquivo .env para voce executar o Docker em seguida.
+
+
+--- Banco de dados do Capacidade Produtiva (interno) ---
+  Este banco sera criado automaticamente pelo Docker.
+  Escolha um usuario e senha para ele.
+
+Nome do banco [capacidade_produtiva]: ↵
+Usuario do banco [cp_user]: ↵
+Senha do banco (escolha uma senha forte) (oculto): ************
+Porta da API [3050]: ↵
+Porta do frontend [5173]: ↵
+
+
+--- Banco de dados SAP (externo, somente leitura) ---
+
+IP ou hostname do servidor SAP: 192.168.10.50
+Porta do PostgreSQL SAP [5432]: ↵
+Nome do banco SAP: sap_producao
+Usuario somente-leitura do banco SAP: cp_readonly
+Senha do usuario SAP (oculto): ************
+
+  Testando conexao com o banco SAP...
+  OK  Banco SAP acessivel
+
+
+--- Servico de Autenticacao ---
+
+URL do servico de autenticacao (ex: http://192.168.1.50:3001): http://192.168.10.30:3001
+  Testando conexao...
+  OK  Servico de autenticacao operacional
+
+Usuario administrador do auth service: joao.silva
+Senha do administrador (oculto): ************
+  Autenticando...
+  OK  Login realizado com sucesso
+
+  Gerando chaves de seguranca automaticamente...
+  OK  Chaves geradas
+
+============================================================
+   Configuracao concluida! Arquivo .env gerado.
+============================================================
+
+Proximo passo — subir o sistema:
+
+   docker compose up -d --build
+
+PS C:\Sistemas\capacidade_produtiva>
+```
+
+O arquivo `.env` foi criado automaticamente com todas as variáveis preenchidas e encoding correto.
+
+---
+
+### PASSO 3 — Subir o Docker
+
+```powershell
+PS C:\Sistemas\capacidade_produtiva> docker compose up -d --build
+```
+
+```
+[+] Building...
+ ✔ backend   — imagem Python compilada      8.3s
+ ✔ frontend  — imagem Node/Vite compilada  45.2s
+
+[+] Running 3/3
+ ✔ Container cp_db     Started   2.1s
+ ✔ Container backend   Started   3.4s
+ ✔ Container frontend  Started   1.2s
+
+PS C:\Sistemas\capacidade_produtiva>
+```
+
+O primeiro build demora entre **3 e 10 minutos** dependendo da velocidade da conexão.
+
+---
+
+### PASSO 4 — Acompanhar a inicialização
+
+```powershell
+PS C:\Sistemas\capacidade_produtiva> docker compose logs -f backend
+```
+
+```
+backend  | ══════════════════════════════════════════════════════════════
+backend  |   ► Migrações Alembic (upgrade head)
+backend  | ══════════════════════════════════════════════════════════════
+backend  | INFO  [alembic] Running upgrade  -> 0001, init schema
+backend  | INFO  [alembic] Running upgrade 0001 -> 0002, parametros
+backend  | ...
+backend  | INFO  [alembic] Running upgrade 0011 -> 0012, teto_sexta_e_extra
+backend  |
+backend  | ══════════════════════════════════════════════════════════════
+backend  |   ► Sincronização SAP → sap_snapshot
+backend  | ══════════════════════════════════════════════════════════════
+backend  |   ✔ Sincronização SAP concluída.
+backend  |
+backend  | ══════════════════════════════════════════════════════════════
+backend  |   ► API CapacidadeProdutiva  →  http://0.0.0.0:3050
+backend  | ══════════════════════════════════════════════════════════════
+backend  |   CP_API_PORT  = 3050
+backend  |   ENVIRONMENT  = production
+backend  |   CP_DB_HOST   = cp_db
+backend  |
 backend  | INFO:     Application startup complete.
 backend  | INFO:     Uvicorn running on http://0.0.0.0:3050
 ```
 
+Pressione **Ctrl+C** para sair dos logs sem parar os containers.
+
 ---
 
-## Passo 4 — Verificar status
+### PASSO 5 — Verificar que tudo está rodando
 
 ```powershell
-docker compose ps
+PS C:\Sistemas\capacidade_produtiva> docker compose ps
 ```
-
-Resultado esperado:
 
 ```
 NAME         STATUS
@@ -173,16 +261,104 @@ frontend     running (healthy)
 
 ---
 
-## Passo 5 — Testar o sistema
+### PASSO 6 — Testar e acessar o sistema
 
 ```powershell
-Invoke-WebRequest -Uri http://localhost:3050/api/health -UseBasicParsing
-# StatusCode deve ser 200
+PS C:\Sistemas\capacidade_produtiva> Invoke-WebRequest -Uri http://localhost:3050/api/health -UseBasicParsing
+
+StatusCode : 200
+Content    : {"status":"ok"}
 ```
 
-Abra o navegador: **`http://localhost:5173`**
+Abra o navegador e acesse **`http://localhost:5173`**.
 
-A tela de login deve aparecer. Use as credenciais do serviço de autenticação.
+A tela de login aparece. Use o mesmo usuário e senha do serviço de autenticação.
+
+---
+
+## Cenários de erro e como resolver
+
+### Erro: senha do auth service errada
+
+O script não deixa prosseguir e encerra com a mensagem:
+
+```
+  Autenticando...
+ERRO  Falha na autenticacao: Credenciais invalidas
+  Verifique o usuario e senha e execute o script novamente.
+```
+
+Execute `setup.ps1` novamente com as credenciais corretas.
+
+---
+
+### Erro: banco SAP inacessível
+
+O script avisa mas continua gerando o `.env`:
+
+```
+  Testando conexao com o banco SAP...
+  AVISO: Nao foi possivel conectar em 192.168.10.50:5432
+  Verifique o firewall. O setup continuara mesmo assim.
+```
+
+O Docker sobe, mas a sincronização SAP falha nos logs:
+
+```
+backend  |   ⚠  Sincronização SAP falhou — API sera iniciada com dados existentes.
+backend  |      Verifique as variáveis SAP_DB_* e a conectividade com o banco SAP.
+```
+
+A API funciona normalmente. Para corrigir: ajuste o IP/credenciais no `.env` e reinicie:
+
+```powershell
+docker compose up -d
+```
+
+---
+
+### Erro: porta 5433 bloqueada pelo Windows
+
+```
+Error: ports are not available: exposing port TCP 127.0.0.1:5433
+bind: An attempt was made to access a socket in a way forbidden by its access permissions.
+```
+
+Verifique quais portas estão reservadas pelo Hyper-V:
+
+```powershell
+netsh int ipv4 show excludedportrange protocol=tcp
+```
+
+Edite o `docker-compose.yml` e mude a porta do serviço `cp_db` para uma porta livre:
+
+```yaml
+ports:
+  - "127.0.0.1:5434:5432"   # troque 5433 por qualquer porta livre
+```
+
+Suba novamente:
+
+```powershell
+docker compose up -d --build
+```
+
+---
+
+### Erro: backend em loop de restart
+
+```powershell
+docker compose logs backend | Select-Object -Last 30
+```
+
+| Mensagem no log | Solução |
+|-----------------|---------|
+| `CP_SECRET_KEY deve ser definido em produção` | Execute `setup.ps1` novamente |
+| `JWT_SECRET deve ser definido em produção` | Execute `setup.ps1` novamente |
+| `AUTH_URL deve ser definido em produção` | Execute `setup.ps1` novamente |
+| `could not connect to server` (SAP) | Verificar IP e firewall do banco SAP |
+| `password authentication failed` | Usuário/senha errados — execute `setup.ps1` novamente |
+| `relation does not exist` | `docker compose exec backend python -m alembic upgrade head` |
 
 ---
 
@@ -229,73 +405,6 @@ docker compose exec backend python -m alembic current
 docker compose exec backend python -m alembic upgrade head
 ```
 
----
-
-## Solução de problemas
-
-### Porta 5433 bloqueada — `bind: An attempt was made to access a socket`
-
-Ocorre quando o Windows reservou a porta para Hyper-V. Verifique:
-
-```powershell
-netsh int ipv4 show excludedportrange protocol=tcp
-```
-
-Se a porta `5433` aparecer na lista, edite o `docker-compose.yml` e mude no serviço `cp_db`:
-
-```yaml
-ports:
-  - "127.0.0.1:5434:5432"   # troque 5433 por qualquer porta livre
-```
-
-### Backend reiniciando em loop
-
-```powershell
-docker compose logs backend | Select-Object -Last 30
-```
-
-| Mensagem no log | Solução |
-|-----------------|---------|
-| `CP_SECRET_KEY deve ser definido em produção` | Rode `setup.ps1` novamente |
-| `JWT_SECRET deve ser definido em produção` | Rode `setup.ps1` novamente |
-| `AUTH_URL deve ser definido em produção` | Rode `setup.ps1` novamente |
-| `could not connect to server` (SAP) | Verificar IP e firewall do banco SAP |
-| `password authentication failed` | Usuário/senha errados no `.env` |
-| `relation does not exist` | `docker compose exec backend python -m alembic upgrade head` |
-
-### Login falha com "token inválido"
-
-O `JWT_SECRET` no `.env` é diferente do auth service. Corrija:
-
-```powershell
-# Ver o valor atual
-Select-String -Path .env -Pattern "JWT_SECRET"
-```
-
-Obtenha o valor correto com o responsável pelo auth service, edite o `.env` e reinicie:
-
-```powershell
-docker compose up -d
-```
-
-### Banco SAP não conecta
-
-```powershell
-docker compose exec backend python -c "
-import psycopg2, os
-conn = psycopg2.connect(
-    host=os.environ['SAP_DB_HOST'],
-    port=os.environ['SAP_DB_PORT'],
-    dbname=os.environ['SAP_DB_NAME'],
-    user=os.environ['SAP_DB_USER'],
-    password=os.environ['SAP_DB_PASSWORD'],
-    connect_timeout=5
-)
-print('OK:', conn.server_version)
-conn.close()
-"
-```
-
 ### Limpar imagens antigas (não apaga dados)
 
 ```powershell
@@ -305,6 +414,8 @@ docker image prune -f
 ---
 
 ## Referência rápida de variáveis do `.env`
+
+Geradas automaticamente pelo `setup.ps1`. Edite apenas se necessário corrigir algum valor.
 
 | Variável | Descrição |
 |----------|-----------|
@@ -320,7 +431,7 @@ docker image prune -f
 | `SAP_DB_NAME` | Nome do banco SAP |
 | `SAP_DB_USER` | Usuário somente-leitura do banco SAP |
 | `SAP_DB_PASSWORD` | Senha do usuário SAP |
-| `JWT_SECRET` | Copiado do `config.env` do auth service |
+| `JWT_SECRET` | Gerado automaticamente pelo `setup.ps1` |
 | `AUTH_URL` | URL do serviço de autenticação |
 | `AUTH_ADMIN_USER` | Usuário admin do auth service |
 | `AUTH_ADMIN_PASSWORD` | Senha admin do auth service |
