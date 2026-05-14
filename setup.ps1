@@ -155,30 +155,15 @@ try {
 }
 
 # =============================================================================
-# JWT_SECRET
-# =============================================================================
-
-Write-Step "Chave JWT (JWT_SECRET)"
-Write-Host ""
-Write-Host "  O JWT_SECRET deve ser IDENTICO ao configurado no servico de"
-Write-Host "  autenticacao. Ele esta no arquivo config.env (ou .env) do"
-Write-Host "  auth service, na linha que comeca com:  JWT_SECRET="
-Write-Host ""
-
-$jwtSecret = Perguntar "JWT_SECRET do servico de autenticacao" -senha $true
-if ($jwtSecret -eq "") {
-    Write-Err "JWT_SECRET nao pode ser vazio."
-    exit 1
-}
-
-# =============================================================================
-# Gerar CP_SECRET_KEY automaticamente
+# Gerar chaves automaticamente
 # =============================================================================
 
 Write-Host ""
-Write-Host "  Gerando CP_SECRET_KEY automaticamente..." -NoNewline
+Write-Host "  Gerando chaves de seguranca automaticamente..." -NoNewline
 $cpSecretKey = Gerar-SecretKey
-Write-Ok "CP_SECRET_KEY gerado"
+$jwtBytes    = [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(64)
+$jwtSecret   = [System.BitConverter]::ToString($jwtBytes).Replace("-","").ToLower()
+Write-Ok "Chaves geradas"
 
 # =============================================================================
 # Gravar .env
