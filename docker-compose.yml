@@ -1,26 +1,28 @@
 # docker-compose.yml — CapacidadeProdutiva
 #
-# Serviços:
-#   cp_db    — PostgreSQL do CP (schemas: capacidade, sap_snapshot, kpi)
-#   backend  — API FastAPI na porta 3050
-#   frontend — React/nginx na porta 5173
+# Servicos:
+#   cp_db    — PostgreSQL interno (opcional, profile: local-db)
+#   backend  — API FastAPI
+#   frontend — React/nginx
 #
-# O banco SAP é externo e somente-leitura (credenciais via SAP_DB_*).
+# Banco CP pode ser interno (Docker) ou externo (servidor existente).
+# O setup.ps1 configura automaticamente a variavel COMPOSE_PROFILES no .env:
+#   - Banco interno:  COMPOSE_PROFILES=local-db  (sobe o cp_db)
+#   - Banco externo:  COMPOSE_PROFILES=           (cp_db nao sobe)
 #
-# Uso rápido:
-#   cp .env.example .env        # preencher credenciais reais
-#   docker compose up --build   # primeira vez (compila imagens)
-#   docker compose up           # execuções seguintes
-#
-# Ordem de inicialização garantida pelo Compose:
-#   cp_db (healthy) → backend (healthy) → frontend
+# Uso:
+#   powershell -ExecutionPolicy Bypass -File setup.ps1
+#   docker compose up -d --build
 
 services:
 
   # ---------------------------------------------------------------------------
-  # Banco de dados do CP
+  # Banco de dados interno do CP (opcional)
+  # Ativo somente quando COMPOSE_PROFILES=local-db (configurado pelo setup.ps1)
+  # Se voce ja tem um PostgreSQL externo, este servico nao sobe.
   # ---------------------------------------------------------------------------
   cp_db:
+    profiles: [local-db]
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -48,12 +50,13 @@ services:
     depends_on:
       cp_db:
         condition: service_healthy
+        required: false   # cp_db pode nao estar ativo (banco externo)
     environment:
       ENVIRONMENT:    ${ENVIRONMENT:-production}
 
-      # Banco CP — aponta para o serviço cp_db desta stack
-      CP_DB_HOST:     cp_db
-      CP_DB_PORT:     5432
+      # Banco CP — host vem do .env (cp_db para interno, IP para externo)
+      CP_DB_HOST:     ${CP_DB_HOST}
+      CP_DB_PORT:     ${CP_DB_PORT:-5432}
       CP_DB_NAME:     ${CP_DB_NAME:-capacidade_produtiva}
       CP_DB_USER:     ${CP_DB_USER:-cp_user}
       CP_DB_PASSWORD: ${CP_DB_PASSWORD}

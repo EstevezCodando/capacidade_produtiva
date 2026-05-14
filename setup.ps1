@@ -29,6 +29,24 @@ function Perguntar {
     }
 }
 
+function Perguntar-SimNao {
+    param($pergunta, $default = "s")
+    $hint = if ($default -eq "s") { "S/n" } else { "s/N" }
+    while ($true) {
+        $valor = Read-Host "$pergunta ($hint)"
+        if ($valor -eq "") { return ($default -eq "s") }
+        if ($valor -match "^[sS]") { return $true }
+        if ($valor -match "^[nN]") { return $false }
+        Write-Host "  Digite s ou n." -ForegroundColor Red
+    }
+}
+
+function Testar-Host {
+    param($host_, $port_)
+    $test = Test-NetConnection -ComputerName $host_ -Port ([int]$port_) -WarningAction SilentlyContinue
+    return $test.TcpTestSucceeded
+}
+
 function Testar-Auth {
     param($url)
     try {
@@ -96,16 +114,78 @@ if (Test-Path ".env") {
 }
 
 # =============================================================================
-# Banco CP (interno - gerenciado pelo Docker)
+# Banco CP — interno (Docker) ou externo (servidor existente)?
 # =============================================================================
 
-Write-Step "Banco de dados do Capacidade Produtiva (interno)"
-Write-Host "  Este banco sera criado automaticamente pelo Docker."
-Write-Host "  Escolha um usuario e senha para ele."
+Write-Step "Banco de dados do Capacidade Produtiva"
+Write-Host ""
+Write-Host "  Opcoes:"
+Write-Host "    1 - Criar banco interno (gerenciado pelo Docker, recomendado para nova instalacao)"
+Write-Host "    2 - Usar banco externo ja existente (outro servidor PostgreSQL)"
+Write-Host ""
 
-$cpDbName     = Perguntar "Nome do banco" "capacidade_produtiva"
-$cpDbUser     = Perguntar "Usuario do banco" "cp_user"
-$cpDbPassword = Perguntar "Senha do banco (escolha uma senha forte)" -senha
+$cpOpcao = ""
+while ($cpOpcao -ne "1" -and $cpOpcao -ne "2") {
+    $cpOpcao = Read-Host "  Escolha [1/2]"
+    if ($cpOpcao -eq "") { $cpOpcao = "1" }
+}
+
+$cpDbHost         = ""
+$cpDbPort         = "5432"
+$cpDbName         = ""
+$cpDbUser         = ""
+$cpDbPassword     = ""
+$composeProfiles  = ""
+
+if ($cpOpcao -eq "1") {
+    # Banco interno — Docker sobe o cp_db automaticamente
+    Write-Host ""
+    Write-Host "  O Docker vai criar e gerenciar o banco automaticamente."
+    Write-Host "  Escolha um nome de usuario e senha para ele."
+    Write-Host ""
+
+    $cpDbName     = Perguntar "Nome do banco" "capacidade_produtiva"
+    $cpDbUser     = Perguntar "Usuario do banco" "cp_user"
+    $cpDbPassword = Perguntar "Senha do banco (escolha uma senha forte)" -senha
+
+    $cpDbHost        = "cp_db"   # nome do servico Docker interno
+    $cpDbPort        = "5432"
+    $composeProfiles = "local-db"
+
+    Write-Ok "Banco interno configurado (Docker ira criar o PostgreSQL)"
+
+} else {
+    # Banco externo — usuario informa o servidor existente
+    Write-Host ""
+    Write-Host "  Informe os dados de conexao do PostgreSQL existente."
+    Write-Host ""
+
+    $cpDbHost     = Perguntar "IP ou hostname do servidor PostgreSQL do CP"
+    $cpDbPort     = Perguntar "Porta do PostgreSQL do CP" "5432"
+    $cpDbName     = Perguntar "Nome do banco de dados do CP" "capacidade_produtiva"
+    $cpDbUser     = Perguntar "Usuario do banco do CP"
+    $cpDbPassword = Perguntar "Senha do usuario" -senha
+
+    Write-Host ""
+    Write-Host "  Testando conexao com ${cpDbHost}:${cpDbPort}..." -NoNewline
+    if (Testar-Host $cpDbHost $cpDbPort) {
+        Write-Ok "Banco CP acessivel"
+    } else {
+        Write-Host ""
+        Write-Host "  AVISO: Nao foi possivel conectar em ${cpDbHost}:${cpDbPort}" -ForegroundColor Yellow
+        Write-Host "  Verifique o firewall/IP. O setup continuara mesmo assim."    -ForegroundColor Yellow
+    }
+
+    $composeProfiles = ""   # cp_db nao sobe no Docker
+
+    Write-Ok "Banco externo configurado"
+}
+
+# =============================================================================
+# Portas da API e frontend
+# =============================================================================
+
+Write-Host ""
 $cpApiPort    = Perguntar "Porta da API" "3050"
 $frontendPort = Perguntar "Porta do frontend" "5173"
 
@@ -123,8 +203,7 @@ $sapDbPassword = Perguntar "Senha do usuario SAP" -senha
 
 Write-Host ""
 Write-Host "  Testando conexao com o banco SAP..." -NoNewline
-$sapTest = Test-NetConnection -ComputerName $sapDbHost -Port ([int]$sapDbPort) -WarningAction SilentlyContinue
-if ($sapTest.TcpTestSucceeded) {
+if (Testar-Host $sapDbHost $sapDbPort) {
     Write-Ok "Banco SAP acessivel"
 } else {
     Write-Host ""
@@ -181,6 +260,9 @@ Write-Ok "Chaves geradas"
 
 $envContent = "ENVIRONMENT=production`r`n"
 $envContent += "`r`n"
+$envContent += "# Banco CP`r`n"
+$envContent += "CP_DB_HOST=$cpDbHost`r`n"
+$envContent += "CP_DB_PORT=$cpDbPort`r`n"
 $envContent += "CP_DB_NAME=$cpDbName`r`n"
 $envContent += "CP_DB_USER=$cpDbUser`r`n"
 $envContent += "CP_DB_PASSWORD=$cpDbPassword`r`n"
@@ -190,6 +272,7 @@ $envContent += "FRONTEND_PORT=$frontendPort`r`n"
 $envContent += "`r`n"
 $envContent += "CP_SECRET_KEY=$cpSecretKey`r`n"
 $envContent += "`r`n"
+$envContent += "# Banco SAP`r`n"
 $envContent += "SAP_DB_HOST=$sapDbHost`r`n"
 $envContent += "SAP_DB_PORT=$sapDbPort`r`n"
 $envContent += "SAP_DB_NAME=$sapDbName`r`n"
@@ -200,6 +283,9 @@ $envContent += "JWT_SECRET=$jwtSecret`r`n"
 $envContent += "AUTH_URL=$authUrl`r`n"
 $envContent += "AUTH_ADMIN_USER=$authAdminUser`r`n"
 $envContent += "AUTH_ADMIN_PASSWORD=$authAdminPassword`r`n"
+$envContent += "`r`n"
+$envContent += "# Perfil Docker: local-db = sobe o cp_db interno; vazio = banco externo`r`n"
+$envContent += "COMPOSE_PROFILES=$composeProfiles`r`n"
 
 [System.IO.File]::WriteAllText(
     "$PWD\.env",
@@ -215,6 +301,14 @@ Write-Host ""
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host "   Configuracao concluida! Arquivo .env gerado."             -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Green
+Write-Host ""
+
+if ($cpOpcao -eq "1") {
+    Write-Host "  Banco CP: interno (Docker vai criar o PostgreSQL automaticamente)"
+} else {
+    Write-Host "  Banco CP: externo em ${cpDbHost}:${cpDbPort}"
+}
+
 Write-Host ""
 Write-Host "Proximo passo - subir o sistema:"
 Write-Host ""

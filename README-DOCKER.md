@@ -1,39 +1,53 @@
 # Implantação no Windows Server — Capacidade Produtiva
 
-Guia passo a passo para levantar o sistema pela primeira vez em um Windows Server,
-utilizando banco de dados PostgreSQL externo para o SAP e serviço de autenticação em outra máquina.
+Guia passo a passo para levantar o sistema pela primeira vez em um Windows Server.
+
+---
+
+## Banco CP — interno ou externo?
+
+O sistema suporta duas configurações para o banco de dados do CP:
+
+| Opção | Quando usar |
+|-------|-------------|
+| **Banco interno** (Docker cria) | Nova instalação, sem PostgreSQL existente |
+| **Banco externo** (servidor existente) | Já existe um PostgreSQL com dados do CP em outra máquina |
+
+O `setup.ps1` pergunta qual opção usar e configura tudo automaticamente.
 
 ---
 
 ## Arquitetura da stack
 
+**Banco CP interno (opção 1):**
+
 ```
-┌─────────────────────────────────────────────────────┐
-│  Windows Server (esta máquina)                      │
-│                                                     │
-│  ┌──────────┐   ┌──────────┐   ┌────────────────┐  │
-│  │ frontend │──▶│ backend  │──▶│ cp_db          │  │
-│  │ nginx    │   │ FastAPI  │   │ PostgreSQL 16  │  │
-│  │ :5173    │   │ :3050    │   │ (interno)      │  │
-│  └──────────┘   └────┬─────┘   └────────────────┘  │
-└────────────────────── │ ───────────────────────────┘
-                        │
-          ┌─────────────┴────────────┐
-          │                          │
-   ┌──────▼──────┐          ┌────────▼───────┐
-   │ SAP DB      │          │ Auth Service   │
-   │ PostgreSQL  │          │ (outra máquina)│
-   │ (externo,   │          │ :3001          │
-   │  read-only) │          └────────────────┘
-   └─────────────┘
+Windows Server (esta maquina)
+  frontend (nginx :5173)
+    |
+  backend (FastAPI :3050)
+    |-- cp_db (PostgreSQL interno, Docker)
+    |-- SAP DB (PostgreSQL externo, read-only)
+    |-- Auth Service (outra maquina)
 ```
 
-**O que roda nesta máquina (Docker):**
-- `cp_db` — PostgreSQL 16 interno, dados do sistema CP
+**Banco CP externo (opção 2):**
+
+```
+Windows Server (esta maquina)
+  frontend (nginx :5173)
+    |
+  backend (FastAPI :3050)
+    |-- CP DB (PostgreSQL externo existente)
+    |-- SAP DB (PostgreSQL externo, read-only)
+    |-- Auth Service (outra maquina)
+```
+
+**O que sempre roda no Docker:**
 - `backend` — API FastAPI com Alembic e sincronização SAP
 - `frontend` — React compilado, servido pelo nginx
 
-**O que é externo (não sobe no Docker):**
+**O que é sempre externo:**
 - Banco SAP — PostgreSQL em outra máquina, acesso somente-leitura
 - Serviço de autenticação — API em outra máquina que emite e valida JWT
 
@@ -56,6 +70,8 @@ Reúna esses dados com as equipes responsáveis antes de iniciar:
 
 | Dado | Onde obter |
 |------|-----------|
+| **Se banco CP externo:** IP/hostname do servidor CP | Equipe de infraestrutura |
+| **Se banco CP externo:** Nome do banco, usuário e senha | DBA |
 | IP ou hostname do servidor SAP | Equipe de infraestrutura |
 | Porta do PostgreSQL SAP | Normalmente `5432` |
 | Nome do banco SAP | Equipe SAP |
@@ -91,66 +107,54 @@ cd C:\Sistemas\capacidade_produtiva
 
 ## Simulação completa do deploy
 
-A seguir, uma simulação com dados de exemplo mostrando exatamente o que aparece na tela em cada etapa.
+A seguir, duas simulações: nova instalação (banco interno) e integração com banco existente.
 
-> **Dados usados no exemplo:**
+---
+
+### Simulação A — Nova instalação (banco interno)
+
+> **Dados usados:**
+> - Banco CP: criado pelo Docker automaticamente
 > - Banco SAP: `192.168.10.50:5432` / banco `sap_producao` / usuário `cp_readonly`
 > - Auth service: `http://192.168.10.30:3001` / admin `joao.silva`
-
----
-
-### PASSO 1 — Abrir o PowerShell como Administrador
-
-Clique em **Iniciar** → pesquise **PowerShell** → botão direito → **Executar como administrador**.
-
-```
-Windows PowerShell
-Copyright (C) Microsoft Corporation. All rights reserved.
-
-PS C:\Windows\System32>
-```
-
-Navegue até a pasta do projeto:
-
-```powershell
-PS C:\Windows\System32> cd C:\Sistemas\capacidade_produtiva
-PS C:\Sistemas\capacidade_produtiva>
-```
-
----
-
-### PASSO 2 — Executar o script de setup
 
 ```powershell
 PS C:\Sistemas\capacidade_produtiva> powershell -ExecutionPolicy Bypass -File setup.ps1
 ```
 
-O script pergunta tudo interativamente. Pressione **Enter** para aceitar o valor padrão entre colchetes `[ ]`.
-
 ```
 ============================================================
-   Capacidade Produtiva — Configuracao inicial
+   Capacidade Produtiva - Configuracao inicial
 ============================================================
 
-Este script vai coletar as informacoes necessarias e gerar
+Este script coleta as informacoes necessarias e gera
 o arquivo .env para voce executar o Docker em seguida.
 
 
---- Banco de dados do Capacidade Produtiva (interno) ---
-  Este banco sera criado automaticamente pelo Docker.
-  Escolha um usuario e senha para ele.
+--- Banco de dados do Capacidade Produtiva ---
 
-Nome do banco [capacidade_produtiva]: ↵
-Usuario do banco [cp_user]: ↵
+  Opcoes:
+    1 - Criar banco interno (gerenciado pelo Docker, recomendado para nova instalacao)
+    2 - Usar banco externo ja existente (outro servidor PostgreSQL)
+
+  Escolha [1/2]: 1
+
+  O Docker vai criar e gerenciar o banco automaticamente.
+  Escolha um nome de usuario e senha para ele.
+
+Nome do banco [capacidade_produtiva]: Enter
+Usuario do banco [cp_user]: Enter
 Senha do banco (escolha uma senha forte) (oculto): ************
-Porta da API [3050]: ↵
-Porta do frontend [5173]: ↵
+  OK  Banco interno configurado (Docker ira criar o PostgreSQL)
+
+Porta da API [3050]: Enter
+Porta do frontend [5173]: Enter
 
 
 --- Banco de dados SAP (externo, somente leitura) ---
 
 IP ou hostname do servidor SAP: 192.168.10.50
-Porta do PostgreSQL SAP [5432]: ↵
+Porta do PostgreSQL SAP [5432]: Enter
 Nome do banco SAP: sap_producao
 Usuario somente-leitura do banco SAP: cp_readonly
 Senha do usuario SAP (oculto): ************
@@ -177,9 +181,62 @@ Senha do administrador (oculto): ************
    Configuracao concluida! Arquivo .env gerado.
 ============================================================
 
-Proximo passo — subir o sistema:
+  Banco CP: interno (Docker vai criar o PostgreSQL automaticamente)
+
+Proximo passo - subir o sistema:
 
    docker compose up -d --build
+```
+
+---
+
+### Simulação B — Banco CP externo já existente
+
+> **Dados usados:**
+> - Banco CP externo: `192.168.10.20:5432` / banco `capacidade_produtiva` / usuário `cp_user`
+> - Banco SAP: `192.168.10.50:5432` / banco `sap_producao` / usuário `cp_readonly`
+> - Auth service: `http://192.168.10.30:3001` / admin `joao.silva`
+
+```powershell
+PS C:\Sistemas\capacidade_produtiva> powershell -ExecutionPolicy Bypass -File setup.ps1
+```
+
+```
+============================================================
+   Capacidade Produtiva - Configuracao inicial
+============================================================
+
+  Escolha [1/2]: 2
+
+  Informe os dados de conexao do PostgreSQL existente.
+
+IP ou hostname do servidor PostgreSQL do CP: 192.168.10.20
+Porta do PostgreSQL do CP [5432]: Enter
+Nome do banco de dados do CP [capacidade_produtiva]: Enter
+Usuario do banco do CP: cp_user
+Senha do usuario (oculto): ************
+
+  Testando conexao com 192.168.10.20:5432...
+  OK  Banco CP acessivel
+  OK  Banco externo configurado
+
+Porta da API [3050]: Enter
+Porta do frontend [5173]: Enter
+
+[... continua igual com SAP e Auth ...]
+
+============================================================
+   Configuracao concluida! Arquivo .env gerado.
+============================================================
+
+  Banco CP: externo em 192.168.10.20:5432
+
+Proximo passo - subir o sistema:
+
+   docker compose up -d --build
+```
+
+O comando `docker compose up` é **o mesmo nos dois casos** — o `.env` gerado pelo script já diz ao Docker o que subir.
 
 PS C:\Sistemas\capacidade_produtiva>
 ```
@@ -420,9 +477,11 @@ Geradas automaticamente pelo `setup.ps1`. Edite apenas se necessário corrigir a
 | Variável | Descrição |
 |----------|-----------|
 | `ENVIRONMENT` | `production` — ativa as validações de segurança |
-| `CP_DB_NAME` | Nome do banco interno do CP |
-| `CP_DB_USER` | Usuário do banco interno |
-| `CP_DB_PASSWORD` | Senha do banco interno |
+| `CP_DB_HOST` | `cp_db` (banco interno) ou IP do servidor externo |
+| `CP_DB_PORT` | Porta do banco CP (padrão: `5432`) |
+| `CP_DB_NAME` | Nome do banco do CP |
+| `CP_DB_USER` | Usuário do banco do CP |
+| `CP_DB_PASSWORD` | Senha do banco do CP |
 | `CP_API_PORT` | Porta da API (padrão: `3050`) |
 | `FRONTEND_PORT` | Porta do frontend (padrão: `5173`) |
 | `CP_SECRET_KEY` | Gerado automaticamente pelo `setup.ps1` |
@@ -435,5 +494,6 @@ Geradas automaticamente pelo `setup.ps1`. Edite apenas se necessário corrigir a
 | `AUTH_URL` | URL do serviço de autenticação |
 | `AUTH_ADMIN_USER` | Usuário admin do auth service |
 | `AUTH_ADMIN_PASSWORD` | Senha admin do auth service |
+| `COMPOSE_PROFILES` | `local-db` = sobe banco interno; vazio = banco externo |
 
-> **`CP_DB_HOST` não entra no `.env`** — o Docker Compose injeta automaticamente o nome do serviço interno `cp_db`.
+> `COMPOSE_PROFILES` é lido automaticamente pelo Docker Compose — não é necessário passá-lo na linha de comando.
