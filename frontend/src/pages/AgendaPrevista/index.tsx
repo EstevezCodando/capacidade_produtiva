@@ -337,8 +337,9 @@ export default function AgendaPrevista() {
   });
 
   const resumoPeriodo = capacidade?.resumo;
+  const capacidadePadraoMinutos = configTeto?.teto_normal_min ?? 360;
 
-  // Retorna o teto padrão para dias ainda não materializados, respeitando sexta-feira
+  // Fallback dia-específico: sexta usa teto_sexta_min, seg-qui usa teto_normal_min
   function capacidadePadraoParaDia(dataStr: string): number {
     return getDay(parseISO(dataStr)) === 5
       ? (configTeto?.teto_sexta_min ?? 240)

@@ -280,7 +280,9 @@ export default function AgendaRealizada() {
             enabled: !!usuarioIdParaCarregar,
         });
 
-    // Retorna o teto padrão para dias ainda não materializados, respeitando sexta-feira
+    const capacidadePadraoMinutos = configTeto?.teto_normal_min ?? 360;
+
+    // Fallback dia-específico: sexta usa teto_sexta_min, seg-qui usa teto_normal_min
     function capacidadePadraoParaDia(dataStr: string): number {
       return getDay(parseISO(dataStr)) === 5
         ? (configTeto?.teto_sexta_min ?? 240)
